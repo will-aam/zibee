@@ -1,3 +1,4 @@
+// middleware.ts
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
@@ -26,11 +27,8 @@ export async function middleware(request: NextRequest) {
   return NextResponse.next();
 }
 
-// middleware.ts (apenas a parte do config no final)
-
 export const config = {
-  // ADICIONEI: sw.js, manifest.json, workbox-.* e extensões de imagem
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|sw.js|manifest.json|workbox-.*|.*\\.png|.*\\.jpg).*)",
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|sw\\.js|manifest\\.json|workbox-.*|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",
   ],
 };

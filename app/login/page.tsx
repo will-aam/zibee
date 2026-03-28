@@ -1,7 +1,8 @@
+// app/login/page.tsx
 "use client";
 
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client"; // O arquivo que criamos no passo anterior
+import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -13,12 +14,13 @@ import {
   CardDescription,
   CardFooter,
 } from "@/components/ui/card";
-import { Loader2, Mail } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
+import { AuroraText } from "@/components/ui/aurora-text";
 
 export default function LoginPage() {
-  const [isLogin, setIsLogin] = useState(true); // Alterna entre Login e Cadastro
+  const [isLogin, setIsLogin] = useState(true);
   const [loading, setLoading] = useState(false);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -27,21 +29,15 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // Função para Entrar ou Cadastrar com Email/Senha
   const handleSubmit = async () => {
     setLoading(true);
     try {
       if (isLogin) {
         // --- LOGIN ---
         await authClient.signIn.email(
+          { email, password },
           {
-            email,
-            password,
-          },
-          {
-            onSuccess: () => {
-              router.push("/"); // Manda para a Home
-            },
+            onSuccess: () => router.push("/"),
             onError: (ctx) => {
               toast({
                 title: "Erro ao entrar",
@@ -60,11 +56,7 @@ export default function LoginPage() {
           return;
         }
         await authClient.signUp.email(
-          {
-            email,
-            password,
-            name,
-          },
+          { email, password, name },
           {
             onSuccess: () => {
               toast({
@@ -85,41 +77,47 @@ export default function LoginPage() {
         );
       }
     } catch (error) {
-      // Erro genérico de rede
       setLoading(false);
     }
   };
 
-  // Função para Login com Google
   const handleGoogleLogin = async () => {
     await authClient.signIn.social({
       provider: "google",
-      callbackURL: "/", // Para onde voltar depois de logar
+      callbackURL: "/",
     });
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-background p-4 animate-in fade-in">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <CardTitle className="text-2xl font-bold text-primary">
-            Zibee
+    // 👇 Mudamos de p-4 para sm:p-4 (sem padding no celular)
+    <div className="min-h-screen flex items-center justify-center bg-background sm:p-4 animate-in fade-in">
+      {/* 👇 Removendo bordas e sombras no mobile, adicionando no sm: */}
+      <Card className="w-full max-w-md border-0 shadow-none rounded-none bg-transparent sm:border sm:border-border sm:shadow-sm sm:rounded-xl sm:bg-card">
+        <CardHeader className="text-center space-y-2 pt-12 sm:pt-6">
+          {/* 👇 Seu título gigante 7xl */}
+          <CardTitle className="text-7xl font-bold tracking-tight pb-2">
+            <AuroraText
+              colors={["#10b981", "#14b8a6", "#3b82f6", "#6366f1"]}
+              speed={1.5}
+            >
+              Zibee
+            </AuroraText>
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-base sm:text-sm">
             {isLogin
               ? "Entre para acessar suas finanças"
               : "Crie sua conta gratuita"}
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-4">
-          {/* Botão Google */}
           <Button
             variant="outline"
-            className="w-full py-5"
+            className="w-full py-6 sm:py-5 text-base sm:text-sm"
             onClick={handleGoogleLogin}
           >
             <svg
-              className="mr-2 h-4 w-4"
+              className="mr-2 h-5 w-5 sm:h-4 sm:w-4"
               aria-hidden="true"
               focusable="false"
               data-prefix="fab"
@@ -136,23 +134,23 @@ export default function LoginPage() {
             Continuar com Google
           </Button>
 
-          <div className="relative">
+          <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t" />
             </div>
             <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-background px-2 text-muted-foreground">
+              <span className="bg-background sm:bg-card px-2 text-muted-foreground">
                 Ou com email
               </span>
             </div>
           </div>
 
-          {/* Campos do Formulário */}
-          <div className="space-y-3">
+          <div className="space-y-4 sm:space-y-3">
             {!isLogin && (
-              <div className="space-y-1">
-                <Label>Nome</Label>
+              <div className="space-y-2 sm:space-y-1">
+                <Label className="text-base sm:text-sm">Nome</Label>
                 <Input
+                  className="py-6 sm:py-2 text-base sm:text-sm"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="Seu nome"
@@ -160,9 +158,10 @@ export default function LoginPage() {
               </div>
             )}
 
-            <div className="space-y-1">
-              <Label>Email</Label>
+            <div className="space-y-2 sm:space-y-1">
+              <Label className="text-base sm:text-sm">Email</Label>
               <Input
+                className="py-6 sm:py-2 text-base sm:text-sm"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
@@ -170,9 +169,10 @@ export default function LoginPage() {
               />
             </div>
 
-            <div className="space-y-1">
-              <Label>Senha</Label>
+            <div className="space-y-2 sm:space-y-1">
+              <Label className="text-base sm:text-sm">Senha</Label>
               <Input
+                className="py-6 sm:py-2 text-base sm:text-sm"
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -182,12 +182,12 @@ export default function LoginPage() {
           </div>
 
           <Button
-            className="w-full font-bold"
+            className="w-full font-bold py-6 sm:py-4 text-base mt-2"
             onClick={handleSubmit}
             disabled={loading}
           >
             {loading ? (
-              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
             ) : isLogin ? (
               "Entrar"
             ) : (
@@ -195,11 +195,11 @@ export default function LoginPage() {
             )}
           </Button>
         </CardContent>
-        <CardFooter className="flex justify-center">
+        <CardFooter className="flex justify-center pb-8 sm:pb-6">
           <Button
             variant="link"
             onClick={() => setIsLogin(!isLogin)}
-            className="text-muted-foreground"
+            className="text-muted-foreground text-base sm:text-sm"
           >
             {isLogin
               ? "Não tem conta? Cadastre-se"

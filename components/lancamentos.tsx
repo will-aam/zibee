@@ -1,48 +1,37 @@
-// compnents/lancamentos.tsx
+// components/lancamentos.tsx
 "use client";
 
 import type React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { authClient } from "@/lib/auth-client"; // <--- NOVO IMPORT
+import { authClient } from "@/lib/auth-client";
 import type { Lancamento } from "@/types";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from "@/components/ui/dialog";
 import { Plus, Trash2, Filter, Loader2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
-// NOVOS COMPONENTES
+// COMPONENTES
 import { MonthSelector } from "./lancamentos/MonthSelector";
 import { LancamentoItem } from "./lancamentos/LancamentoItem";
 import { LancamentosFilters } from "./lancamentos/LancamentosFilters";
+import { LancamentoFormDialog } from "./lancamentos/LancamentoFormDialog"; // <--- NOVO FORMULÁRIO COMPONENTIZADO
 
 export default function Lancamentos() {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>([]);
   const [loading, setLoading] = useState(true);
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingId, setEditingId] = useState<number | null>(null);
   const { toast } = useToast();
 
-  // --- NOVO: ID DO USUÁRIO ---
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+
+  // Controle do Modal
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [lancamentoEditando, setLancamentoEditando] =
+    useState<Lancamento | null>(null);
 
   // Seleção e Opções
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
@@ -52,7 +41,6 @@ export default function Lancamentos() {
   const [formasPagamentoDB, setFormasPagamentoDB] = useState<
     { id: number; nome: string }[]
   >([]);
-  // const [loadingOptions, setLoadingOptions] = useState(true); // Removido pois não estava sendo usado visualmente
 
   // Filtros
   const [searchQuery, setSearchQuery] = useState("");
@@ -67,18 +55,6 @@ export default function Lancamentos() {
     new Date().toISOString().slice(0, 7),
   );
 
-  // Formulario
-  const [formData, setFormData] = useState<Partial<Lancamento>>({
-    descricao: "",
-    categoria: "Contas Fixas",
-    tipo: "Despesa",
-    valor: 0,
-    forma_pagamento: "Pix",
-    data_vencimento: new Date().toISOString().split("T")[0],
-    pago: false,
-    observacoes: "",
-  });
-
   useEffect(() => {
     if (date) {
       const ano = date.getFullYear();
@@ -88,30 +64,25 @@ export default function Lancamentos() {
   }, [date]);
 
   const fetchOpcoes = useCallback(async () => {
-    // NÃO FILTRA MAIS POR user_id AQUI
     try {
-      // setLoadingOptions(true);
       const { data: cat } = await supabase
         .from("categorias")
         .select("*")
-        // .eq("user_id", userId) // <--- REMOVIDO PARA SER GLOBAL
         .order("nome");
       if (cat) setCategoriasDB(cat);
 
       const { data: pay } = await supabase
         .from("formas_pagamento")
         .select("*")
-        // .eq("user_id", userId) // <--- REMOVIDO PARA SER GLOBAL
         .order("nome");
       if (pay) setFormasPagamentoDB(pay);
-    } finally {
-      // setLoadingOptions(false);
+    } catch (err) {
+      console.error(err);
     }
-  }, []); // Sem dependência de userId
+  }, []);
 
   const fetchLancamentos = useCallback(async () => {
-    if (!userId) return; // Só busca se tiver usuário
-
+    if (!userId) return;
     try {
       setLoading(true);
       setSelectedIds([]);
@@ -122,7 +93,7 @@ export default function Lancamentos() {
       const { data, error } = await supabase
         .from("lancamentos")
         .select("*")
-        .eq("user_id", userId) // <--- SEGURANÇA: Só traz dados desse usuário
+        .eq("user_id", userId)
         .gte("data_vencimento", dataInicio)
         .lte("data_vencimento", dataFim)
         .order("data_vencimento", { ascending: true });
@@ -161,6 +132,7 @@ export default function Lancamentos() {
     let matchStatus = true;
     if (filtroStatus === "pago") matchStatus = l.pago === true;
     if (filtroStatus === "pendente") matchStatus = l.pago === false;
+
     return (
       matchSearch &&
       matchTipo &&
@@ -170,7 +142,7 @@ export default function Lancamentos() {
     );
   });
 
-  // --- AÇÕES CRUD E SELEÇÃO ---
+  // --- AÇÕES DE LISTA ---
   const handleSelectAll = () => {
     if (
       selectedIds.length === lancamentosFiltrados.length &&
@@ -190,41 +162,12 @@ export default function Lancamentos() {
         .from("lancamentos")
         .delete()
         .in("id", selectedIds)
-        .eq("user_id", userId); // <--- SEGURANÇA: Garante que só apaga se for meu
+        .eq("user_id", userId);
       toast({ title: `${selectedIds.length} excluídos.` });
       setLancamentos((prev) => prev.filter((l) => !selectedIds.includes(l.id)));
       setSelectedIds([]);
-    } catch (error) {
+    } catch {
       toast({ title: "Erro ao excluir", variant: "destructive" });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!userId) return;
-
-    try {
-      if (editingId) {
-        await supabase
-          .from("lancamentos")
-          .update(formData)
-          .eq("id", editingId)
-          .eq("user_id", userId); // <--- SEGURANÇA
-        toast({ title: "Atualizado!" });
-      } else {
-        await supabase
-          .from("lancamentos")
-          .insert([{ ...formData, user_id: userId }]); // <--- SEGURANÇA: Cria com meu ID
-        toast({ title: "Criado!" });
-      }
-      resetForm();
-      fetchLancamentos();
-    } catch (error: any) {
-      toast({
-        title: "Erro ao salvar",
-        description: error.message,
-        variant: "destructive",
-      });
     }
   };
 
@@ -235,7 +178,7 @@ export default function Lancamentos() {
         .from("lancamentos")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId); // <--- SEGURANÇA
+        .eq("user_id", userId);
       setLancamentos((prev) => prev.filter((l) => l.id !== id));
       toast({ title: "Excluído com sucesso" });
     } catch {
@@ -255,30 +198,20 @@ export default function Lancamentos() {
         .from("lancamentos")
         .update({ pago: novoStatus })
         .eq("id", lancamento.id)
-        .eq("user_id", userId); // <--- SEGURANÇA
+        .eq("user_id", userId);
     } catch {
       toast({ title: "Erro ao atualizar", variant: "destructive" });
     }
   };
 
-  const resetForm = () => {
-    setFormData({
-      descricao: "",
-      categoria: categoriasDB[0]?.nome || "Contas Fixas",
-      tipo: "Despesa",
-      valor: 0,
-      forma_pagamento: formasPagamentoDB[0]?.nome || "Pix",
-      data_vencimento: new Date().toISOString().split("T")[0],
-      pago: false,
-      observacoes: "",
-    });
-    setEditingId(null);
-    setIsDialogOpen(false);
+  // Funções para abrir o Modal
+  const handleNovoLancamento = () => {
+    setLancamentoEditando(null); // Reseta para criar novo
+    setIsDialogOpen(true);
   };
 
   const handleEdit = (lancamento: Lancamento) => {
-    setFormData(lancamento);
-    setEditingId(lancamento.id);
+    setLancamentoEditando(lancamento); // Passa os dados para o modal
     setIsDialogOpen(true);
   };
 
@@ -289,197 +222,30 @@ export default function Lancamentos() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Lançamentos</h1>
         </div>
+
         <div className="flex items-center gap-2 w-full sm:w-auto">
           <MonthSelector date={date} setDate={setDate} />
 
-          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-            <DialogTrigger asChild>
-              <Button onClick={resetForm} size="icon" className="shrink-0">
-                <Plus className="h-5 w-5" />
-              </Button>
-            </DialogTrigger>
-
-            {/* MODAL BLINDADO (TELA CHEIA MOBILE) */}
-            <DialogContent
-              className="w-screen h-screen max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0" // <--- ALTERADO AQUI
-              onInteractOutside={(e) => e.preventDefault()}
-            >
-              {/* HEADER SIMPLES */}
-              <DialogHeader className="p-6 pb-2 border-b">
-                <DialogTitle>
-                  {editingId ? "Editar" : "Novo"} Lançamento
-                </DialogTitle>
-              </DialogHeader>
-
-              {/* Área de Scroll para o Formulário */}
-              <div className="flex-1 overflow-y-auto p-6">
-                <form
-                  id="lancamento-form"
-                  onSubmit={handleSubmit}
-                  className="space-y-6"
-                >
-                  <div className="space-y-2">
-                    <Label>Descrição</Label>
-                    <Input
-                      value={formData.descricao}
-                      onChange={(e) =>
-                        setFormData({ ...formData, descricao: e.target.value })
-                      }
-                      required
-                      placeholder="Ex: Mercado, Salário..."
-                      className="text-lg py-6"
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label>Valor</Label>
-                      <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                          R$
-                        </span>
-                        <Input
-                          type="number"
-                          step="0.01"
-                          value={formData.valor || ""}
-                          onChange={(e) =>
-                            setFormData({
-                              ...formData,
-                              valor: Number(e.target.value),
-                            })
-                          }
-                          required
-                          className="pl-9"
-                        />
-                      </div>
-                    </div>
-                    <div className="space-y-2">
-                      <Label>
-                        {formData.tipo === "Receita"
-                          ? "Fonte de Renda"
-                          : "Categoria"}
-                      </Label>{" "}
-                      <Select
-                        value={formData.tipo}
-                        onValueChange={(v: any) =>
-                          setFormData({ ...formData, tipo: v })
-                        }
-                      >
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Despesa">Despesa</SelectItem>
-                          <SelectItem value="Receita">Receita</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>Categoria</Label>
-                    <Select
-                      value={formData.categoria}
-                      onValueChange={(v) =>
-                        setFormData({ ...formData, categoria: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {categoriasDB.map((c) => (
-                          <SelectItem key={c.id} value={c.nome}>
-                            {c.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>
-                      {formData.tipo === "Receita"
-                        ? "Recebido via"
-                        : "Forma de Pagamento"}
-                    </Label>{" "}
-                    <Select
-                      value={formData.forma_pagamento}
-                      onValueChange={(v) =>
-                        setFormData({ ...formData, forma_pagamento: v })
-                      }
-                    >
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {formasPagamentoDB.map((f) => (
-                          <SelectItem key={f.id} value={f.nome}>
-                            {f.nome}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2 border p-3 rounded-md mt-2">
-                    <Checkbox
-                      id="pago"
-                      checked={formData.pago}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, pago: checked === true })
-                      }
-                    />
-                    <Label
-                      htmlFor="pago"
-                      className="cursor-pointer flex-1 font-medium"
-                    >
-                      {formData.tipo === "Receita"
-                        ? "Já foi recebido?"
-                        : "Já foi pago?"}
-                    </Label>
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label>
-                      {formData.tipo === "Receita"
-                        ? "Data do Recebimento"
-                        : "Data de Vencimento"}
-                    </Label>
-                    <Input
-                      type="date"
-                      value={formData.data_vencimento}
-                      onChange={(e) =>
-                        setFormData({
-                          ...formData,
-                          data_vencimento: e.target.value,
-                        })
-                      }
-                    />
-                  </div>
-
-                  <div className="h-4"></div>
-                </form>
-              </div>
-
-              {/* Rodapé Fixo */}
-              <div className="p-4 border-t bg-background/95 backdrop-blur z-10 flex gap-3">
-                <Button
-                  variant="outline"
-                  className="flex-1"
-                  onClick={() => setIsDialogOpen(false)}
-                  type="button"
-                >
-                  Cancelar
-                </Button>
-                <Button className="flex-1" type="submit" form="lancamento-form">
-                  Salvar
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
+          <Button
+            onClick={handleNovoLancamento}
+            size="icon"
+            className="shrink-0"
+          >
+            <Plus className="h-5 w-5" />
+          </Button>
         </div>
       </div>
+
+      {/* FORMULÁRIO COMPONENTIZADO */}
+      <LancamentoFormDialog
+        isOpen={isDialogOpen}
+        onClose={() => setIsDialogOpen(false)}
+        onSuccess={fetchLancamentos}
+        lancamentoToEdit={lancamentoEditando}
+        userId={userId}
+        categoriasDB={categoriasDB}
+        formasPagamentoDB={formasPagamentoDB}
+      />
 
       {/* CONTROLES: SELECT ALL + SEARCH + FILTROS */}
       <div className="flex flex-col gap-3">
@@ -536,7 +302,7 @@ export default function Lancamentos() {
         />
       </div>
 
-      {/* LISTA */}
+      {/* LISTA DE LANÇAMENTOS */}
       <div className="space-y-3">
         {loading ? (
           <div className="flex justify-center py-8">
@@ -574,7 +340,6 @@ export default function Lancamentos() {
               lancamento={lancamento}
               isSelected={selectedIds.includes(lancamento.id)}
               onSelect={() => {
-                // Lógica de seleção individual manual
                 if (selectedIds.includes(lancamento.id)) {
                   setSelectedIds((prev) =>
                     prev.filter((id) => id !== lancamento.id),

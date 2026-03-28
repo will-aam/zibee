@@ -103,7 +103,7 @@ export default function LoginPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold text-primary">
-            My Pocket
+            Zibee
           </CardTitle>
           <CardDescription>
             {isLogin

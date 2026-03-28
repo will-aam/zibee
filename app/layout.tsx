@@ -25,7 +25,7 @@ export const viewport: Viewport = {
 };
 
 export const metadata: Metadata = {
-  title: "My Pocket",
+  title: "Zibee",
   description:
     "Gerencie suas finanças pessoais, controle receitas, despesas e planeje suas metas financeiras",
 
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: "black-translucent",
-    title: "My Pocket",
+    title: "Zibee",
   },
 };
 

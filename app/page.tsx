@@ -2,7 +2,9 @@
 "use client";
 
 import { useState } from "react";
-import { authClient } from "@/lib/auth-client"; // <--- IMPORTANTE PARA O LOGOUT
+import { Audiowide } from "next/font/google";
+import Image from "next/image";
+import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import Dashboard from "@/components/dashboard";
 import Lancamentos from "@/components/lancamentos";
@@ -15,16 +17,18 @@ import {
   Receipt,
   Target,
   Settings,
-  Menu,
-  ChevronLeft,
   Home as HomeIcon,
   FileText,
   Cog,
   PieChart,
   LogOut, // <--- ÍCONE DE SAIR
-  User,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+
+const audiowide = Audiowide({
+  weight: "400",
+  subsets: ["latin"],
+});
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -53,21 +57,32 @@ export default function Home() {
       >
         <div className="flex h-16 items-center justify-between border-b px-4">
           {!sidebarCollapsed && (
-            <h1 className="text-xl font-bold text-primary truncate">
-              {session.data?.user.name || "My Pocket"}
-            </h1>
+            <div className="flex items-center gap-2 overflow-hidden">
+              {/* O seu ícone da pasta public */}
+              <Image
+                src="/icons8-abelha-64.png"
+                alt="Logo"
+                width={32}
+                height={32}
+                className="rounded-md shrink-0"
+              />
+
+              {/* O nome com a fonte Audiowide aplicada */}
+              <h1
+                className={`text-xl text-primary truncate ${audiowide.className}`}
+              >
+                {session.data?.user.name || "Zibee"}
+              </h1>
+            </div>
           )}
+
           <Button
             variant="ghost"
             size="icon"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-            className="ml-auto"
+            className="ml-auto shrink-0"
           >
-            {sidebarCollapsed ? (
-              <Menu className="h-5 w-5" />
-            ) : (
-              <ChevronLeft className="h-5 w-5" />
-            )}
+            {/* (Ícone do botão de fechar/abrir que já estava aqui) */}
           </Button>
         </div>
 
@@ -187,9 +202,7 @@ export default function Home() {
         {activeTab === "configuracoes" && (
           <Configuracoes onNavigate={setActiveTab} />
         )}
-        {activeTab === "despesas_fixas" && (
-          <DespesasFixas onBack={() => setActiveTab("configuracoes")} />
-        )}
+        {activeTab === "despesas_fixas" && <DespesasFixas />}
       </main>
 
       {/* --- MENU MOBILE (Fixo embaixo) --- */}

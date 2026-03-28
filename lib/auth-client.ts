@@ -2,6 +2,9 @@
 import { createAuthClient } from "better-auth/react";
 
 export const authClient = createAuthClient({
-  // Adicione a base URL aqui para bater com o servidor
-  baseURL: "http://localhost:3000",
+  // Detecta automaticamente onde o app está rodando
+  baseURL:
+    process.env.NODE_ENV === "development"
+      ? "http://localhost:3000"
+      : "https://zibee.vercel.app",
 });

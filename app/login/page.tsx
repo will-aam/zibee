@@ -14,7 +14,7 @@ import {
   CardDescription,
   CardFooter,
 } from "@/components/ui/card";
-import { Loader2 } from "lucide-react";
+import { Loader2, Eye, EyeOff } from "lucide-react"; // <--- IMPORT DOS ÍCONES DE OLHO
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { AuroraText } from "@/components/ui/aurora-text";
@@ -26,10 +26,16 @@ export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
 
+  // <--- NOVO ESTADO PARA VER SENHA
+  const [showPassword, setShowPassword] = useState(false);
+
   const router = useRouter();
   const { toast } = useToast();
 
-  const handleSubmit = async () => {
+  // <--- RECEBE O EVENTO DO FORMULÁRIO (e: React.FormEvent)
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault(); // Evita o recarregamento padrão da página ao dar Enter
+
     setLoading(true);
     try {
       if (isLogin) {
@@ -89,12 +95,9 @@ export default function LoginPage() {
   };
 
   return (
-    // 👇 Mudamos de p-4 para sm:p-4 (sem padding no celular)
     <div className="min-h-screen flex items-center justify-center bg-background sm:p-4 animate-in fade-in">
-      {/* 👇 Removendo bordas e sombras no mobile, adicionando no sm: */}
       <Card className="w-full max-w-md border-0 shadow-none rounded-none bg-transparent sm:border sm:border-border sm:shadow-sm sm:rounded-xl sm:bg-card">
         <CardHeader className="text-center space-y-2 pt-12 sm:pt-6">
-          {/* 👇 Seu título gigante 7xl */}
           <CardTitle className="text-7xl font-bold tracking-tight pb-2">
             <AuroraText
               colors={["#10b981", "#14b8a6", "#3b82f6", "#6366f1"]}
@@ -115,6 +118,7 @@ export default function LoginPage() {
             variant="outline"
             className="w-full py-6 sm:py-5 text-base sm:text-sm"
             onClick={handleGoogleLogin}
+            type="button" // Previne que envie formulário acidentalmente
           >
             <svg
               className="mr-2 h-5 w-5 sm:h-4 sm:w-4"
@@ -145,7 +149,8 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <div className="space-y-4 sm:space-y-3">
+          {/* 👇 ENVOLVENDO OS CAMPOS E O BOTÃO EM UM FORM */}
+          <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-3">
             {!isLogin && (
               <div className="space-y-2 sm:space-y-1">
                 <Label className="text-base sm:text-sm">Nome</Label>
@@ -159,46 +164,68 @@ export default function LoginPage() {
             )}
 
             <div className="space-y-2 sm:space-y-1">
-              <Label className="text-base sm:text-sm">Email</Label>
+              <Label className="text-base sm:text-sm">E-mail</Label>
               <Input
                 className="py-6 sm:py-2 text-base sm:text-sm"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="exemplo@email.com"
+                required // Adiciona validação nativa do navegador
               />
             </div>
 
             <div className="space-y-2 sm:space-y-1">
               <Label className="text-base sm:text-sm">Senha</Label>
-              <Input
-                className="py-6 sm:py-2 text-base sm:text-sm"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="******"
-              />
+              {/* 👇 CONTAINER RELATIVO PARA POSICIONAR O ÍCONE */}
+              <div className="relative">
+                <Input
+                  className="py-6 sm:py-2 pr-12 text-base sm:text-sm" // pr-12 dá espaço para o ícone
+                  type={showPassword ? "text" : "password"} // Alterna o tipo
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="******"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground p-1 transition-colors"
+                  aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 sm:h-4 sm:w-4" />
+                  ) : (
+                    <Eye className="h-5 w-5 sm:h-4 sm:w-4" />
+                  )}
+                </button>
+              </div>
             </div>
-          </div>
 
-          <Button
-            className="w-full font-bold py-6 sm:py-4 text-base mt-2"
-            onClick={handleSubmit}
-            disabled={loading}
-          >
-            {loading ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-            ) : isLogin ? (
-              "Entrar"
-            ) : (
-              "Criar Conta"
-            )}
-          </Button>
+            {/* 👇 O BOTÃO DE SUBMIT AGORA FICA DENTRO DO FORM */}
+            <Button
+              type="submit" // Agora ele aciona o onSubmit do <form> (suporta o Enter)
+              className="w-full font-bold py-6 sm:py-4 text-base mt-4"
+              disabled={loading}
+            >
+              {loading ? (
+                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              ) : isLogin ? (
+                "Entrar"
+              ) : (
+                "Criar Conta"
+              )}
+            </Button>
+          </form>
         </CardContent>
         <CardFooter className="flex justify-center pb-8 sm:pb-6">
           <Button
             variant="link"
-            onClick={() => setIsLogin(!isLogin)}
+            type="button"
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setShowPassword(false); // Reseta o olhinho ao trocar de aba
+            }}
             className="text-muted-foreground text-base sm:text-sm"
           >
             {isLogin

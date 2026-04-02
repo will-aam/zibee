@@ -24,6 +24,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 
+type RecurrenceEndType = "infinito" | "ate_data" | "ocorrencias";
+
 interface LancamentoFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
@@ -47,14 +49,21 @@ export function LancamentoFormDialog({
 
   // Estado do Formulário
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
-  // NOVO: Estado para controlar se é uma conta recorrente
+  // Estado para controlar recorrência
   const [isRecorrente, setIsRecorrente] = useState(false);
+  const [recurrenceEndType, setRecurrenceEndType] =
+    useState<RecurrenceEndType>("infinito");
+  const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
+  const [recurrenceOccurrences, setRecurrenceOccurrences] = useState(2);
 
   // Quando o modal abrir/fechar ou mudar o item sendo editado, resetamos os dados
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData(lancamentoToEdit);
-      setIsRecorrente(false); // Edição não mostra/afeta a recorrência padrão
+      setIsRecorrente(false);
+      setRecurrenceEndType("infinito");
+      setRecurrenceEndDate("");
+      setRecurrenceOccurrences(2);
     } else {
       setFormData({
         descricao: "",
@@ -67,54 +76,209 @@ export function LancamentoFormDialog({
         observacoes: "",
       });
       setIsRecorrente(false);
+      setRecurrenceEndType("infinito");
+      setRecurrenceEndDate("");
+      setRecurrenceOccurrences(2);
     }
   }, [lancamentoToEdit, isOpen, categoriasDB, formasPagamentoDB]);
+
+  const formatDateLocal = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
+  };
+
+  const parseDateLocal = (dateStr: string) => {
+    const [y, m, d] = dateStr.split("-").map(Number);
+    return new Date(y, m - 1, d);
+  };
+
+  const addMonthsKeepingDay = (baseDate: Date, monthsToAdd: number) => {
+    const target = new Date(baseDate);
+    const baseDay = target.getDate();
+    target.setMonth(target.getMonth() + monthsToAdd, 1);
+    const maxDay = new Date(
+      target.getFullYear(),
+      target.getMonth() + 1,
+      0,
+    ).getDate();
+    target.setDate(Math.min(baseDay, maxDay));
+    return target;
+  };
+
+  const createRecurrenceItems = (
+    basePayload: Omit<Lancamento, "id">,
+    includeCurrent: boolean,
+  ) => {
+    const items: Omit<Lancamento, "id">[] = [];
+    const baseDate = parseDateLocal(basePayload.data_vencimento);
+
+    if (includeCurrent) items.push(basePayload);
+
+    if (recurrenceEndType === "ocorrencias") {
+      for (let i = 1; i < recurrenceOccurrences; i++) {
+        const nextDate = addMonthsKeepingDay(baseDate, i);
+        items.push({
+          ...basePayload,
+          data_vencimento: formatDateLocal(nextDate),
+          pago: false,
+        });
+      }
+      return items;
+    }
+
+    if (recurrenceEndType === "ate_data") {
+      const end = parseDateLocal(recurrenceEndDate);
+      let monthOffset = 1;
+      while (true) {
+        const nextDate = addMonthsKeepingDay(baseDate, monthOffset);
+        if (nextDate > end) break;
+        items.push({
+          ...basePayload,
+          data_vencimento: formatDateLocal(nextDate),
+          pago: false,
+        });
+        monthOffset += 1;
+      }
+    }
+
+    return items;
+  };
+
+  const validateRecurrence = () => {
+    if (!isRecorrente || formData.tipo !== "Despesa") return true;
+    if (!formData.data_vencimento) {
+      toast({
+        title: "Recorrência inválida",
+        description: "Informe a data de vencimento para aplicar recorrência.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (recurrenceEndType === "ocorrencias" && recurrenceOccurrences < 2) {
+      toast({
+        title: "Recorrência inválida",
+        description: "Quantidade de ocorrências deve ser pelo menos 2.",
+        variant: "destructive",
+      });
+      return false;
+    }
+
+    if (recurrenceEndType === "ate_data") {
+      if (!recurrenceEndDate) {
+        toast({
+          title: "Recorrência inválida",
+          description: "Selecione a data final da recorrência.",
+          variant: "destructive",
+        });
+        return false;
+      }
+      if (parseDateLocal(recurrenceEndDate) < parseDateLocal(formData.data_vencimento)) {
+        toast({
+          title: "Recorrência inválida",
+          description:
+            "A data final deve ser igual ou posterior à data do lançamento.",
+          variant: "destructive",
+        });
+        return false;
+      }
+    }
+
+    return true;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
+    if (!validateRecurrence()) return;
 
     try {
+      const basePayload = {
+        ...formData,
+        user_id: userId,
+      } as Omit<Lancamento, "id">;
+
       if (lancamentoToEdit) {
         // --- MODO EDIÇÃO ---
+        const { user_id, id: _ignoredId, ...updatePayload } =
+          basePayload as Omit<Lancamento, "id"> & { id?: number };
         await supabase
           .from("lancamentos")
-          .update(formData)
+          .update(updatePayload)
           .eq("id", lancamentoToEdit.id)
           .eq("user_id", userId);
+
+        if (isRecorrente && formData.tipo === "Despesa") {
+          if (recurrenceEndType === "infinito") {
+            const diaDoVencimento = Number(
+              formData.data_vencimento?.split("-")[2] || 1,
+            );
+            const { error: errorDespesaFixa } = await supabase
+              .from("despesas_fixas")
+              .insert([
+                {
+                  user_id: userId,
+                  nome: formData.descricao,
+                  valor: formData.valor,
+                  dia_vencimento: diaDoVencimento,
+                  categoria: formData.categoria,
+                  forma_pagamento: formData.forma_pagamento,
+                },
+              ]);
+            if (errorDespesaFixa) throw errorDespesaFixa;
+          } else {
+            const recurrenceItems = createRecurrenceItems(basePayload, false);
+            if (recurrenceItems.length > 0) {
+              const { error: recurrenceError } = await supabase
+                .from("lancamentos")
+                .insert(recurrenceItems);
+              if (recurrenceError) throw recurrenceError;
+            }
+          }
+        }
+
         toast({ title: "Atualizado!" });
       } else {
         // --- MODO CRIAÇÃO ---
-        const { error } = await supabase
-          .from("lancamentos")
-          .insert([{ ...formData, user_id: userId }]);
-
-        if (error) throw error;
-
-        // --- NOVO: LÓGICA DE DESPESA RECORRENTE ---
         if (isRecorrente && formData.tipo === "Despesa") {
-          // Extraímos apenas o DIA da data escolhida ("2024-03-15" -> 15)
-          const diaDoVencimento = Number(
-            formData.data_vencimento?.split("-")[2] || 1,
-          );
+          if (recurrenceEndType === "infinito") {
+            const { error } = await supabase.from("lancamentos").insert([basePayload]);
+            if (error) throw error;
 
-          await supabase.from("despesas_fixas").insert([
-            {
-              user_id: userId,
-              nome: formData.descricao,
-              valor: formData.valor,
-              dia_vencimento: diaDoVencimento,
-              categoria: formData.categoria,
-              forma_pagamento: formData.forma_pagamento,
-            },
-          ]);
+            const diaDoVencimento = Number(
+              formData.data_vencimento?.split("-")[2] || 1,
+            );
+
+            const { error: errorDespesaFixa } = await supabase
+              .from("despesas_fixas")
+              .insert([
+                {
+                  user_id: userId,
+                  nome: formData.descricao,
+                  valor: formData.valor,
+                  dia_vencimento: diaDoVencimento,
+                  categoria: formData.categoria,
+                  forma_pagamento: formData.forma_pagamento,
+                },
+              ]);
+            if (errorDespesaFixa) throw errorDespesaFixa;
+          } else {
+            const recurrenceItems = createRecurrenceItems(basePayload, true);
+            const { error: recurrenceError } = await supabase
+              .from("lancamentos")
+              .insert(recurrenceItems);
+            if (recurrenceError) throw recurrenceError;
+          }
 
           toast({
             title: "Criado com Recorrência!",
-            description:
-              "Esta despesa foi adicionada aos lançamentos e às Despesas Fixas.",
+            description: "Recorrência aplicada ao lançamento com sucesso.",
           });
         } else {
+          const { error } = await supabase.from("lancamentos").insert([basePayload]);
+          if (error) throw error;
           toast({ title: "Criado!" });
         }
       }
@@ -283,22 +447,81 @@ export function LancamentoFormDialog({
                 </Label>
               </div>
 
-              {/* CHECKBOX DE CONTA RECORRENTE (Aparece apenas se for despesa nova) */}
-              {!lancamentoToEdit && formData.tipo === "Despesa" && (
-                <div className="flex items-center gap-2 border p-3 rounded-md bg-muted/20">
-                  <Checkbox
-                    id="recorrente"
-                    checked={isRecorrente}
-                    onCheckedChange={(checked) =>
-                      setIsRecorrente(checked === true)
-                    }
-                  />
-                  <Label
-                    htmlFor="recorrente"
-                    className="cursor-pointer flex-1 font-medium text-primary"
-                  >
-                    Repetir todo mês (Tornar Recorrente)
-                  </Label>
+              {formData.tipo === "Despesa" && (
+                <div className="space-y-3 border p-3 rounded-md bg-muted/20">
+                  <div className="flex items-center gap-2">
+                    <Checkbox
+                      id="recorrente"
+                      checked={isRecorrente}
+                      onCheckedChange={(checked) =>
+                        setIsRecorrente(checked === true)
+                      }
+                    />
+                    <Label
+                      htmlFor="recorrente"
+                      className="cursor-pointer flex-1 font-medium text-primary"
+                    >
+                      {lancamentoToEdit
+                        ? "Aplicar recorrência a partir deste lançamento"
+                        : "Repetir todo mês (Tornar Recorrente)"}
+                    </Label>
+                  </div>
+
+                  {isRecorrente && (
+                    <div className="grid gap-3">
+                      <div className="space-y-2">
+                        <Label>Condição de término</Label>
+                        <Select
+                          value={recurrenceEndType}
+                          onValueChange={(v: RecurrenceEndType) =>
+                            setRecurrenceEndType(v)
+                          }
+                        >
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="infinito">
+                              Sem fim (despesa fixa)
+                            </SelectItem>
+                            <SelectItem value="ate_data">
+                              Até uma data
+                            </SelectItem>
+                            <SelectItem value="ocorrencias">
+                              Número de ocorrências
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {recurrenceEndType === "ate_data" && (
+                        <div className="space-y-2">
+                          <Label>Data final</Label>
+                          <Input
+                            type="date"
+                            value={recurrenceEndDate}
+                            onChange={(e) =>
+                              setRecurrenceEndDate(e.target.value)
+                            }
+                          />
+                        </div>
+                      )}
+
+                      {recurrenceEndType === "ocorrencias" && (
+                        <div className="space-y-2">
+                          <Label>Quantidade de ocorrências</Label>
+                          <Input
+                            type="number"
+                            min="2"
+                            value={recurrenceOccurrences}
+                            onChange={(e) =>
+                              setRecurrenceOccurrences(Number(e.target.value))
+                            }
+                          />
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               )}
             </div>

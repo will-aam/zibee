@@ -25,6 +25,7 @@ import {
 import { useToast } from "@/hooks/use-toast";
 
 type RecurrenceEndType = "infinito" | "ate_data" | "ocorrencias";
+const MAX_RECURRENCE_MONTHS = 600;
 
 interface LancamentoFormDialogProps {
   isOpen: boolean;
@@ -130,8 +131,7 @@ export function LancamentoFormDialog({
 
     if (recurrenceEndType === "ate_data") {
       const end = parseDateLocal(recurrenceEndDate);
-      let monthOffset = 1;
-      while (true) {
+      for (let monthOffset = 1; monthOffset <= MAX_RECURRENCE_MONTHS; monthOffset++) {
         const nextDate = addMonthsKeepingDay(baseDate, monthOffset);
         if (nextDate > end) break;
         items.push({
@@ -139,7 +139,6 @@ export function LancamentoFormDialog({
           data_vencimento: formatDateLocal(nextDate),
           pago: false,
         });
-        monthOffset += 1;
       }
     }
 
@@ -202,8 +201,17 @@ export function LancamentoFormDialog({
 
       if (lancamentoToEdit) {
         // --- MODO EDIÇÃO ---
-        const { user_id, id: _ignoredId, ...updatePayload } =
-          basePayload as Omit<Lancamento, "id"> & { id?: number };
+        const updatePayload = {
+          descricao: formData.descricao,
+          categoria: formData.categoria,
+          tipo: formData.tipo,
+          valor: formData.valor,
+          forma_pagamento: formData.forma_pagamento,
+          data_vencimento: formData.data_vencimento,
+          pago: formData.pago,
+          observacoes: formData.observacoes,
+          link: formData.link,
+        };
         await supabase
           .from("lancamentos")
           .update(updatePayload)

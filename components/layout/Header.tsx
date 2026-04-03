@@ -1,11 +1,12 @@
-// components/layout/Header.tsx
 "use client";
 
 import * as React from "react";
+import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { Settings } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
+import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import ProfileAvatarModal, {
   type AvatarSelection,
   type AvatarStyle,
@@ -13,6 +14,7 @@ import ProfileAvatarModal, {
 
 interface HeaderProps {
   onOpenFilters: () => void;
+  onNavigate?: (tab: string) => void;
 }
 
 function getGreeting(): string {
@@ -29,15 +31,53 @@ function avatarUrl(style: AvatarStyle, seed: string) {
   return `https://api.dicebear.com/9.x/${style}/svg?seed=${safeSeed}&size=96`;
 }
 
-export default function Header({ onOpenFilters }: HeaderProps) {
+function MobileDashboardSummarySkeleton() {
+  return (
+    <section className="-mt-12 px-4 md:hidden">
+      <div className="rounded-3xl bg-background shadow-sm border overflow-hidden">
+        <div className="px-5 pt-5 pb-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="h-4 w-24 rounded bg-muted animate-pulse" />
+              <div className="mt-3 h-8 w-44 rounded bg-muted animate-pulse" />
+            </div>
+            <div className="shrink-0 h-10 w-10 rounded-2xl bg-muted animate-pulse" />
+          </div>
+        </div>
+
+        <div className="h-px bg-border" />
+
+        <div className="px-2 py-2">
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="w-full px-3 py-3 rounded-2xl flex items-center gap-3"
+            >
+              <div className="h-10 w-10 rounded-2xl bg-muted animate-pulse" />
+              <div className="flex-1 min-w-0">
+                <div className="h-4 w-40 rounded bg-muted animate-pulse" />
+                <div className="mt-2 h-3 w-28 rounded bg-muted animate-pulse" />
+              </div>
+              <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+            </div>
+          ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
   const session = authClient.useSession();
   const { toast } = useToast();
 
+  const userId = session.data?.user?.id;
   const userName = session.data?.user?.name || "Zibee";
   const baseSeed = userName;
 
   const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
 
+  // Avatar
   const [loadingAvatar, setLoadingAvatar] = React.useState(true);
   const [savingAvatar, setSavingAvatar] = React.useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = React.useState<string | null>(
@@ -49,7 +89,20 @@ export default function Header({ onOpenFilters }: HeaderProps) {
     seed: `${baseSeed}-1`,
   });
 
-  // Carrega do server (Better Auth + Supabase admin)
+  // Totais do painel (MobileDashboardSummary)
+  const [loadingTotals, setLoadingTotals] = React.useState(true);
+  const [totalReceitas, setTotalReceitas] = React.useState(0);
+  const [totalDespesas, setTotalDespesas] = React.useState(0);
+  const [totalDespesasFixas, setTotalDespesasFixas] = React.useState(0);
+
+  // Saldo geral: SOMENTE entradas confirmadas - gastos variáveis
+  // Regra: se não tiver entradas confirmadas, não calcula (fica 0)
+  const saldoGeral = React.useMemo(() => {
+    if (!totalReceitas || totalReceitas <= 0) return 0;
+    return totalReceitas - totalDespesas;
+  }, [totalReceitas, totalDespesas]);
+
+  // ====== Carregar Avatar (API) ======
   React.useEffect(() => {
     let cancelled = false;
 
@@ -59,7 +112,6 @@ export default function Header({ onOpenFilters }: HeaderProps) {
         const res = await fetch("/api/profile/avatar", { method: "GET" });
 
         if (!res.ok) {
-          // se for 401, usuário não está logado (ou cookie não chegou)
           setLoadingAvatar(false);
           return;
         }
@@ -94,7 +146,7 @@ export default function Header({ onOpenFilters }: HeaderProps) {
       if (savingAvatar) return;
 
       setSaveErrorMessage(null);
-      setAvatar(next); // otimista
+      setAvatar(next);
 
       setSavingAvatar(true);
       try {
@@ -142,6 +194,76 @@ export default function Header({ onOpenFilters }: HeaderProps) {
     [savingAvatar, toast],
   );
 
+  // ====== Carregar Totais (Supabase direto) ======
+  React.useEffect(() => {
+    let cancelled = false;
+
+    async function loadTotals() {
+      if (!userId) {
+        setLoadingTotals(false);
+        return;
+      }
+
+      setLoadingTotals(true);
+
+      try {
+        // Entradas confirmadas
+        const { data: receitasData, error: receitasError } = await supabase
+          .from("lancamentos")
+          .select("valor")
+          .eq("user_id", userId)
+          .eq("tipo", "Receita")
+          .eq("pago", true);
+
+        if (receitasError) throw receitasError;
+
+        // Gastos variáveis (hoje: tudo do tipo Despesa)
+        const { data: despesasData, error: despesasError } = await supabase
+          .from("lancamentos")
+          .select("valor")
+          .eq("user_id", userId)
+          .eq("tipo", "Despesa");
+
+        if (despesasError) throw despesasError;
+
+        // Contas fixas mensais (métrica separada)
+        const { data: fixasData, error: fixasError } = await supabase
+          .from("despesas_fixas")
+          .select("valor")
+          .eq("user_id", userId);
+
+        if (fixasError) throw fixasError;
+
+        if (cancelled) return;
+
+        const rec =
+          receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+        const desp =
+          despesasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+        const fix =
+          fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+
+        setTotalReceitas(rec);
+        setTotalDespesas(desp);
+        setTotalDespesasFixas(fix);
+      } catch {
+        if (!cancelled) {
+          setTotalReceitas(0);
+          setTotalDespesas(0);
+          setTotalDespesasFixas(0);
+        }
+      } finally {
+        if (!cancelled) setLoadingTotals(false);
+      }
+    }
+
+    loadTotals();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
   return (
     <section className="md:hidden">
       <header
@@ -177,26 +299,27 @@ export default function Header({ onOpenFilters }: HeaderProps) {
           </div>
 
           <button
+            type="button"
             onClick={onOpenFilters}
             className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
-            aria-label="Abrir configurações"
+            aria-label="Abrir filtros"
           >
             <Settings className="h-5 w-5" />
           </button>
         </div>
       </header>
 
-      {/*
-      // CARD “flutuando” — você vai substituir por outro componente.
-      // Exemplo:
-      // import QuickAccessCard from "@/components/....";
-      // <QuickAccessCard /> */}
-      <div className="-mt-10 px-4">
-        <div className="rounded-2xl bg-background shadow-sm border p-4">
-          <p className="text-sm text-muted-foreground">Acesso rápido</p>
-          <p className="text-base font-semibold">Seu painel</p>
-        </div>
-      </div>
+      {loadingTotals ? (
+        <MobileDashboardSummarySkeleton />
+      ) : (
+        <MobileDashboardSummary
+          saldoGeral={saldoGeral}
+          entradasConfirmadas={totalReceitas}
+          gastosVariaveis={totalDespesas}
+          contasFixasMensais={totalDespesasFixas}
+          onNavigate={(target) => onNavigate?.(target)}
+        />
+      )}
 
       <ProfileAvatarModal
         open={openProfileDrawer}

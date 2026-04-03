@@ -1,9 +1,9 @@
 "use client";
 
 import * as React from "react";
-import { X, Loader2 } from "lucide-react";
+import { X } from "lucide-react";
 
-export type AvatarStyle = "bottts-neutral" | "lorelei-neutral";
+export type AvatarStyle = "bottts-neutral" | "fun-emoji" | "lorelei-neutral";
 
 export interface AvatarSelection {
   style: AvatarStyle;
@@ -12,6 +12,7 @@ export interface AvatarSelection {
 
 const STYLES: Array<{ id: AvatarStyle; label: string }> = [
   { id: "bottts-neutral", label: "Robôs" },
+  { id: "fun-emoji", label: "Emojis" },
   { id: "lorelei-neutral", label: "Personas" },
 ];
 
@@ -28,18 +29,21 @@ function buildSeedOptions(baseSeed: string, count: number) {
 interface ProfileAvatarModalProps {
   open: boolean;
   onClose: () => void;
+
+  /** seed base do usuário (nome/id/email). Usamos só para gerar variações. */
   baseSeed: string;
 
   value: AvatarSelection;
   onChange: (next: AvatarSelection) => void;
 
-  optionsPerStyle?: number;
-
-  /** mostra estado de salvamento */
+  /** opcional: sinaliza salvamento em andamento */
   saving?: boolean;
 
-  /** opcional: mostrar msg de erro no rodapé */
+  /** opcional: mensagem de erro (exibida no drawer) */
   errorMessage?: string | null;
+
+  /** quantas opções mostrar por estilo */
+  optionsPerStyle?: number;
 }
 
 export default function ProfileAvatarModal({
@@ -48,21 +52,16 @@ export default function ProfileAvatarModal({
   baseSeed,
   value,
   onChange,
-  optionsPerStyle = 40,
   saving = false,
   errorMessage = null,
+  optionsPerStyle = 40,
 }: ProfileAvatarModalProps) {
   const [activeStyle, setActiveStyle] = React.useState<AvatarStyle>(
     value.style,
   );
 
   React.useEffect(() => {
-    // se por algum motivo vier um estilo antigo, cai pra bottts-neutral
-    const next =
-      value.style === "lorelei-neutral" || value.style === "bottts-neutral"
-        ? value.style
-        : "bottts-neutral";
-    setActiveStyle(next);
+    setActiveStyle(value.style);
   }, [value.style]);
 
   React.useEffect(() => {
@@ -85,7 +84,7 @@ export default function ProfileAvatarModal({
       {/* Overlay */}
       <button
         className="absolute inset-0 bg-black/40"
-        onClick={saving ? undefined : onClose}
+        onClick={onClose}
         aria-label="Fechar"
       />
 
@@ -102,22 +101,14 @@ export default function ProfileAvatarModal({
         {/* Header */}
         <div className="px-4 py-4 border-b flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <div className="flex items-center gap-2">
-              <p className="text-base font-semibold">Foto do perfil</p>
-              {saving ? (
-                <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
-                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  Salvando…
-                </span>
-              ) : null}
-            </div>
-            <p className="text-sm text-muted-foreground break-words">
+            <p className="text-base font-semibold">Foto do perfil</p>
+            <p className="text-sm text-muted-foreground wrap-break-word">
               Escolha um avatar da biblioteca
             </p>
           </div>
 
           <button
-            className="p-2 rounded-xl hover:bg-muted transition shrink-0 disabled:opacity-50"
+            className="p-2 rounded-xl hover:bg-muted transition shrink-0"
             onClick={onClose}
             aria-label="Fechar"
             disabled={saving}
@@ -134,13 +125,15 @@ export default function ProfileAvatarModal({
               return (
                 <button
                   key={s.id}
+                  type="button"
                   onClick={() => setActiveStyle(s.id)}
                   disabled={saving}
                   className={[
-                    "px-3 py-2 rounded-xl text-sm border transition disabled:opacity-50",
+                    "px-3 py-2 rounded-xl text-sm border transition",
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background hover:bg-muted/40",
+                    saving ? "opacity-60 cursor-not-allowed" : "",
                   ].join(" ")}
                 >
                   {s.label}
@@ -150,7 +143,16 @@ export default function ProfileAvatarModal({
           </div>
         </div>
 
-        {/* Grid */}
+        {/* Erro (se houver) */}
+        {errorMessage ? (
+          <div className="px-4 pt-3">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive wrap-break-word">
+              {errorMessage}
+            </div>
+          </div>
+        ) : null}
+
+        {/* Grid (sem quadradinhos) */}
         <div className="px-4 py-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-4 gap-4">
             {seedOptions.map((seed) => {
@@ -160,13 +162,15 @@ export default function ProfileAvatarModal({
               return (
                 <button
                   key={`${activeStyle}:${seed}`}
+                  type="button"
                   onClick={() => onChange({ style: activeStyle, seed })}
                   disabled={saving}
                   className={[
-                    "rounded-full transition active:scale-95 disabled:opacity-60 disabled:active:scale-100",
+                    "rounded-full transition active:scale-95",
                     selected
                       ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                       : "",
+                    saving ? "opacity-70 cursor-not-allowed" : "",
                   ].join(" ")}
                   aria-label="Selecionar avatar"
                   title={seed}
@@ -182,26 +186,24 @@ export default function ProfileAvatarModal({
             })}
           </div>
 
-          {/* Mensagens responsivas */}
-          {errorMessage ? (
-            <p className="text-xs text-destructive mt-6 leading-snug break-words">
-              {errorMessage}
-            </p>
-          ) : (
-            <p className="text-[11px] text-muted-foreground mt-6 leading-snug break-words">
-              Sua escolha é salva automaticamente.
-            </p>
-          )}
+          <p className="text-[11px] text-muted-foreground mt-6 leading-snug wrap-break-word">
+            (Por enquanto) Isso salva no seu aparelho. Depois vamos salvar no
+            Supabase.
+          </p>
         </div>
 
         {/* Footer */}
         <div className="px-4 py-4 border-t">
           <button
-            className="w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground hover:opacity-95 transition disabled:opacity-60"
+            type="button"
+            className={[
+              "w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground hover:opacity-95 transition",
+              saving ? "opacity-70 cursor-not-allowed" : "",
+            ].join(" ")}
             onClick={onClose}
             disabled={saving}
           >
-            Concluir
+            {saving ? "Salvando..." : "Concluir"}
           </button>
         </div>
       </aside>

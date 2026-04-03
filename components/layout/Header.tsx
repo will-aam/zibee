@@ -16,9 +16,9 @@ import ProfileAvatarModal, {
   type AvatarSelection,
   type AvatarStyle,
 } from "@/components/profile/ProfileAvatarModal";
+import { Button } from "../ui/button";
 
 interface HeaderProps {
-  onOpenFilters?: () => void;
   onNavigate?: (tab: string) => void;
 }
 
@@ -72,7 +72,7 @@ function MobileDashboardSummarySkeleton() {
   );
 }
 
-export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
+export default function Header({ onNavigate }: HeaderProps) {
   const session = authClient.useSession();
   const { toast } = useToast();
 
@@ -101,20 +101,12 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
   const [totalDespesas, setTotalDespesas] = React.useState(0);
   const [totalDespesasFixas, setTotalDespesasFixas] = React.useState(0);
 
-  // Saldo geral: SOMENTE entradas confirmadas - gastos variáveis
   const saldoGeral = React.useMemo(() => {
     if (!totalReceitas || totalReceitas <= 0) return 0;
     return totalReceitas - totalDespesas;
   }, [totalReceitas, totalDespesas]);
 
-  // ====== ler range salvo (De/Até) ======
-  const readRange = React.useCallback(() => {
-    const from = localStorage.getItem(STORAGE_FROM_KEY);
-    const to = localStorage.getItem(STORAGE_TO_KEY);
-    return { from: from || null, to: to || null };
-  }, []);
-
-  // ====== Carregar Avatar (API) ======
+  // ====== Avatar ======
   React.useEffect(() => {
     let cancelled = false;
 
@@ -140,7 +132,7 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
           seed: data.avatar_seed?.trim() ? data.avatar_seed : `${baseSeed}-1`,
         });
       } catch {
-        // não quebra UI
+        // ignore
       } finally {
         if (!cancelled) setLoadingAvatar(false);
       }
@@ -206,7 +198,13 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
     [savingAvatar, toast],
   );
 
-  // ====== Carregar Totais (Supabase direto) ======
+  // ====== Totais (respondem ao filtro de período) ======
+  const readRange = React.useCallback(() => {
+    const from = localStorage.getItem(STORAGE_FROM_KEY);
+    const to = localStorage.getItem(STORAGE_TO_KEY);
+    return { from: from || null, to: to || null };
+  }, []);
+
   const loadTotals = React.useCallback(async () => {
     if (!userId) {
       setLoadingTotals(false);
@@ -214,11 +212,9 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
     }
 
     setLoadingTotals(true);
-
     const { from, to } = readRange();
 
     try {
-      // Entradas confirmadas
       let receitasQuery = supabase
         .from("lancamentos")
         .select("valor")
@@ -226,15 +222,12 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
         .eq("tipo", "Receita")
         .eq("pago", true);
 
-      // Gastos variáveis (hoje: tudo do tipo Despesa)
       let despesasQuery = supabase
         .from("lancamentos")
         .select("valor")
         .eq("user_id", userId)
         .eq("tipo", "Despesa");
 
-      // Contas fixas mensais (métrica separada) — por enquanto não filtramos por data
-      // (é recorrência mensal cadastral, não um lançamento com vencimento)
       const fixasQuery = supabase
         .from("despesas_fixas")
         .select("valor")
@@ -278,22 +271,10 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
     }
   }, [readRange, userId]);
 
-  // load inicial
   React.useEffect(() => {
-    let cancelled = false;
-
-    async function run() {
-      if (cancelled) return;
-      await loadTotals();
-    }
-
-    run();
-    return () => {
-      cancelled = true;
-    };
+    loadTotals();
   }, [loadTotals]);
 
-  // reagir ao filtro aplicado no drawer
   React.useEffect(() => {
     function onFilterChanged() {
       loadTotals();
@@ -303,21 +284,30 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
   }, [loadTotals]);
 
   return (
-    <section className="md:hidden">
-      <header
-        className="
-          bg-primary text-primary-foreground
-          px-4
-          pt-[max(22px,env(safe-area-inset-top))]
-          pb-20
-        "
-      >
-        <div className="flex items-center gap-4">
+    <>
+      {/* Desktop header */}
+      <header className="hidden md:flex items-center justify-between px-6 py-4 border-b bg-background/70 backdrop-blur">
+        <div className="min-w-0">
+          <p className="text-sm text-muted-foreground">{getGreeting()},</p>
+          <p className="text-xl font-semibold truncate">{userName}</p>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            type="button"
+            variant="outline"
+            className="rounded-2xl"
+            onClick={() => setOpenFilterDrawer(true)}
+          >
+            <Filter className="h-4 w-4 mr-2" />
+            Filtrar
+          </Button>
+
           <button
             type="button"
             onClick={() => setOpenProfileDrawer(true)}
-            className="shrink-0 h-16 w-16 rounded-full bg-primary-foreground/15 overflow-hidden flex items-center justify-center ring-1 ring-white/15"
-            aria-label="Abrir configurações do perfil"
+            className="h-10 w-10 rounded-full overflow-hidden ring-1 ring-border"
+            aria-label="Abrir perfil"
           >
             <img
               src={avatarUrl(avatar.style, avatar.seed)}
@@ -328,40 +318,68 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
               ].join(" ")}
             />
           </button>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm opacity-90">{getGreeting()},</p>
-            <p className="font-bold text-xl leading-tight truncate">
-              {userName}!
-            </p>
-          </div>
-
-          <button
-            type="button"
-            onClick={() => {
-              onOpenFilters?.();
-              setOpenFilterDrawer(true);
-            }}
-            className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
-            aria-label="Abrir filtros"
-          >
-            <Filter className="h-5 w-5" />
-          </button>
         </div>
       </header>
 
-      {loadingTotals ? (
-        <MobileDashboardSummarySkeleton />
-      ) : (
-        <MobileDashboardSummary
-          saldoGeral={saldoGeral}
-          entradasConfirmadas={totalReceitas}
-          gastosVariaveis={totalDespesas}
-          contasFixasMensais={totalDespesasFixas}
-          onNavigate={(target) => onNavigate?.(target)}
-        />
-      )}
+      {/* Mobile header + summary */}
+      <section className="md:hidden">
+        <header
+          className="
+            bg-primary text-primary-foreground
+            px-4
+            pt-[max(22px,env(safe-area-inset-top))]
+            pb-20
+          "
+        >
+          <div className="flex items-center gap-4">
+            <button
+              type="button"
+              onClick={() => setOpenProfileDrawer(true)}
+              className="shrink-0 h-16 w-16 rounded-full bg-primary-foreground/15 overflow-hidden flex items-center justify-center ring-1 ring-white/15"
+              aria-label="Abrir configurações do perfil"
+            >
+              <img
+                src={avatarUrl(avatar.style, avatar.seed)}
+                alt="Avatar do perfil"
+                className={[
+                  "h-full w-full object-cover",
+                  loadingAvatar ? "opacity-80" : "opacity-100",
+                ].join(" ")}
+              />
+            </button>
 
+            <div className="flex-1 min-w-0">
+              <p className="text-sm opacity-90">{getGreeting()},</p>
+              <p className="font-bold text-xl leading-tight truncate">
+                {userName}!
+              </p>
+            </div>
+
+            <button
+              type="button"
+              onClick={() => setOpenFilterDrawer(true)}
+              className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
+              aria-label="Abrir filtros"
+            >
+              <Filter className="h-5 w-5" />
+            </button>
+          </div>
+        </header>
+
+        {loadingTotals ? (
+          <MobileDashboardSummarySkeleton />
+        ) : (
+          <MobileDashboardSummary
+            saldoGeral={saldoGeral}
+            entradasConfirmadas={totalReceitas}
+            gastosVariaveis={totalDespesas}
+            contasFixasMensais={totalDespesasFixas}
+            onNavigate={(target) => onNavigate?.(target)}
+          />
+        )}
+      </section>
+
+      {/* Drawer global (aparece em qualquer breakpoint) */}
       <DateRangeFilterDrawer
         open={openFilterDrawer}
         onClose={() => setOpenFilterDrawer(false)}
@@ -376,6 +394,6 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
         saving={savingAvatar}
         errorMessage={saveErrorMessage}
       />
-    </section>
+    </>
   );
 }

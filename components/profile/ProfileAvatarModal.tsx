@@ -3,18 +3,14 @@
 import * as React from "react";
 import { X } from "lucide-react";
 
-export type AvatarStyle = "bottts-neutral" | "fun-emoji" | "lorelei-neutral";
+export type AvatarStyle = "bottts-neutral";
 
 export interface AvatarSelection {
   style: AvatarStyle;
   seed: string;
 }
 
-const STYLES: Array<{ id: AvatarStyle; label: string }> = [
-  { id: "bottts-neutral", label: "Robôs" },
-  { id: "fun-emoji", label: "Emojis" },
-  { id: "lorelei-neutral", label: "Personas" },
-];
+const ROBOT_STYLE: AvatarStyle = "bottts-neutral";
 
 function avatarUrl(style: AvatarStyle, seed: string) {
   const safeSeed = encodeURIComponent(seed || "Zibee");
@@ -42,8 +38,8 @@ interface ProfileAvatarModalProps {
   /** opcional: mensagem de erro (exibida no drawer) */
   errorMessage?: string | null;
 
-  /** quantas opções mostrar por estilo */
-  optionsPerStyle?: number;
+  /** quantas opções mostrar */
+  optionsCount?: number;
 }
 
 export default function ProfileAvatarModal({
@@ -54,16 +50,8 @@ export default function ProfileAvatarModal({
   onChange,
   saving = false,
   errorMessage = null,
-  optionsPerStyle = 40,
+  optionsCount = 120,
 }: ProfileAvatarModalProps) {
-  const [activeStyle, setActiveStyle] = React.useState<AvatarStyle>(
-    value.style,
-  );
-
-  React.useEffect(() => {
-    setActiveStyle(value.style);
-  }, [value.style]);
-
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -73,8 +61,8 @@ export default function ProfileAvatarModal({
   }, [open, onClose]);
 
   const seedOptions = React.useMemo(
-    () => buildSeedOptions(baseSeed, optionsPerStyle),
-    [baseSeed, optionsPerStyle],
+    () => buildSeedOptions(baseSeed, optionsCount),
+    [baseSeed, optionsCount],
   );
 
   if (!open) return null;
@@ -102,9 +90,6 @@ export default function ProfileAvatarModal({
         <div className="px-4 py-4 border-b flex items-start justify-between gap-4">
           <div className="min-w-0">
             <p className="text-base font-semibold">Foto do perfil</p>
-            <p className="text-sm text-muted-foreground wrap-break-word">
-              Escolha um avatar da biblioteca
-            </p>
           </div>
 
           <button
@@ -117,53 +102,27 @@ export default function ProfileAvatarModal({
           </button>
         </div>
 
-        {/* Tabs */}
-        <div className="px-4 pt-3">
-          <div className="flex flex-wrap gap-2">
-            {STYLES.map((s) => {
-              const active = activeStyle === s.id;
-              return (
-                <button
-                  key={s.id}
-                  type="button"
-                  onClick={() => setActiveStyle(s.id)}
-                  disabled={saving}
-                  className={[
-                    "px-3 py-2 rounded-xl text-sm border transition",
-                    active
-                      ? "bg-primary text-primary-foreground border-primary"
-                      : "bg-background hover:bg-muted/40",
-                    saving ? "opacity-60 cursor-not-allowed" : "",
-                  ].join(" ")}
-                >
-                  {s.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-
         {/* Erro (se houver) */}
         {errorMessage ? (
           <div className="px-4 pt-3">
-            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive wrap-break-word">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive wrap-break-wordword">
               {errorMessage}
             </div>
           </div>
         ) : null}
 
-        {/* Grid (sem quadradinhos) */}
+        {/* Grid */}
         <div className="px-4 py-4 overflow-y-auto flex-1">
-          <div className="grid grid-cols-4 gap-4">
+          <div className="grid grid-cols-4 sm:grid-cols-6 md:grid-cols-8 gap-4">
             {seedOptions.map((seed) => {
               const selected =
-                value.style === activeStyle && value.seed === seed;
+                value.style === ROBOT_STYLE && value.seed === seed;
 
               return (
                 <button
-                  key={`${activeStyle}:${seed}`}
+                  key={`${ROBOT_STYLE}:${seed}`}
                   type="button"
-                  onClick={() => onChange({ style: activeStyle, seed })}
+                  onClick={() => onChange({ style: ROBOT_STYLE, seed })}
                   disabled={saving}
                   className={[
                     "rounded-full transition active:scale-95",
@@ -176,7 +135,7 @@ export default function ProfileAvatarModal({
                   title={seed}
                 >
                   <img
-                    src={avatarUrl(activeStyle, seed)}
+                    src={avatarUrl(ROBOT_STYLE, seed)}
                     alt="Avatar"
                     className="h-16 w-16 rounded-full bg-muted"
                     loading="lazy"
@@ -186,9 +145,8 @@ export default function ProfileAvatarModal({
             })}
           </div>
 
-          <p className="text-[11px] text-muted-foreground mt-6 leading-snug wrap-break-word">
-            (Por enquanto) Isso salva no seu aparelho. Depois vamos salvar no
-            Supabase.
+          <p className="text-[11px] text-muted-foreground mt-6 leading-snug break-wordwords">
+            Dica: se quiser ver mais robôs, aumente o número de opções (seeds).
           </p>
         </div>
 

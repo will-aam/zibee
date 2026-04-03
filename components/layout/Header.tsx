@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { Sora } from "next/font/google";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import DateRangeFilterDrawer, {
@@ -16,7 +17,9 @@ import ProfileAvatarModal, {
   type AvatarSelection,
   type AvatarStyle,
 } from "@/components/profile/ProfileAvatarModal";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
+
+const sora = Sora({ subsets: ["latin"] });
 
 interface HeaderProps {
   onNavigate?: (tab: string) => void;
@@ -286,7 +289,9 @@ export default function Header({ onNavigate }: HeaderProps) {
   return (
     <>
       {/* Desktop header */}
-      <header className="hidden md:flex items-center justify-between px-6 py-4 border-b bg-background/70 backdrop-blur">
+      <header
+        className={`hidden md:flex items-center justify-between px-6 py-4 border-b bg-background/70 backdrop-blur ${sora.className}`}
+      >
         <div className="min-w-0">
           <p className="text-sm text-muted-foreground">{getGreeting()},</p>
           <p className="text-xl font-semibold truncate">{userName}</p>
@@ -306,7 +311,7 @@ export default function Header({ onNavigate }: HeaderProps) {
           <button
             type="button"
             onClick={() => setOpenProfileDrawer(true)}
-            className="h-10 w-10 rounded-full overflow-hidden ring-1 ring-border"
+            className="h-10 w-10 rounded-full overflow-hidden ring-1 ring-border hover:ring-2 hover:ring-primary/30 transition"
             aria-label="Abrir perfil"
           >
             <img
@@ -322,7 +327,7 @@ export default function Header({ onNavigate }: HeaderProps) {
       </header>
 
       {/* Mobile header + summary */}
-      <section className="md:hidden">
+      <section className={`md:hidden ${sora.className}`}>
         <header
           className="
             bg-primary text-primary-foreground
@@ -335,7 +340,21 @@ export default function Header({ onNavigate }: HeaderProps) {
             <button
               type="button"
               onClick={() => setOpenProfileDrawer(true)}
-              className="shrink-0 h-16 w-16 rounded-full bg-primary-foreground/15 overflow-hidden flex items-center justify-center ring-1 ring-white/15"
+              className="
+    shrink-0
+    h-16 w-16
+    rounded-full
+    overflow-hidden
+    flex items-center justify-center
+
+    ring-2 ring-white/80       /* separa do avatar (funciona com qualquer cor) */
+    ring-offset-2
+    ring-offset-primary        /* integra com o fundo azul */
+    
+    hover:scale-105
+    active:scale-95
+    transition
+  "
               aria-label="Abrir configurações do perfil"
             >
               <img
@@ -349,8 +368,8 @@ export default function Header({ onNavigate }: HeaderProps) {
             </button>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm opacity-90">{getGreeting()},</p>
-              <p className="font-bold text-xl leading-tight truncate">
+              <p className="text-sm text-white/85">{getGreeting()},</p>
+              <p className="font-semibold text-xl leading-tight truncate text-white">
                 {userName}!
               </p>
             </div>
@@ -358,10 +377,10 @@ export default function Header({ onNavigate }: HeaderProps) {
             <button
               type="button"
               onClick={() => setOpenFilterDrawer(true)}
-              className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
+              className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
               aria-label="Abrir filtros"
             >
-              <Filter className="h-5 w-5" />
+              <Filter className="h-5 w-5 text-white" />
             </button>
           </div>
         </header>
@@ -379,7 +398,6 @@ export default function Header({ onNavigate }: HeaderProps) {
         )}
       </section>
 
-      {/* Drawer global (aparece em qualquer breakpoint) */}
       <DateRangeFilterDrawer
         open={openFilterDrawer}
         onClose={() => setOpenFilterDrawer(false)}

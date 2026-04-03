@@ -1,9 +1,14 @@
 "use client";
 
 import * as React from "react";
-import { X, Calendar, Check } from "lucide-react";
+import { X, Calendar as CalendarIcon, Check } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
+import { Calendar } from "@/components/ui/calendar";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 
 type PresetKey = "this_month" | "last_month" | "all_time" | "custom";
 
@@ -19,11 +24,6 @@ interface DateRangeFilterDrawerProps {
   onApplied?: (value: DateRangeValue) => void;
 }
 
-/**
- * IMPORTANTE:
- * - Estas chaves/evento precisam bater com Dashboard e Header.
- * - Dashboard e Header escutam esse evento para refazer queries.
- */
 export const FILTER_EVENT = "dashboard:filter-changed";
 export const STORAGE_MONTH_KEY = "dashboardFiltroMes";
 export const STORAGE_FROM_KEY = "dashboardFiltroDe";
@@ -36,6 +36,19 @@ function pad2(n: number) {
 
 function toYMD(d: Date) {
   return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+function parseYMD(s: string | null | undefined): Date | undefined {
+  if (!s) return undefined;
+  // importante: construir como local para evitar offset estranho
+  const [y, m, d] = s.split("-").map(Number);
+  if (!y || !m || !d) return undefined;
+  const dt = new Date(y, m - 1, d);
+  return Number.isNaN(dt.getTime()) ? undefined : dt;
+}
+
+function formatPtBR(d: Date) {
+  return d.toLocaleDateString("pt-BR");
 }
 
 function monthRange(year: number, month1to12: number) {
@@ -56,19 +69,12 @@ function getLastMonthRange() {
   return monthRange(year, month);
 }
 
-function isValidYMD(s: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(s)) return false;
-  const d = new Date(s + "T00:00:00");
-  return !Number.isNaN(d.getTime());
-}
-
 function readStored(): DateRangeValue {
   const preset =
     (localStorage.getItem(STORAGE_PRESET_KEY) as PresetKey) || "this_month";
   const from = localStorage.getItem(STORAGE_FROM_KEY);
   const to = localStorage.getItem(STORAGE_TO_KEY);
 
-  // fallback: se não tiver nada salvo, default = este mês
   if (!localStorage.getItem(STORAGE_PRESET_KEY) && !from && !to) {
     const r = getThisMonthRange();
     return { preset: "this_month", from: r.from, to: r.to };
@@ -84,7 +90,6 @@ function readStored(): DateRangeValue {
 function persist(value: DateRangeValue) {
   localStorage.setItem(STORAGE_PRESET_KEY, value.preset);
 
-  // "Todo período"
   if (value.preset === "all_time") {
     localStorage.setItem(STORAGE_MONTH_KEY, "todos");
     localStorage.removeItem(STORAGE_FROM_KEY);
@@ -92,7 +97,6 @@ function persist(value: DateRangeValue) {
     return;
   }
 
-  // Range (este mês / mês passado / personalizado)
   localStorage.removeItem(STORAGE_MONTH_KEY);
 
   if (value.from) localStorage.setItem(STORAGE_FROM_KEY, value.from);
@@ -131,14 +135,59 @@ function PresetPill({
   );
 }
 
+function DateButton({
+  label,
+  value,
+  disabled,
+  onPick,
+}: {
+  label: string;
+  value: string | null;
+  disabled?: boolean;
+  onPick: (d: Date | undefined) => void;
+}) {
+  const selectedDate = parseYMD(value);
+
+  return (
+    <div className="space-y-2">
+      <p className="text-xs font-medium text-muted-foreground">{label}</p>
+
+      <Popover>
+        <PopoverTrigger asChild>
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full justify-between rounded-2xl"
+            disabled={disabled}
+          >
+            <span className="text-sm">
+              {selectedDate ? formatPtBR(selectedDate) : "Selecionar"}
+            </span>
+            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
+          </Button>
+        </PopoverTrigger>
+
+        <PopoverContent className="w-auto p-0" align="start">
+          <Calendar
+            mode="single"
+            selected={selectedDate}
+            onSelect={onPick}
+            initialFocus
+          />
+        </PopoverContent>
+      </Popover>
+    </div>
+  );
+}
+
 export default function DateRangeFilterDrawer({
   open,
   onClose,
   onApplied,
 }: DateRangeFilterDrawerProps) {
   const [preset, setPreset] = React.useState<PresetKey>("this_month");
-  const [from, setFrom] = React.useState<string>("");
-  const [to, setTo] = React.useState<string>("");
+  const [from, setFrom] = React.useState<string | null>(null);
+  const [to, setTo] = React.useState<string | null>(null);
   const [error, setError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
@@ -147,8 +196,8 @@ export default function DateRangeFilterDrawer({
     setError(null);
     const stored = readStored();
     setPreset(stored.preset);
-    setFrom(stored.from || "");
-    setTo(stored.to || "");
+    setFrom(stored.from);
+    setTo(stored.to);
   }, [open]);
 
   React.useEffect(() => {
@@ -165,8 +214,8 @@ export default function DateRangeFilterDrawer({
       setTo(r.to);
     }
     if (preset === "all_time") {
-      setFrom("");
-      setTo("");
+      setFrom(null);
+      setTo(null);
     }
   }, [preset, open]);
 
@@ -182,12 +231,12 @@ export default function DateRangeFilterDrawer({
 
   const canApply = (() => {
     if (preset === "all_time") return true;
-
     if (!from || !to) return false;
-    if (!isValidYMD(from) || !isValidYMD(to)) return false;
 
-    const df = new Date(from + "T00:00:00").getTime();
-    const dt = new Date(to + "T00:00:00").getTime();
+    const df = parseYMD(from)?.getTime();
+    const dt = parseYMD(to)?.getTime();
+    if (!df || !dt) return false;
+
     return df <= dt;
   })();
 
@@ -196,15 +245,15 @@ export default function DateRangeFilterDrawer({
 
     if (preset !== "all_time") {
       if (!from || !to) {
-        setError("Preencha as duas datas.");
+        setError("Selecione as duas datas.");
         return;
       }
-      if (!isValidYMD(from) || !isValidYMD(to)) {
+      const df = parseYMD(from)?.getTime();
+      const dt = parseYMD(to)?.getTime();
+      if (!df || !dt) {
         setError("Data inválida.");
         return;
       }
-      const df = new Date(from + "T00:00:00").getTime();
-      const dt = new Date(to + "T00:00:00").getTime();
       if (df > dt) {
         setError("O 'De' não pode ser maior que o 'Até'.");
         return;
@@ -214,9 +263,8 @@ export default function DateRangeFilterDrawer({
     const value: DateRangeValue =
       preset === "all_time"
         ? { preset, from: null, to: null }
-        : { preset, from: from || null, to: to || null };
+        : { preset, from, to };
 
-    // salvar + avisar (Header e Dashboard escutam)
     persist(value);
     fireFilterChanged();
 
@@ -224,16 +272,16 @@ export default function DateRangeFilterDrawer({
     onClose();
   }
 
+  const disableDates = preset === "all_time";
+
   return (
     <div className="fixed inset-0 z-50" aria-modal="true" role="dialog">
-      {/* overlay */}
       <button
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-label="Fechar"
       />
 
-      {/* sheet (mobile first) */}
       <aside
         className="
           absolute bottom-0 left-0 w-full
@@ -252,7 +300,7 @@ export default function DateRangeFilterDrawer({
         <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-base font-semibold flex items-center gap-2">
-              <Calendar className="h-5 w-5" />
+              <CalendarIcon className="h-5 w-5" />
               Período
             </p>
             <p className="text-xs text-muted-foreground truncate">
@@ -271,7 +319,6 @@ export default function DateRangeFilterDrawer({
 
         {/* content */}
         <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4">
-          {/* presets */}
           <div className="flex flex-wrap gap-2">
             <PresetPill
               active={preset === "this_month"}
@@ -302,33 +349,26 @@ export default function DateRangeFilterDrawer({
             </PresetPill>
           </div>
 
-          {/* dates */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">De</p>
-              <Input
-                type="date"
-                value={from}
-                onChange={(e) => {
-                  setPreset("custom");
-                  setFrom(e.target.value);
-                }}
-                disabled={preset === "all_time"}
-              />
-            </div>
+            <DateButton
+              label="De"
+              value={from}
+              disabled={disableDates}
+              onPick={(d) => {
+                setPreset("custom");
+                setFrom(d ? toYMD(d) : null);
+              }}
+            />
 
-            <div className="space-y-2">
-              <p className="text-xs font-medium text-muted-foreground">Até</p>
-              <Input
-                type="date"
-                value={to}
-                onChange={(e) => {
-                  setPreset("custom");
-                  setTo(e.target.value);
-                }}
-                disabled={preset === "all_time"}
-              />
-            </div>
+            <DateButton
+              label="Até"
+              value={to}
+              disabled={disableDates}
+              onPick={(d) => {
+                setPreset("custom");
+                setTo(d ? toYMD(d) : null);
+              }}
+            />
           </div>
 
           {error ? (
@@ -338,7 +378,7 @@ export default function DateRangeFilterDrawer({
           ) : null}
 
           <p className="text-xs text-muted-foreground">
-            No celular, o seletor de data é nativo e mais rápido.
+            Dica: use “Este mês” / “Mês passado” para comparar rápido.
           </p>
         </div>
 

@@ -1,9 +1,8 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Progress } from "@/components/ui/progress";
 import {
   TrendingDown,
@@ -13,14 +12,21 @@ import {
   Loader2,
   AlertCircle,
   Wallet,
-  ArrowRight,
 } from "lucide-react";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  Tooltip,
+  ResponsiveContainer,
+  CartesianGrid,
+} from "recharts";
 
 interface DashboardProps {
   onNavigate?: (tab: string) => void;
 }
 
-// compat: chaves atuais + novas do filtro por data
 const STORAGE_MONTH_KEY = "dashboardFiltroMes";
 const STORAGE_FROM_KEY = "dashboardFiltroDe";
 const STORAGE_TO_KEY = "dashboardFiltroAte";
@@ -29,127 +35,66 @@ const FILTER_EVENT = "dashboard:filter-changed";
 function pad2(n: number) {
   return String(n).padStart(2, "0");
 }
-
 function getCurrentYearMonth() {
   const now = new Date();
-  const y = now.getFullYear();
-  const m = pad2(now.getMonth() + 1);
-  return `${y}-${m}`; // YYYY-MM
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 }
-
 function monthToRange(anoMes: string) {
   const [ano, mes] = anoMes.split("-");
-  const dataInicio = `${anoMes}-01`;
   const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
-  const dataFim = `${anoMes}-${pad2(ultimoDia)}`;
-  return { from: dataInicio, to: dataFim };
+  return { from: `${anoMes}-01`, to: `${anoMes}-${pad2(ultimoDia)}` };
 }
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
-  // --- USER SESSION ---
   const session = authClient.useSession();
   const userId = session.data?.user.id;
 
-  // --- ESTADOS DO FILTRO (mantidos como fallback/compat) ---
   const [mesSelecionado, setMesSelecionado] = useState("todos");
-  const [mesesDisponiveis, setMesesDisponiveis] = useState<string[]>([]);
-
-  // --- ESTADOS DE DADOS ---
   const [loading, setLoading] = useState(true);
+
+  // Totais e Dados
   const [totalDespesas, setTotalDespesas] = useState(0);
   const [totalReceitas, setTotalReceitas] = useState(0);
   const [totalDespesasFixas, setTotalDespesasFixas] = useState(0);
-
-  // Gráfico
   const [categoriasChart, setCategoriasChart] = useState<any[]>([]);
-
   const [proximosVencimentos, setProximosVencimentos] = useState<any[]>([]);
   const [metaFixada, setMetaFixada] = useState<any>(null);
   const [progressoMeta, setProgressoMeta] = useState(0);
 
-  // Buscar meses disponíveis (pode remover depois se não for usar)
-  const fetchMeses = useCallback(async () => {
-    if (!userId) return;
-    try {
-      const { data, error } = await supabase
-        .from("lancamentos")
-        .select("data_vencimento")
-        .eq("user_id", userId)
-        .order("data_vencimento", { ascending: false });
+  // Dados brutos para o gráfico de evolução
+  const [despesasBrutas, setDespesasBrutas] = useState<any[]>([]);
 
-      if (error) throw error;
+  // Filtro local do gráfico em linha (ex: "7D", "30D")
+  const [periodoGrafico, setPeriodoGrafico] = useState<"7D" | "30D" | "ALL">(
+    "30D",
+  );
 
-      if (data) {
-        const mesesSet = new Set<string>();
-        data.forEach((item) => {
-          if (item.data_vencimento) {
-            mesesSet.add(item.data_vencimento.slice(0, 7));
-          }
-        });
-        setMesesDisponiveis(Array.from(mesesSet));
-      }
-    } catch (error: any) {
-      console.error("Erro ao buscar meses:", error.message);
-    }
-  }, [userId]);
-
-  // Inicialização compat (mês)
-  useEffect(() => {
-    if (userId) fetchMeses();
-
-    const filtroSalvo = localStorage.getItem(STORAGE_MONTH_KEY);
-    if (filtroSalvo) {
-      setMesSelecionado(filtroSalvo);
-    } else {
-      // padrão: mês atual (como você pediu)
-      const current = getCurrentYearMonth();
-      setMesSelecionado(current);
-      localStorage.setItem(STORAGE_MONTH_KEY, current);
-    }
-  }, [userId, fetchMeses]);
-
-  // Lê filtros: prioridade para De/Até (localStorage) -> fallback mês -> todos
-  const readRange = useCallback((): {
-    from: string | null;
-    to: string | null;
-  } => {
+  const readRange = useCallback(() => {
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
-
-    if (from || to) {
-      return { from: from || null, to: to || null };
-    }
-
+    if (from || to) return { from: from || null, to: to || null };
     const mes = localStorage.getItem(STORAGE_MONTH_KEY) || mesSelecionado;
-
     if (!mes || mes === "todos") return { from: null, to: null };
-
     return monthToRange(mes);
   }, [mesSelecionado]);
 
-  // Buscar Dados do Dashboard
   const fetchDashboardData = useCallback(async () => {
     if (!userId) return;
-
     try {
       setLoading(true);
-
       const { from, to } = readRange();
 
-      // --- Queries Base ---
       let queryDespesas = supabase
         .from("lancamentos")
         .select("*")
         .eq("user_id", userId)
         .eq("tipo", "Despesa");
-
       let queryReceitas = supabase
         .from("lancamentos")
         .select("*")
         .eq("user_id", userId)
         .eq("tipo", "Receita")
         .eq("pago", true);
-
       let queryVencimentos = supabase
         .from("lancamentos")
         .select("*")
@@ -176,52 +121,45 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         { data: vencimentosData },
       ] = await Promise.all([queryDespesas, queryReceitas, queryVencimentos]);
 
-      // A) Total Despesas
+      setDespesasBrutas(lancamentosData || []);
+
       const totalDesp =
         lancamentosData?.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
         0;
       setTotalDespesas(totalDesp);
 
-      // B) Total Receitas
       const totalRec =
         receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       setTotalReceitas(totalRec);
 
-      // C) Categorias chart
       const categoriasMap = lancamentosData?.reduce((acc: any, curr) => {
         const key = curr.categoria || "Sem categoria";
         acc[key] = (acc[key] || 0) + Number(curr.valor);
         return acc;
       }, {});
+      setCategoriasChart(
+        Object.entries(categoriasMap || {})
+          .map(([name, value]) => ({ name, value: Number(value) }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, 5),
+      );
 
-      const chartData = Object.entries(categoriasMap || {})
-        .map(([name, value]) => ({ name, value: Number(value) }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
-
-      setCategoriasChart(chartData);
-
-      // D) Próximos Vencimentos
       setProximosVencimentos(vencimentosData || []);
 
-      // E) Despesas Fixas (não filtra por data porque é recorrência mensal cadastrada)
       const { data: fixasData } = await supabase
         .from("despesas_fixas")
         .select("valor")
         .eq("user_id", userId);
+      setTotalDespesasFixas(
+        fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
+      );
 
-      const totalFixas =
-        fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-      setTotalDespesasFixas(totalFixas);
-
-      // F) Meta Fixada
       const { data: metaData } = await supabase
         .from("metas")
         .select("*")
         .eq("user_id", userId)
         .eq("fixada", true)
         .maybeSingle();
-
       if (metaData) {
         setMetaFixada(metaData);
         const totalMeta =
@@ -230,9 +168,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           Number(metaData.valor_atual) ||
           Number(metaData.valor_depositado) ||
           0;
-
-        const porcentagem = Math.min((atualMeta / totalMeta) * 100, 100);
-        setProgressoMeta(porcentagem);
+        setProgressoMeta(Math.min((atualMeta / totalMeta) * 100, 100));
       } else {
         setMetaFixada(null);
       }
@@ -247,8 +183,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (userId) fetchDashboardData();
   }, [fetchDashboardData, userId]);
 
-  // quando o Header aplicar filtro (drawer), o dashboard atualiza
   useEffect(() => {
+    const current =
+      localStorage.getItem(STORAGE_MONTH_KEY) || getCurrentYearMonth();
+    setMesSelecionado(current);
+
     function onFilterChanged() {
       fetchDashboardData();
     }
@@ -259,6 +198,35 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const formatMoney = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
+  const dadosGraficoEvolucao = useMemo(() => {
+    const hoje = new Date();
+    const diasFiltrar =
+      periodoGrafico === "7D" ? 7 : periodoGrafico === "30D" ? 30 : 999;
+    const dataLimite = new Date(
+      hoje.getTime() - diasFiltrar * 24 * 60 * 60 * 1000,
+    );
+
+    const filtrados = despesasBrutas.filter(
+      (d) => new Date(d.data_vencimento) >= dataLimite,
+    );
+
+    const agrupado = filtrados.reduce((acc: any, curr) => {
+      const dataStr = new Date(curr.data_vencimento).toLocaleDateString(
+        "pt-BR",
+        { day: "2-digit", month: "2-digit" },
+      );
+      acc[dataStr] = (acc[dataStr] || 0) + Number(curr.valor);
+      return acc;
+    }, {});
+
+    return Object.keys(agrupado)
+      .sort()
+      .map((data) => ({
+        data,
+        valor: agrupado[data],
+      }));
+  }, [despesasBrutas, periodoGrafico]);
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -268,218 +236,260 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   }
 
   return (
-    <div className="space-y-6 p-4 md:p-6 animate-in fade-in slide-in-from-bottom-4">
-      {/* TOTAIS (3 COLUNAS) - desktop only */}
-      <div className="hidden md:grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        {/* 1. RECEITAS (Verde) - confirmadas */}
-        <Card className="border-l-4 border-l-green-500 shadow-sm">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Entradas Confirmadas
-            </CardTitle>
-            <TrendingUp className="h-4 w-4 text-green-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-green-600">
+    <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4 bg-background">
+      {/* SEÇÃO 1: RESUMO FINANCEIRO - APENAS DESKTOP */}
+      <section className="hidden md:block">
+        <h2 className="text-lg font-semibold mb-4 text-foreground/80">
+          Visão Geral
+        </h2>
+        <div className="grid gap-6 grid-cols-3">
+          <div className="pb-4 border-b border-border/50">
+            <div className="flex items-center gap-2 text-sm font-medium text-green-600 mb-1">
+              <TrendingUp className="h-4 w-4" /> Entradas Confirmadas
+            </div>
+            <div className="text-3xl font-light text-foreground">
               {formatMoney(totalReceitas)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Já recebido em conta
-            </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* 2. DESPESAS VARIÁVEIS (Vermelho) */}
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Gastos Variáveis
-            </CardTitle>
-            <TrendingDown className="h-4 w-4 text-red-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-red-500">
+          <div className="pb-4 border-b border-border/50">
+            <div className="flex items-center gap-2 text-sm font-medium text-red-500 mb-1">
+              <TrendingDown className="h-4 w-4" /> Gastos Variáveis
+            </div>
+            <div className="text-3xl font-light text-foreground">
               {formatMoney(totalDespesas)}
             </div>
-            <p className="text-xs text-muted-foreground mt-1">
-              Total acumulado
-            </p>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* 3. DESPESAS FIXAS (Azul) */}
-        <Card
-          onClick={() => onNavigate && onNavigate("despesas_fixas")}
-          className="cursor-pointer hover:bg-accent/50 transition-colors"
-        >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">
-              Contas Fixas Mensais
-            </CardTitle>
-            <Wallet className="h-4 w-4 text-blue-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-blue-500">
+          <div
+            onClick={() => onNavigate && onNavigate("despesas_fixas")}
+            className="pb-4 border-b border-border/50 cursor-pointer hover:opacity-70 transition-opacity"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1">
+              <Wallet className="h-4 w-4" /> Contas Fixas Mensais
+            </div>
+            <div className="text-3xl font-light text-foreground">
               {formatMoney(totalDespesasFixas)}
             </div>
-            <div className="flex items-center text-xs text-muted-foreground mt-1">
-              Recorrência mensal
-              <ArrowRight className="h-3 w-3 ml-1" />
+          </div>
+        </div>
+      </section>
+
+      {/* SEÇÃO 2: EVOLUÇÃO DAS DESPESAS - APENAS DESKTOP */}
+      <section className="pt-4 hidden md:block">
+        <div className="flex items-center justify-between mb-6">
+          <h2 className="text-lg font-semibold text-foreground/80">
+            Evolução das Despesas
+          </h2>
+          <div className="flex bg-muted rounded-md p-1">
+            {(["7D", "30D", "ALL"] as const).map((periodo) => (
+              <button
+                key={periodo}
+                onClick={() => setPeriodoGrafico(periodo)}
+                className={`px-3 py-1 text-xs font-medium rounded-sm transition-colors ${
+                  periodoGrafico === periodo
+                    ? "bg-background shadow text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
+              >
+                {periodo === "ALL" ? "Tudo" : periodo}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="h-[250px] w-full">
+          {dadosGraficoEvolucao.length > 0 ? (
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              minWidth={1}
+              minHeight={1}
+            >
+              <LineChart
+                data={dadosGraficoEvolucao}
+                margin={{ top: 5, right: 0, left: -20, bottom: 0 }}
+              >
+                <CartesianGrid
+                  strokeDasharray="3 3"
+                  vertical={false}
+                  stroke="rgba(255,255,255,0.1)"
+                />
+                <XAxis
+                  dataKey="data"
+                  axisLine={false}
+                  tickLine={false}
+                  tick={{ fontSize: 12, fill: "currentColor", opacity: 0.5 }}
+                />
+                <YAxis
+                  axisLine={false}
+                  tickLine={false}
+                  tickFormatter={(val) => `R$${val}`}
+                  tick={{ fontSize: 12, fill: "currentColor", opacity: 0.5 }}
+                />
+                <Tooltip
+                  formatter={(value: number) => [
+                    formatMoney(value),
+                    "Despesas",
+                  ]}
+                  contentStyle={{
+                    borderRadius: "8px",
+                    border: "none",
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    backgroundColor: "var(--background)",
+                  }}
+                />
+                <Line
+                  type="monotone"
+                  dataKey="valor"
+                  stroke="#f97316"
+                  strokeWidth={3}
+                  dot={{ r: 4, fill: "#f97316" }}
+                  activeDot={{ r: 6 }}
+                />
+              </LineChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="h-full flex items-center justify-center text-sm text-muted-foreground">
+              Sem dados suficientes para o período.
             </div>
-          </CardContent>
-        </Card>
+          )}
+        </div>
+      </section>
+
+      {/* SEÇÃO 3: CATEGORIAS E PRÓXIMOS VENCIMENTOS - MOBILE E DESKTOP */}
+      <div className="grid gap-12 md:grid-cols-2 pt-4">
+        {/* Onde estou gastando? */}
+        <section>
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
+            <TrendingDown className="h-5 w-5 text-orange-500" /> Onde estou
+            gastando?
+          </h2>
+          <div className="space-y-5">
+            {categoriasChart.length > 0 ? (
+              categoriasChart.map((item, index) => (
+                <div key={index} className="space-y-1.5">
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="font-medium text-foreground">
+                      {item.name}
+                    </span>
+                    <span className="text-muted-foreground">
+                      {formatMoney(item.value)}
+                    </span>
+                  </div>
+                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                    <div
+                      className="h-full bg-orange-500 transition-all duration-500"
+                      style={{
+                        width:
+                          totalDespesas > 0
+                            ? `${(item.value / totalDespesas) * 100}%`
+                            : "0%",
+                      }}
+                    />
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Sem gastos neste período.
+              </div>
+            )}
+          </div>
+        </section>
+
+        {/* Contas a Pagar */}
+        <section>
+          <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
+            <AlertCircle className="h-5 w-5 text-blue-500" /> Próximos
+            Vencimentos
+          </h2>
+          <div className="space-y-0">
+            {proximosVencimentos.length > 0 ? (
+              proximosVencimentos.map((item) => {
+                const dataVenc = new Date(item.data_vencimento);
+                dataVenc.setMinutes(
+                  dataVenc.getMinutes() + dataVenc.getTimezoneOffset(),
+                );
+                const hoje = new Date();
+                hoje.setHours(0, 0, 0, 0);
+                const isAtrasado = dataVenc < hoje;
+
+                return (
+                  <div
+                    key={item.id}
+                    className="flex items-center justify-between py-3 border-b border-border/40 last:border-0 hover:bg-muted/30 transition-colors -mx-2 px-2 rounded-md"
+                  >
+                    <div className="space-y-1">
+                      <p className="font-medium leading-none text-sm text-foreground">
+                        {item.descricao}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                          className={`flex items-center gap-1 ${isAtrasado ? "text-red-500 font-medium" : ""}`}
+                        >
+                          <Calendar className="h-3 w-3" />
+                          {dataVenc.toLocaleDateString("pt-BR")}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <span className="font-medium block text-sm text-foreground">
+                        {formatMoney(item.valor)}
+                      </span>
+                      {isAtrasado && (
+                        <span className="text-[10px] text-red-500 uppercase font-bold">
+                          Vencido
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-sm text-muted-foreground">
+                Tudo pago! Nenhuma conta pendente próxima.
+              </div>
+            )}
+          </div>
+        </section>
       </div>
 
       {/* META FIXADA */}
       {metaFixada && (
-        <Card
+        <section
           onClick={() => onNavigate && onNavigate("metas")}
-          className="border-l-4 border-l-primary shadow-sm bg-card/50 backdrop-blur-sm cursor-pointer hover:bg-accent/50 transition-colors"
+          className="mt-8 pt-6 border-t border-border/50 cursor-pointer hover:opacity-80 transition-opacity"
         >
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
-              <Target className="h-5 w-5 text-primary" />
-              Meta: {metaFixada.nome}
-            </CardTitle>
-            <ArrowRight className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              <div className="flex justify-between text-sm font-medium">
-                <span className="text-muted-foreground">Progresso</span>
-                <span>{progressoMeta.toFixed(1)}%</span>
-              </div>
-              <Progress value={progressoMeta} className="h-3 rounded-full" />
-              <div className="flex justify-between text-xs text-muted-foreground pt-1">
-                <span>
-                  {formatMoney(
-                    Number(
-                      metaFixada.valor_atual ||
-                        metaFixada.valor_depositado ||
-                        0,
-                    ),
-                  )}
-                </span>
-                <span>
-                  de{" "}
-                  {formatMoney(
-                    Number(
-                      metaFixada.valor_objetivo || metaFixada.valor_total || 0,
-                    ),
-                  )}
-                </span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+              <Target className="h-4 w-4 text-primary" /> Meta:{" "}
+              {metaFixada.nome}
+            </h2>
+            <span className="text-sm font-medium text-foreground">
+              {progressoMeta.toFixed(1)}%
+            </span>
+          </div>
+          <Progress value={progressoMeta} className="h-2 mb-2" />
+          <div className="flex justify-between text-xs text-muted-foreground">
+            <span>
+              {formatMoney(
+                Number(
+                  metaFixada.valor_atual || metaFixada.valor_depositado || 0,
+                ),
+              )}
+            </span>
+            <span>
+              Objetivo:{" "}
+              {formatMoney(
+                Number(
+                  metaFixada.valor_objetivo || metaFixada.valor_total || 0,
+                ),
+              )}
+            </span>
+          </div>
+        </section>
       )}
-
-      {/* GRÁFICO (BARRINHAS) + VENCIMENTOS */}
-      <div className="grid gap-4 md:grid-cols-2">
-        {/* Gráfico */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <TrendingDown className="h-5 w-5 text-orange-500" />
-              Onde estou gastando?
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {categoriasChart.length > 0 ? (
-                categoriasChart.map((item, index) => (
-                  <div key={index} className="space-y-1">
-                    <div className="flex items-center justify-between text-sm">
-                      <span className="font-medium">{item.name}</span>
-                      <span className="text-muted-foreground">
-                        {formatMoney(item.value)}
-                      </span>
-                    </div>
-                    <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
-                      <div
-                        className="h-full bg-orange-500/80 transition-all duration-500"
-                        style={{
-                          width:
-                            totalDespesas > 0
-                              ? `${(item.value / totalDespesas) * 100}%`
-                              : "0%",
-                        }}
-                      />
-                    </div>
-                  </div>
-                ))
-              ) : (
-                <div className="py-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
-                  Sem gastos neste período.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Próximos Vencimentos */}
-        <Card className="shadow-sm">
-          <CardHeader>
-            <CardTitle className="text-base flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-blue-500" />
-              Contas a Pagar (Próximas)
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {proximosVencimentos.length > 0 ? (
-                proximosVencimentos.map((item) => {
-                  const dataVenc = new Date(item.data_vencimento);
-                  dataVenc.setMinutes(
-                    dataVenc.getMinutes() + dataVenc.getTimezoneOffset(),
-                  );
-
-                  const hoje = new Date();
-                  hoje.setHours(0, 0, 0, 0);
-                  const isAtrasado = dataVenc < hoje;
-
-                  return (
-                    <div
-                      key={item.id}
-                      className="flex items-center justify-between rounded-lg border p-3 hover:bg-accent/50 transition-colors"
-                    >
-                      <div className="space-y-1">
-                        <p className="font-medium leading-none text-sm">
-                          {item.descricao}
-                        </p>
-                        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                          <span
-                            className={`flex items-center gap-1 ${
-                              isAtrasado ? "text-red-500 font-bold" : ""
-                            }`}
-                          >
-                            <Calendar className="h-3 w-3" />
-                            {dataVenc.toLocaleDateString("pt-BR")}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="text-right">
-                        <span className="font-bold block text-sm">
-                          {formatMoney(item.valor)}
-                        </span>
-                        {isAtrasado && (
-                          <span className="text-[10px] text-red-500 uppercase font-bold">
-                            Vencido
-                          </span>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })
-              ) : (
-                <div className="py-6 text-center text-sm text-muted-foreground border border-dashed rounded-lg">
-                  Tudo pago! Nenhuma conta pendente próxima.
-                </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
     </div>
   );
 }

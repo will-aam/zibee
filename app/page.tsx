@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -14,7 +13,6 @@ import Receitas from "@/components/receitas";
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [filtersOpen, setFiltersOpen] = useState(false);
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300">
@@ -33,12 +31,7 @@ export default function Home() {
         }`}
       >
         {/* CABEÇALHO MOBILE */}
-        {activeTab === "dashboard" && (
-          <Header
-            onOpenFilters={() => setFiltersOpen(true)}
-            onNavigate={setActiveTab}
-          />
-        )}
+        {activeTab === "dashboard" && <Header onNavigate={setActiveTab} />}
 
         <div
           className={

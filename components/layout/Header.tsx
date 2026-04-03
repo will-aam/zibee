@@ -3,17 +3,22 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
-import { Settings } from "lucide-react";
+import { Filter } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
+import DateRangeFilterDrawer, {
+  FILTER_EVENT,
+  STORAGE_FROM_KEY,
+  STORAGE_TO_KEY,
+} from "@/components/layout/DateRangeFilterDrawer";
 import ProfileAvatarModal, {
   type AvatarSelection,
   type AvatarStyle,
 } from "@/components/profile/ProfileAvatarModal";
 
 interface HeaderProps {
-  onOpenFilters: () => void;
+  onOpenFilters?: () => void;
   onNavigate?: (tab: string) => void;
 }
 
@@ -76,6 +81,7 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
   const baseSeed = userName;
 
   const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
+  const [openFilterDrawer, setOpenFilterDrawer] = React.useState(false);
 
   // Avatar
   const [loadingAvatar, setLoadingAvatar] = React.useState(true);
@@ -96,11 +102,17 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
   const [totalDespesasFixas, setTotalDespesasFixas] = React.useState(0);
 
   // Saldo geral: SOMENTE entradas confirmadas - gastos variáveis
-  // Regra: se não tiver entradas confirmadas, não calcula (fica 0)
   const saldoGeral = React.useMemo(() => {
     if (!totalReceitas || totalReceitas <= 0) return 0;
     return totalReceitas - totalDespesas;
   }, [totalReceitas, totalDespesas]);
+
+  // ====== ler range salvo (De/Até) ======
+  const readRange = React.useCallback(() => {
+    const from = localStorage.getItem(STORAGE_FROM_KEY);
+    const to = localStorage.getItem(STORAGE_TO_KEY);
+    return { from: from || null, to: to || null };
+  }, []);
 
   // ====== Carregar Avatar (API) ======
   React.useEffect(() => {
@@ -195,74 +207,100 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
   );
 
   // ====== Carregar Totais (Supabase direto) ======
+  const loadTotals = React.useCallback(async () => {
+    if (!userId) {
+      setLoadingTotals(false);
+      return;
+    }
+
+    setLoadingTotals(true);
+
+    const { from, to } = readRange();
+
+    try {
+      // Entradas confirmadas
+      let receitasQuery = supabase
+        .from("lancamentos")
+        .select("valor")
+        .eq("user_id", userId)
+        .eq("tipo", "Receita")
+        .eq("pago", true);
+
+      // Gastos variáveis (hoje: tudo do tipo Despesa)
+      let despesasQuery = supabase
+        .from("lancamentos")
+        .select("valor")
+        .eq("user_id", userId)
+        .eq("tipo", "Despesa");
+
+      // Contas fixas mensais (métrica separada) — por enquanto não filtramos por data
+      // (é recorrência mensal cadastral, não um lançamento com vencimento)
+      const fixasQuery = supabase
+        .from("despesas_fixas")
+        .select("valor")
+        .eq("user_id", userId);
+
+      if (from) {
+        receitasQuery = receitasQuery.gte("data_vencimento", from);
+        despesasQuery = despesasQuery.gte("data_vencimento", from);
+      }
+      if (to) {
+        receitasQuery = receitasQuery.lte("data_vencimento", to);
+        despesasQuery = despesasQuery.lte("data_vencimento", to);
+      }
+
+      const [
+        { data: receitasData, error: receitasError },
+        { data: despesasData, error: despesasError },
+        { data: fixasData, error: fixasError },
+      ] = await Promise.all([receitasQuery, despesasQuery, fixasQuery]);
+
+      if (receitasError) throw receitasError;
+      if (despesasError) throw despesasError;
+      if (fixasError) throw fixasError;
+
+      const rec =
+        receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const desp =
+        despesasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const fix =
+        fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+
+      setTotalReceitas(rec);
+      setTotalDespesas(desp);
+      setTotalDespesasFixas(fix);
+    } catch {
+      setTotalReceitas(0);
+      setTotalDespesas(0);
+      setTotalDespesasFixas(0);
+    } finally {
+      setLoadingTotals(false);
+    }
+  }, [readRange, userId]);
+
+  // load inicial
   React.useEffect(() => {
     let cancelled = false;
 
-    async function loadTotals() {
-      if (!userId) {
-        setLoadingTotals(false);
-        return;
-      }
-
-      setLoadingTotals(true);
-
-      try {
-        // Entradas confirmadas
-        const { data: receitasData, error: receitasError } = await supabase
-          .from("lancamentos")
-          .select("valor")
-          .eq("user_id", userId)
-          .eq("tipo", "Receita")
-          .eq("pago", true);
-
-        if (receitasError) throw receitasError;
-
-        // Gastos variáveis (hoje: tudo do tipo Despesa)
-        const { data: despesasData, error: despesasError } = await supabase
-          .from("lancamentos")
-          .select("valor")
-          .eq("user_id", userId)
-          .eq("tipo", "Despesa");
-
-        if (despesasError) throw despesasError;
-
-        // Contas fixas mensais (métrica separada)
-        const { data: fixasData, error: fixasError } = await supabase
-          .from("despesas_fixas")
-          .select("valor")
-          .eq("user_id", userId);
-
-        if (fixasError) throw fixasError;
-
-        if (cancelled) return;
-
-        const rec =
-          receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-        const desp =
-          despesasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-        const fix =
-          fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-
-        setTotalReceitas(rec);
-        setTotalDespesas(desp);
-        setTotalDespesasFixas(fix);
-      } catch {
-        if (!cancelled) {
-          setTotalReceitas(0);
-          setTotalDespesas(0);
-          setTotalDespesasFixas(0);
-        }
-      } finally {
-        if (!cancelled) setLoadingTotals(false);
-      }
+    async function run() {
+      if (cancelled) return;
+      await loadTotals();
     }
 
-    loadTotals();
-
+    run();
     return () => {
       cancelled = true;
     };
-  }, [userId]);
+  }, [loadTotals]);
+
+  // reagir ao filtro aplicado no drawer
+  React.useEffect(() => {
+    function onFilterChanged() {
+      loadTotals();
+    }
+    window.addEventListener(FILTER_EVENT, onFilterChanged);
+    return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
+  }, [loadTotals]);
 
   return (
     <section className="md:hidden">
@@ -300,11 +338,14 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
 
           <button
             type="button"
-            onClick={onOpenFilters}
+            onClick={() => {
+              onOpenFilters?.();
+              setOpenFilterDrawer(true);
+            }}
             className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
             aria-label="Abrir filtros"
           >
-            <Settings className="h-5 w-5" />
+            <Filter className="h-5 w-5" />
           </button>
         </div>
       </header>
@@ -320,6 +361,11 @@ export default function Header({ onOpenFilters, onNavigate }: HeaderProps) {
           onNavigate={(target) => onNavigate?.(target)}
         />
       )}
+
+      <DateRangeFilterDrawer
+        open={openFilterDrawer}
+        onClose={() => setOpenFilterDrawer(false)}
+      />
 
       <ProfileAvatarModal
         open={openProfileDrawer}

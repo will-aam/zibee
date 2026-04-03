@@ -1,17 +1,9 @@
-// components/dashboard.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Progress } from "@/components/ui/progress";
 import {
   TrendingDown,
@@ -28,12 +20,37 @@ interface DashboardProps {
   onNavigate?: (tab: string) => void;
 }
 
+// compat: chaves atuais + novas do filtro por data
+const STORAGE_MONTH_KEY = "dashboardFiltroMes";
+const STORAGE_FROM_KEY = "dashboardFiltroDe";
+const STORAGE_TO_KEY = "dashboardFiltroAte";
+const FILTER_EVENT = "dashboard:filter-changed";
+
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+
+function getCurrentYearMonth() {
+  const now = new Date();
+  const y = now.getFullYear();
+  const m = pad2(now.getMonth() + 1);
+  return `${y}-${m}`; // YYYY-MM
+}
+
+function monthToRange(anoMes: string) {
+  const [ano, mes] = anoMes.split("-");
+  const dataInicio = `${anoMes}-01`;
+  const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
+  const dataFim = `${anoMes}-${pad2(ultimoDia)}`;
+  return { from: dataInicio, to: dataFim };
+}
+
 export default function Dashboard({ onNavigate }: DashboardProps) {
   // --- USER SESSION ---
   const session = authClient.useSession();
   const userId = session.data?.user.id;
 
-  // --- ESTADOS DO FILTRO ---
+  // --- ESTADOS DO FILTRO (mantidos como fallback/compat) ---
   const [mesSelecionado, setMesSelecionado] = useState("todos");
   const [mesesDisponiveis, setMesesDisponiveis] = useState<string[]>([]);
 
@@ -50,16 +67,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [metaFixada, setMetaFixada] = useState<any>(null);
   const [progressoMeta, setProgressoMeta] = useState(0);
 
-  // 1. Formatar mês
-  const formatarMesLegivel = (anoMes: string) => {
-    if (anoMes === "todos") return "Todos os períodos";
-    const [ano, mes] = anoMes.split("-");
-    const data = new Date(Number(ano), Number(mes) - 1, 1);
-    const nomeMes = data.toLocaleString("pt-BR", { month: "long" });
-    return `${nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1)} de ${ano}`;
-  };
-
-  // 2. Buscar meses disponíveis
+  // Buscar meses disponíveis (pode remover depois se não for usar)
   const fetchMeses = useCallback(async () => {
     if (!userId) return;
     try {
@@ -85,46 +93,63 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     }
   }, [userId]);
 
-  // 3. Inicialização Filtro
+  // Inicialização compat (mês)
   useEffect(() => {
-    if (userId) {
-      fetchMeses();
-    }
-    const filtroSalvo = localStorage.getItem("dashboardFiltroMes");
+    if (userId) fetchMeses();
+
+    const filtroSalvo = localStorage.getItem(STORAGE_MONTH_KEY);
     if (filtroSalvo) {
       setMesSelecionado(filtroSalvo);
+    } else {
+      // padrão: mês atual (como você pediu)
+      const current = getCurrentYearMonth();
+      setMesSelecionado(current);
+      localStorage.setItem(STORAGE_MONTH_KEY, current);
     }
   }, [userId, fetchMeses]);
 
-  const handleFiltroChange = (valor: string) => {
-    setMesSelecionado(valor);
-    localStorage.setItem("dashboardFiltroMes", valor);
-  };
+  // Lê filtros: prioridade para De/Até (localStorage) -> fallback mês -> todos
+  const readRange = useCallback((): {
+    from: string | null;
+    to: string | null;
+  } => {
+    const from = localStorage.getItem(STORAGE_FROM_KEY);
+    const to = localStorage.getItem(STORAGE_TO_KEY);
 
-  // 4. Buscar Dados do Dashboard
+    if (from || to) {
+      return { from: from || null, to: to || null };
+    }
+
+    const mes = localStorage.getItem(STORAGE_MONTH_KEY) || mesSelecionado;
+
+    if (!mes || mes === "todos") return { from: null, to: null };
+
+    return monthToRange(mes);
+  }, [mesSelecionado]);
+
+  // Buscar Dados do Dashboard
   const fetchDashboardData = useCallback(async () => {
     if (!userId) return;
 
     try {
       setLoading(true);
 
+      const { from, to } = readRange();
+
       // --- Queries Base ---
-      // Despesas (Mantém a lógica de ver o comprometimento total, pago ou não)
       let queryDespesas = supabase
         .from("lancamentos")
         .select("*")
         .eq("user_id", userId)
         .eq("tipo", "Despesa");
 
-      // Receitas (ALTERAÇÃO AQUI: Só o que já entrou no bolso)
       let queryReceitas = supabase
         .from("lancamentos")
         .select("*")
         .eq("user_id", userId)
         .eq("tipo", "Receita")
-        .eq("pago", true); // <--- TRAVA DE SEGURANÇA: Só soma se estiver marcado como recebido
+        .eq("pago", true);
 
-      // Vencimentos (Contas a Pagar)
       let queryVencimentos = supabase
         .from("lancamentos")
         .select("*")
@@ -134,30 +159,22 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .order("data_vencimento", { ascending: true })
         .limit(5);
 
-      // --- Aplicar Filtro de Mês ---
-      if (mesSelecionado !== "todos") {
-        const [ano, mes] = mesSelecionado.split("-");
-        const dataInicio = `${mesSelecionado}-01`;
-        const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
-        const dataFim = `${mesSelecionado}-${ultimoDia}`;
-
-        queryDespesas = queryDespesas
-          .gte("data_vencimento", dataInicio)
-          .lte("data_vencimento", dataFim);
-
-        queryReceitas = queryReceitas
-          .gte("data_vencimento", dataInicio)
-          .lte("data_vencimento", dataFim);
-
-        queryVencimentos = queryVencimentos
-          .gte("data_vencimento", dataInicio)
-          .lte("data_vencimento", dataFim);
+      if (from) {
+        queryDespesas = queryDespesas.gte("data_vencimento", from);
+        queryReceitas = queryReceitas.gte("data_vencimento", from);
+        queryVencimentos = queryVencimentos.gte("data_vencimento", from);
+      }
+      if (to) {
+        queryDespesas = queryDespesas.lte("data_vencimento", to);
+        queryReceitas = queryReceitas.lte("data_vencimento", to);
+        queryVencimentos = queryVencimentos.lte("data_vencimento", to);
       }
 
-      // Executar Queries
-      const { data: lancamentosData } = await queryDespesas;
-      const { data: receitasData } = await queryReceitas;
-      const { data: vencimentosData } = await queryVencimentos;
+      const [
+        { data: lancamentosData },
+        { data: receitasData },
+        { data: vencimentosData },
+      ] = await Promise.all([queryDespesas, queryReceitas, queryVencimentos]);
 
       // A) Total Despesas
       const totalDesp =
@@ -170,9 +187,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       setTotalReceitas(totalRec);
 
-      // C) Cálculo das Categorias
+      // C) Categorias chart
       const categoriasMap = lancamentosData?.reduce((acc: any, curr) => {
-        acc[curr.categoria] = (acc[curr.categoria] || 0) + Number(curr.valor);
+        const key = curr.categoria || "Sem categoria";
+        acc[key] = (acc[key] || 0) + Number(curr.valor);
         return acc;
       }, {});
 
@@ -186,7 +204,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       // D) Próximos Vencimentos
       setProximosVencimentos(vencimentosData || []);
 
-      // E) Despesas Fixas
+      // E) Despesas Fixas (não filtra por data porque é recorrência mensal cadastrada)
       const { data: fixasData } = await supabase
         .from("despesas_fixas")
         .select("valor")
@@ -223,13 +241,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     } finally {
       setLoading(false);
     }
-  }, [mesSelecionado, userId]);
+  }, [readRange, userId]);
 
   useEffect(() => {
-    if (userId) {
+    if (userId) fetchDashboardData();
+  }, [fetchDashboardData, userId]);
+
+  // quando o Header aplicar filtro (drawer), o dashboard atualiza
+  useEffect(() => {
+    function onFilterChanged() {
       fetchDashboardData();
     }
-  }, [fetchDashboardData, userId]);
+    window.addEventListener(FILTER_EVENT, onFilterChanged);
+    return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
+  }, [fetchDashboardData]);
 
   const formatMoney = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -244,34 +269,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="space-y-6 p-4 md:p-6 animate-in fade-in slide-in-from-bottom-4">
-      {/* HEADER + FILTRO */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div className="w-full sm:w-[200px]">
-          <Select value={mesSelecionado} onValueChange={handleFiltroChange}>
-            <SelectTrigger className="w-full">
-              <Calendar className="w-4 h-4 mr-2 text-muted-foreground" />
-              <SelectValue placeholder="Selecione o período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="todos">Todos os períodos</SelectItem>
-              {mesesDisponiveis.map((mes) => (
-                <SelectItem key={mes} value={mes}>
-                  {formatarMesLegivel(mes)}
-                </SelectItem>
-              ))}
-              {mesesDisponiveis.length === 0 && mesSelecionado !== "todos" && (
-                <SelectItem value={mesSelecionado}>
-                  {formatarMesLegivel(mesSelecionado)}
-                </SelectItem>
-              )}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
-
-      {/* TOTAIS (3 COLUNAS) */}
-      <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
-        {/* 1. RECEITAS (Verde) - AGORA SÓ CONFIRMADAS */}
+      {/* TOTAIS (3 COLUNAS) - desktop only */}
+      <div className="hidden md:grid gap-4 grid-cols-1 sm:grid-cols-2 md:grid-cols-3">
+        {/* 1. RECEITAS (Verde) - confirmadas */}
         <Card className="border-l-4 border-l-green-500 shadow-sm">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">
@@ -399,7 +399,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       <div
                         className="h-full bg-orange-500/80 transition-all duration-500"
                         style={{
-                          width: `${(item.value / totalDespesas) * 100}%`,
+                          width:
+                            totalDespesas > 0
+                              ? `${(item.value / totalDespesas) * 100}%`
+                              : "0%",
                         }}
                       />
                     </div>

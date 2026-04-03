@@ -4,6 +4,7 @@ import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "next-themes";
+import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
 // Configurei as variáveis para o Tailwind reconhecer as fontes corretamente
@@ -76,6 +77,7 @@ export default function RootLayout({
           disableTransitionOnChange // Evita animações estranhas ao mudar o tema
         >
           {children}
+          <Toaster />
         </ThemeProvider>
         <Analytics />
       </body>

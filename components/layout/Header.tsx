@@ -1,8 +1,11 @@
+// components/layout/Header.tsx
 "use client";
 
 import * as React from "react";
 import { authClient } from "@/lib/auth-client";
 import { Settings } from "lucide-react";
+import { useToast } from "@/hooks/use-toast";
+
 import ProfileAvatarModal, {
   type AvatarSelection,
   type AvatarStyle,
@@ -19,12 +22,7 @@ function getGreeting(): string {
   return "Boa noite";
 }
 
-const AVATAR_STORAGE_KEY = "zibee:profileAvatar";
-
-function getDefaultAvatar(seed: string): AvatarSelection {
-  // default: bottts-neutral
-  return { style: "bottts-neutral", seed: seed || "Zibee" };
-}
+const DEFAULT_STYLE: AvatarStyle = "bottts-neutral";
 
 function avatarUrl(style: AvatarStyle, seed: string) {
   const safeSeed = encodeURIComponent(seed || "Zibee");
@@ -33,48 +31,119 @@ function avatarUrl(style: AvatarStyle, seed: string) {
 
 export default function Header({ onOpenFilters }: HeaderProps) {
   const session = authClient.useSession();
-  const userName = session.data?.user.name || "Zibee";
+  const { toast } = useToast();
 
-  // seed: ideal é algo estável (id/email). Por enquanto usamos nome.
-  const seed = userName;
+  const userName = session.data?.user?.name || "Zibee";
+  const baseSeed = userName;
 
-  const [avatar, setAvatar] = React.useState<AvatarSelection>(() => {
-    // SSR safety: "use client" garante client, mas ainda assim guardamos fallback
-    return getDefaultAvatar(seed);
+  const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
+
+  const [loadingAvatar, setLoadingAvatar] = React.useState(true);
+  const [savingAvatar, setSavingAvatar] = React.useState(false);
+  const [saveErrorMessage, setSaveErrorMessage] = React.useState<string | null>(
+    null,
+  );
+
+  const [avatar, setAvatar] = React.useState<AvatarSelection>({
+    style: DEFAULT_STYLE,
+    seed: `${baseSeed}-1`,
   });
 
-  const [openProfileModal, setOpenProfileModal] = React.useState(false);
-
-  // carrega do localStorage quando montar
+  // Carrega do server (Better Auth + Supabase admin)
   React.useEffect(() => {
-    try {
-      const raw = localStorage.getItem(AVATAR_STORAGE_KEY);
-      if (!raw) {
-        setAvatar(getDefaultAvatar(seed));
-        return;
+    let cancelled = false;
+
+    async function loadAvatar() {
+      setLoadingAvatar(true);
+      try {
+        const res = await fetch("/api/profile/avatar", { method: "GET" });
+
+        if (!res.ok) {
+          // se for 401, usuário não está logado (ou cookie não chegou)
+          setLoadingAvatar(false);
+          return;
+        }
+
+        const data = (await res.json()) as {
+          avatar_style?: AvatarStyle;
+          avatar_seed?: string;
+        };
+
+        if (cancelled) return;
+
+        setAvatar({
+          style: (data.avatar_style || DEFAULT_STYLE) as AvatarStyle,
+          seed: data.avatar_seed?.trim() ? data.avatar_seed : `${baseSeed}-1`,
+        });
+      } catch {
+        // não quebra UI
+      } finally {
+        if (!cancelled) setLoadingAvatar(false);
       }
-      const parsed = JSON.parse(raw) as Partial<AvatarSelection>;
-      const style = (parsed.style as AvatarStyle) || "bottts-neutral";
-      const savedSeed = parsed.seed || seed;
-      setAvatar({ style, seed: savedSeed });
-    } catch {
-      setAvatar(getDefaultAvatar(seed));
     }
-    // seed muda se o usuário mudar; podemos rehidratar
-  }, [seed]);
 
-  // persiste quando avatar mudar
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(avatar));
-    } catch {
-      // ignore
-    }
-  }, [avatar]);
+    loadAvatar();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [baseSeed]);
+
+  const handleAvatarChange = React.useCallback(
+    async (next: AvatarSelection) => {
+      if (savingAvatar) return;
+
+      setSaveErrorMessage(null);
+      setAvatar(next); // otimista
+
+      setSavingAvatar(true);
+      try {
+        const res = await fetch("/api/profile/avatar", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            avatar_style: next.style,
+            avatar_seed: next.seed,
+          }),
+        });
+
+        if (!res.ok) {
+          const payload = await res.json().catch(() => null);
+          const msg =
+            payload?.error ||
+            "Não foi possível salvar agora. Verifique sua conexão e tente novamente.";
+
+          setSaveErrorMessage(msg);
+          toast({
+            title: "Erro ao salvar",
+            description: msg,
+            variant: "destructive",
+          });
+          return;
+        }
+
+        toast({
+          title: "Salvo!",
+          description: "Sua foto de perfil foi atualizada.",
+        });
+      } catch {
+        const msg =
+          "Falha de conexão. Tente novamente quando sua internet estabilizar.";
+        setSaveErrorMessage(msg);
+        toast({
+          title: "Erro ao salvar",
+          description: msg,
+          variant: "destructive",
+        });
+      } finally {
+        setSavingAvatar(false);
+      }
+    },
+    [savingAvatar, toast],
+  );
 
   return (
     <section className="md:hidden">
-      {/* HERO (20% maior) */}
       <header
         className="
           bg-primary text-primary-foreground
@@ -84,21 +153,22 @@ export default function Header({ onOpenFilters }: HeaderProps) {
         "
       >
         <div className="flex items-center gap-4">
-          {/* Avatar clicável */}
           <button
             type="button"
-            onClick={() => setOpenProfileModal(true)}
+            onClick={() => setOpenProfileDrawer(true)}
             className="shrink-0 h-16 w-16 rounded-full bg-primary-foreground/15 overflow-hidden flex items-center justify-center ring-1 ring-white/15"
             aria-label="Abrir configurações do perfil"
           >
             <img
-              src={avatarUrl(avatar.style, seed)}
+              src={avatarUrl(avatar.style, avatar.seed)}
               alt="Avatar do perfil"
-              className="h-full w-full object-cover"
+              className={[
+                "h-full w-full object-cover",
+                loadingAvatar ? "opacity-80" : "opacity-100",
+              ].join(" ")}
             />
           </button>
 
-          {/* Saudação + nome */}
           <div className="flex-1 min-w-0">
             <p className="text-sm opacity-90">{getGreeting()},</p>
             <p className="font-bold text-xl leading-tight truncate">
@@ -106,7 +176,6 @@ export default function Header({ onOpenFilters }: HeaderProps) {
             </p>
           </div>
 
-          {/* Botão (mantive Settings aqui como você pediu) */}
           <button
             onClick={onOpenFilters}
             className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
@@ -117,24 +186,14 @@ export default function Header({ onOpenFilters }: HeaderProps) {
         </div>
       </header>
 
-      {/*
-      // CARD “flutuando” — você vai substituir por outro componente.
-      // Exemplo:
-      // import QuickAccessCard from "@/components/....";
-      // <QuickAccessCard /> */}
-      <div className="-mt-10 px-4">
-        <div className="rounded-2xl bg-background shadow-sm border p-4">
-          <p className="text-sm text-muted-foreground">Acesso rápido</p>
-          <p className="text-base font-semibold">Seu painel</p>
-        </div>
-      </div>
-
       <ProfileAvatarModal
-        open={openProfileModal}
-        onClose={() => setOpenProfileModal(false)}
-        baseSeed={seed}
+        open={openProfileDrawer}
+        onClose={() => setOpenProfileDrawer(false)}
+        baseSeed={baseSeed}
         value={avatar}
-        onChange={(next) => setAvatar(next)}
+        onChange={handleAvatarChange}
+        saving={savingAvatar}
+        errorMessage={saveErrorMessage}
       />
     </section>
   );

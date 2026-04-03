@@ -1,7 +1,8 @@
+// components/profile/ProfileAvatarModal.tsx
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 
 export type AvatarStyle = "bottts-neutral" | "fun-emoji" | "lorelei-neutral";
 
@@ -29,15 +30,18 @@ function buildSeedOptions(baseSeed: string, count: number) {
 interface ProfileAvatarModalProps {
   open: boolean;
   onClose: () => void;
-
-  /** seed base do usuário (nome/id/email). Usamos só para gerar variações. */
   baseSeed: string;
 
   value: AvatarSelection;
   onChange: (next: AvatarSelection) => void;
 
-  /** quantas opções mostrar por estilo */
   optionsPerStyle?: number;
+
+  /** mostra estado de salvamento */
+  saving?: boolean;
+
+  /** opcional: mostrar msg de erro no rodapé */
+  errorMessage?: string | null;
 }
 
 export default function ProfileAvatarModal({
@@ -47,6 +51,8 @@ export default function ProfileAvatarModal({
   value,
   onChange,
   optionsPerStyle = 40,
+  saving = false,
+  errorMessage = null,
 }: ProfileAvatarModalProps) {
   const [activeStyle, setActiveStyle] = React.useState<AvatarStyle>(
     value.style,
@@ -76,7 +82,7 @@ export default function ProfileAvatarModal({
       {/* Overlay */}
       <button
         className="absolute inset-0 bg-black/40"
-        onClick={onClose}
+        onClick={saving ? undefined : onClose}
         aria-label="Fechar"
       />
 
@@ -93,16 +99,25 @@ export default function ProfileAvatarModal({
         {/* Header */}
         <div className="px-4 py-4 border-b flex items-start justify-between gap-4">
           <div className="min-w-0">
-            <p className="text-base font-semibold">Foto do perfil</p>
+            <div className="flex items-center gap-2">
+              <p className="text-base font-semibold">Foto do perfil</p>
+              {saving ? (
+                <span className="inline-flex items-center gap-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Salvando…
+                </span>
+              ) : null}
+            </div>
             <p className="text-sm text-muted-foreground wrap-break-word">
               Escolha um avatar da biblioteca
             </p>
           </div>
 
           <button
-            className="p-2 rounded-xl hover:bg-muted transition shrink-0"
+            className="p-2 rounded-xl hover:bg-muted transition shrink-0 disabled:opacity-50"
             onClick={onClose}
             aria-label="Fechar"
+            disabled={saving}
           >
             <X className="h-5 w-5" />
           </button>
@@ -117,8 +132,9 @@ export default function ProfileAvatarModal({
                 <button
                   key={s.id}
                   onClick={() => setActiveStyle(s.id)}
+                  disabled={saving}
                   className={[
-                    "px-3 py-2 rounded-xl text-sm border transition",
+                    "px-3 py-2 rounded-xl text-sm border transition disabled:opacity-50",
                     active
                       ? "bg-primary text-primary-foreground border-primary"
                       : "bg-background hover:bg-muted/40",
@@ -131,7 +147,7 @@ export default function ProfileAvatarModal({
           </div>
         </div>
 
-        {/* Grid (sem quadradinhos/borda ao redor de cada opção) */}
+        {/* Grid */}
         <div className="px-4 py-4 overflow-y-auto flex-1">
           <div className="grid grid-cols-4 gap-4">
             {seedOptions.map((seed) => {
@@ -142,8 +158,9 @@ export default function ProfileAvatarModal({
                 <button
                   key={`${activeStyle}:${seed}`}
                   onClick={() => onChange({ style: activeStyle, seed })}
+                  disabled={saving}
                   className={[
-                    "rounded-full transition active:scale-95",
+                    "rounded-full transition active:scale-95 disabled:opacity-60 disabled:active:scale-100",
                     selected
                       ? "ring-2 ring-primary ring-offset-2 ring-offset-background"
                       : "",
@@ -162,17 +179,24 @@ export default function ProfileAvatarModal({
             })}
           </div>
 
-          {/* <p className="text-[11px] text-muted-foreground mt-6 leading-snug wrap-break-word">
-            (Por enquanto) Isso salva no seu aparelho. Depois vamos salvar no
-            Supabase.
-          </p> */}
+          {/* Mensagens responsivas */}
+          {errorMessage ? (
+            <p className="text-xs text-destructive mt-6 leading-snug wrap-break-word">
+              {errorMessage}
+            </p>
+          ) : (
+            <p className="text-[11px] text-muted-foreground mt-6 leading-snug wrap-break-word">
+              Sua escolha é salva automaticamente.
+            </p>
+          )}
         </div>
 
-        {/* Footer (sem botão vermelho / sem carregar mais) */}
+        {/* Footer */}
         <div className="px-4 py-4 border-t">
           <button
-            className="w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground hover:opacity-95 transition"
+            className="w-full px-4 py-3 rounded-xl bg-primary text-primary-foreground hover:opacity-95 transition disabled:opacity-60"
             onClick={onClose}
+            disabled={saving}
           >
             Concluir
           </button>

@@ -1,10 +1,9 @@
-// components/profile/ProfileAvatarModal.tsx
 "use client";
 
 import * as React from "react";
 import { X, Loader2 } from "lucide-react";
 
-export type AvatarStyle = "bottts-neutral" | "fun-emoji" | "lorelei-neutral";
+export type AvatarStyle = "bottts-neutral" | "lorelei-neutral";
 
 export interface AvatarSelection {
   style: AvatarStyle;
@@ -13,7 +12,6 @@ export interface AvatarSelection {
 
 const STYLES: Array<{ id: AvatarStyle; label: string }> = [
   { id: "bottts-neutral", label: "Robôs" },
-  { id: "fun-emoji", label: "Emojis" },
   { id: "lorelei-neutral", label: "Personas" },
 ];
 
@@ -59,7 +57,12 @@ export default function ProfileAvatarModal({
   );
 
   React.useEffect(() => {
-    setActiveStyle(value.style);
+    // se por algum motivo vier um estilo antigo, cai pra bottts-neutral
+    const next =
+      value.style === "lorelei-neutral" || value.style === "bottts-neutral"
+        ? value.style
+        : "bottts-neutral";
+    setActiveStyle(next);
   }, [value.style]);
 
   React.useEffect(() => {
@@ -108,7 +111,7 @@ export default function ProfileAvatarModal({
                 </span>
               ) : null}
             </div>
-            <p className="text-sm text-muted-foreground wrap-break-word">
+            <p className="text-sm text-muted-foreground break-words">
               Escolha um avatar da biblioteca
             </p>
           </div>
@@ -181,11 +184,11 @@ export default function ProfileAvatarModal({
 
           {/* Mensagens responsivas */}
           {errorMessage ? (
-            <p className="text-xs text-destructive mt-6 leading-snug wrap-break-word">
+            <p className="text-xs text-destructive mt-6 leading-snug break-words">
               {errorMessage}
             </p>
           ) : (
-            <p className="text-[11px] text-muted-foreground mt-6 leading-snug wrap-break-word">
+            <p className="text-[11px] text-muted-foreground mt-6 leading-snug break-words">
               Sua escolha é salva automaticamente.
             </p>
           )}

@@ -186,6 +186,18 @@ export default function Header({ onOpenFilters }: HeaderProps) {
         </div>
       </header>
 
+      {/*
+      // CARD “flutuando” — você vai substituir por outro componente.
+      // Exemplo:
+      // import QuickAccessCard from "@/components/....";
+      // <QuickAccessCard /> */}
+      <div className="-mt-10 px-4">
+        <div className="rounded-2xl bg-background shadow-sm border p-4">
+          <p className="text-sm text-muted-foreground">Acesso rápido</p>
+          <p className="text-base font-semibold">Seu painel</p>
+        </div>
+      </div>
+
       <ProfileAvatarModal
         open={openProfileDrawer}
         onClose={() => setOpenProfileDrawer(false)}

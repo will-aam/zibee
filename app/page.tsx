@@ -3,6 +3,7 @@
 
 import { useState } from "react";
 import Sidebar from "@/components/layout/Sidebar";
+import Header from "@/components/layout/Header";
 import Dashboard from "@/components/dashboard";
 import Lancamentos from "@/components/lancamentos";
 import Metas from "@/components/metas";
@@ -13,6 +14,7 @@ import Receitas from "@/components/receitas";
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [filtersOpen, setFiltersOpen] = useState(false); // TODO: connect to Dashboard filter when implemented
 
   return (
     <div className="min-h-screen bg-background pb-20 md:pb-0 transition-all duration-300">
@@ -30,6 +32,10 @@ export default function Home() {
           sidebarCollapsed ? "md:pl-0 pt-16 md:pt-4" : "md:pl-64"
         }`}
       >
+        {/* CABEÇALHO MOBILE */}
+        {activeTab === "dashboard" && (
+          <Header onOpenFilters={() => setFiltersOpen(true)} />
+        )}
         <div
           className={
             sidebarCollapsed ? "max-w-7xl mx-auto px-4 sm:px-6 lg:px-8" : ""

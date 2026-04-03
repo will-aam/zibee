@@ -1,7 +1,12 @@
 "use client";
 
+import * as React from "react";
 import { authClient } from "@/lib/auth-client";
-import { User, Settings } from "lucide-react";
+import { Settings } from "lucide-react";
+import ProfileAvatarModal, {
+  type AvatarSelection,
+  type AvatarStyle,
+} from "@/components/profile/ProfileAvatarModal";
 
 interface HeaderProps {
   onOpenFilters: () => void;
@@ -14,26 +19,84 @@ function getGreeting(): string {
   return "Boa noite";
 }
 
+const AVATAR_STORAGE_KEY = "zibee:profileAvatar";
+
+function getDefaultAvatar(seed: string): AvatarSelection {
+  // default: bottts-neutral
+  return { style: "bottts-neutral", seed: seed || "Zibee" };
+}
+
+function avatarUrl(style: AvatarStyle, seed: string) {
+  const safeSeed = encodeURIComponent(seed || "Zibee");
+  return `https://api.dicebear.com/9.x/${style}/svg?seed=${safeSeed}&size=96`;
+}
+
 export default function Header({ onOpenFilters }: HeaderProps) {
   const session = authClient.useSession();
   const userName = session.data?.user.name || "Zibee";
 
+  // seed: ideal é algo estável (id/email). Por enquanto usamos nome.
+  const seed = userName;
+
+  const [avatar, setAvatar] = React.useState<AvatarSelection>(() => {
+    // SSR safety: "use client" garante client, mas ainda assim guardamos fallback
+    return getDefaultAvatar(seed);
+  });
+
+  const [openProfileModal, setOpenProfileModal] = React.useState(false);
+
+  // carrega do localStorage quando montar
+  React.useEffect(() => {
+    try {
+      const raw = localStorage.getItem(AVATAR_STORAGE_KEY);
+      if (!raw) {
+        setAvatar(getDefaultAvatar(seed));
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<AvatarSelection>;
+      const style = (parsed.style as AvatarStyle) || "bottts-neutral";
+      const savedSeed = parsed.seed || seed;
+      setAvatar({ style, seed: savedSeed });
+    } catch {
+      setAvatar(getDefaultAvatar(seed));
+    }
+    // seed muda se o usuário mudar; podemos rehidratar
+  }, [seed]);
+
+  // persiste quando avatar mudar
+  React.useEffect(() => {
+    try {
+      localStorage.setItem(AVATAR_STORAGE_KEY, JSON.stringify(avatar));
+    } catch {
+      // ignore
+    }
+  }, [avatar]);
+
   return (
     <section className="md:hidden">
-      {/* HERO (área grande azul) */}
+      {/* HERO (20% maior) */}
       <header
         className="
           bg-primary text-primary-foreground
           px-4
-          pt-[max(20px,env(safe-area-inset-top))]
-          pb-16
+          pt-[max(22px,env(safe-area-inset-top))]
+          pb-20
         "
       >
         <div className="flex items-center gap-4">
-          {/* Ícone de perfil / futuramente avatar */}
-          <div className="shrink-0 h-14 w-14 rounded-full bg-primary-foreground/20 flex items-center justify-center">
-            <User className="h-8 w-8" />
-          </div>
+          {/* Avatar clicável */}
+          <button
+            type="button"
+            onClick={() => setOpenProfileModal(true)}
+            className="shrink-0 h-16 w-16 rounded-full bg-primary-foreground/15 overflow-hidden flex items-center justify-center ring-1 ring-white/15"
+            aria-label="Abrir configurações do perfil"
+          >
+            <img
+              src={avatarUrl(avatar.style, seed)}
+              alt="Avatar do perfil"
+              className="h-full w-full object-cover"
+            />
+          </button>
 
           {/* Saudação + nome */}
           <div className="flex-1 min-w-0">
@@ -43,10 +106,10 @@ export default function Header({ onOpenFilters }: HeaderProps) {
             </p>
           </div>
 
-          {/* Botão de configurações (por enquanto reaproveitando handler) */}
+          {/* Botão (mantive Settings aqui como você pediu) */}
           <button
             onClick={onOpenFilters}
-            className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
+            className="shrink-0 p-3 rounded-2xl bg-primary-foreground/10 hover:bg-primary-foreground/15 active:scale-95 transition"
             aria-label="Abrir configurações"
           >
             <Settings className="h-5 w-5" />
@@ -65,6 +128,14 @@ export default function Header({ onOpenFilters }: HeaderProps) {
           <p className="text-base font-semibold">Seu painel</p>
         </div>
       </div>
+
+      <ProfileAvatarModal
+        open={openProfileModal}
+        onClose={() => setOpenProfileModal(false)}
+        baseSeed={seed}
+        value={avatar}
+        onChange={(next) => setAvatar(next)}
+      />
     </section>
   );
 }

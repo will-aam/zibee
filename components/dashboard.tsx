@@ -246,11 +246,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-6 p-4 md:p-6 animate-in fade-in slide-in-from-bottom-4">
       {/* HEADER + FILTRO */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold">Visão Geral</h1>
-          <p className="text-muted-foreground">Resumo financeiro</p>
-        </div>
-
         <div className="w-full sm:w-[200px]">
           <Select value={mesSelecionado} onValueChange={handleFiltroChange}>
             <SelectTrigger className="w-full">

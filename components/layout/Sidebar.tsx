@@ -1,23 +1,26 @@
 // components/layout/Sidebar.tsx
 "use client";
 
-import { useState } from "react"; // <--- NOVO IMPORT
+import { useState } from "react";
 import { Audiowide } from "next/font/google";
 import Image from "next/image";
 import { authClient } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
+import { Target, LogOut, Loader2 } from "lucide-react";
+
 import {
-  LayoutDashboard,
-  Receipt,
-  Target,
-  Settings,
-  Home as HomeIcon,
-  FileText,
-  Cog,
-  PieChart,
-  LogOut,
-  Loader2, // <--- NOVO ÍCONE DE LOADING
-} from "lucide-react";
+  HomeIcon as HomeSolid,
+  DocumentTextIcon as DocumentTextSolid,
+  ChartPieIcon as ChartPieSolid,
+  Cog6ToothIcon as CogSolid,
+} from "@heroicons/react/24/solid";
+
+import {
+  HomeIcon,
+  DocumentTextIcon,
+  ChartPieIcon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/outline";
 
 const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
 
@@ -37,11 +40,10 @@ export default function Sidebar({
   const router = useRouter();
   const session = authClient.useSession();
 
-  // ESTADO DE LOADING PARA O LOGOUT
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const handleLogout = async () => {
-    setIsLoggingOut(true); // <--- INICIA O LOADING
+    setIsLoggingOut(true);
     try {
       await authClient.signOut({
         fetchOptions: {
@@ -49,7 +51,6 @@ export default function Sidebar({
             router.push("/login");
           },
           onError: () => {
-            // Se falhar por algum motivo (ex: sem internet), desativa o loading
             setIsLoggingOut(false);
           },
         },
@@ -59,17 +60,29 @@ export default function Sidebar({
     }
   };
 
+  const navButtonClass = (isActive: boolean) =>
+    `group relative flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left
+     transition-all duration-200 ease-out
+     active:scale-[0.985]
+     cursor-pointer select-none
+     ${
+       isActive
+         ? "text-primary bg-primary/10"
+         : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+     }`;
+
   return (
     <>
-      {/* --- BOTÃO FLUTUANTE (APARECE QUANDO SIDEBAR ESTÁ RECOLHIDA 100%) --- */}
+      {/* BOTÃO FLUTUANTE */}
       <button
         onClick={() => setSidebarCollapsed(false)}
-        className={`hidden md:flex fixed top-4 left-4 z-50 items-center justify-center p-2 hover:scale-105 transition-all duration-300 cursor-pointer ${
-          sidebarCollapsed
-            ? "translate-x-0 opacity-100 delay-150"
-            : "-translate-x-full opacity-0 pointer-events-none"
-        }`}
-        title="Abrir Menu"
+        className={`hidden md:flex fixed cursor-pointer top-4 left-4 z-50 items-center justify-center rounded-xl p-2
+          transition-all duration-300 ease-out transform-gpu
+          ${
+            sidebarCollapsed
+              ? "translate-x-0 opacity-100 scale-100"
+              : "-translate-x-4 opacity-0 scale-95 pointer-events-none"
+          }`}
       >
         <Image
           src="/icons8-abelha-64.png"
@@ -77,168 +90,206 @@ export default function Sidebar({
           width={32}
           height={32}
           className="shrink-0"
+          priority
         />
       </button>
 
-      {/* --- SIDEBAR DESKTOP --- */}
+      {/* SIDEBAR DESKTOP */}
       <aside
-        className={`hidden md:fixed md:left-0 md:top-0 md:flex md:h-screen md:flex-col md:border-r md:bg-card md:w-64 transition-transform duration-300 z-40 ${
-          sidebarCollapsed ? "-translate-x-full" : "translate-x-0"
-        }`}
+        className={`hidden md:fixed md:left-0 md:top-0 md:flex md:h-screen md:w-64 md:flex-col
+          border-r bg-background/95 backdrop-blur-sm z-40 overflow-hidden
+          transform-gpu transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]
+          ${sidebarCollapsed ? "-translate-x-full" : "translate-x-0"}`}
       >
-        {/* CABEÇALHO CLICÁVEL (RECOLHE A SIDEBAR) */}
+        {/* conteúdo interno com animação separada */}
         <div
-          className="flex h-16 items-center gap-3 px-4 cursor-pointer"
-          onClick={() => setSidebarCollapsed(true)}
-          title="Recolher Menu"
+          className={`flex h-full flex-col transition-all duration-300 ease-out
+            ${
+              sidebarCollapsed
+                ? "opacity-0 translate-x-2"
+                : "opacity-100 translate-x-0"
+            }`}
         >
-          <Image
-            src="/icons8-abelha-64.png"
-            alt="Logo"
-            width={32}
-            height={32}
-            className="rounded-md shrink-0"
-          />
-          <h1
-            className={`text-xl text-primary truncate ${audiowide.className}`}
+          {/* CABEÇALHO */}
+          <div
+            className="flex h-16 items-center gap-3 px-4 cursor-pointer transition-all duration-200 active:scale-[0.99]"
+            onClick={() => setSidebarCollapsed(true)}
           >
-            {session.data?.user.name || "Zibee"}
-          </h1>
-        </div>
+            <Image
+              src="/icons8-abelha-64.png"
+              alt="Logo"
+              width={32}
+              height={32}
+              className="rounded-md shrink-0"
+              priority
+            />
+            <h1
+              className={`text-xl text-primary truncate ${audiowide.className}`}
+            >
+              {session.data?.user.name || "Zibee"}
+            </h1>
+          </div>
 
-        <nav className="flex-1 space-y-2 p-4">
-          <button
-            onClick={() => setActiveTab("dashboard")}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-all ${
-              activeTab === "dashboard"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <LayoutDashboard className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Dashboard</span>
-          </button>
+          <nav className="flex-1 space-y-2 p-4">
+            <button
+              onClick={() => setActiveTab("dashboard")}
+              className={navButtonClass(activeTab === "dashboard")}
+            >
+              {activeTab === "dashboard" ? (
+                <HomeSolid className="h-5 w-5 shrink-0" />
+              ) : (
+                <HomeIcon className="h-5 w-5 shrink-0" />
+              )}
+              <span className="font-medium">Dashboard</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab("lancamentos")}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-all ${
-              activeTab === "lancamentos"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <Receipt className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Lançamentos</span>
-          </button>
+            <button
+              onClick={() => setActiveTab("lancamentos")}
+              className={navButtonClass(activeTab === "lancamentos")}
+            >
+              {activeTab === "lancamentos" ? (
+                <DocumentTextSolid className="h-5 w-5 shrink-0" />
+              ) : (
+                <DocumentTextIcon className="h-5 w-5 shrink-0" />
+              )}
+              <span className="font-medium">Lançamentos</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab("receitas")}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-all ${
-              activeTab === "receitas"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <PieChart className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Planos</span>
-          </button>
+            <button
+              onClick={() => setActiveTab("receitas")}
+              className={navButtonClass(activeTab === "receitas")}
+            >
+              {activeTab === "receitas" ? (
+                <ChartPieSolid className="h-5 w-5 shrink-0" />
+              ) : (
+                <ChartPieIcon className="h-5 w-5 shrink-0" />
+              )}
+              <span className="font-medium">Planos</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab("metas")}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-all ${
-              activeTab === "metas"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <Target className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Metas</span>
-          </button>
+            <button
+              onClick={() => setActiveTab("metas")}
+              className={navButtonClass(activeTab === "metas")}
+            >
+              <Target
+                className={`h-5 w-5 shrink-0 transition-all duration-200 ${
+                  activeTab === "metas" ? "text-primary" : ""
+                }`}
+              />
+              <span className="font-medium">Metas</span>
+            </button>
 
-          <button
-            onClick={() => setActiveTab("configuracoes")}
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-all ${
-              activeTab === "configuracoes"
-                ? "bg-primary text-primary-foreground shadow-sm"
-                : "text-muted-foreground hover:bg-accent hover:text-accent-foreground"
-            }`}
-          >
-            <Settings className="h-5 w-5 shrink-0" />
-            <span className="font-medium">Configurações</span>
-          </button>
-        </nav>
+            <button
+              onClick={() => setActiveTab("configuracoes")}
+              className={navButtonClass(activeTab === "configuracoes")}
+            >
+              {activeTab === "configuracoes" ? (
+                <CogSolid className="h-5 w-5 shrink-0" />
+              ) : (
+                <Cog6ToothIcon className="h-5 w-5 shrink-0" />
+              )}
+              <span className="font-medium">Configurações</span>
+            </button>
+          </nav>
 
-        {/* --- RODAPÉ COM BOTÃO DE LOGOUT ATUALIZADO --- */}
-        <div className="p-4 border-t">
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut} // <--- Desabilita o botão para evitar múltiplos cliques
-            className={`flex w-full items-center gap-3 rounded-lg px-4 py-3 text-left transition-all ${
-              isLoggingOut
-                ? "text-red-400 opacity-70 cursor-not-allowed"
-                : "text-red-500 hover:bg-red-500/10"
-            }`}
-          >
-            {isLoggingOut ? (
-              <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
-            ) : (
-              <LogOut className="h-5 w-5 shrink-0" />
-            )}
-            <span className="font-medium">
-              {isLoggingOut ? "Saindo..." : "Sair"}
-            </span>
-          </button>
+          {/* RODAPÉ */}
+          <div className="p-4">
+            <button
+              onClick={handleLogout}
+              disabled={isLoggingOut}
+              className={`flex w-full items-center gap-3 rounded-xl px-4 py-3 text-left
+                transition-all duration-200 ease-out active:scale-[0.985]
+                ${
+                  isLoggingOut
+                    ? "text-red-400 opacity-70 cursor-not-allowed"
+                    : "text-red-500 hover:bg-red-500/10 cursor-pointer"
+                }`}
+            >
+              {isLoggingOut ? (
+                <Loader2 className="h-5 w-5 shrink-0 animate-spin" />
+              ) : (
+                <LogOut className="h-5 w-5 shrink-0" />
+              )}
+              <span className="font-medium">
+                {isLoggingOut ? "Saindo..." : "Sair"}
+              </span>
+            </button>
+          </div>
         </div>
       </aside>
 
-      {/* --- MENU MOBILE (Fixo embaixo) --- */}
-      <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50 md:hidden w-[95%] max-w-sm">
-        <div className="bg-card border rounded-2xl px-2 py-2 flex items-center justify-between shadow-xl backdrop-blur-sm bg-opacity-95">
+      {/* MOBILE */}
+      <div className="fixed bottom-4 left-1/2 z-50 w-[95%] max-w-sm -translate-x-1/2 md:hidden">
+        <div className="bg-card/95 backdrop-blur-sm border rounded-2xl px-2 py-2 flex items-center justify-between shadow-xl">
           <button
             onClick={() => setActiveTab("dashboard")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all ${
-              activeTab === "dashboard"
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground"
-            }`}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl
+              transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer
+              ${
+                activeTab === "dashboard"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground"
+              }`}
           >
-            <HomeIcon className="h-5 w-5" />
+            {activeTab === "dashboard" ? (
+              <HomeSolid className="h-5 w-5" />
+            ) : (
+              <HomeIcon className="h-5 w-5" />
+            )}
             <span className="text-[10px] mt-1 font-medium">Home</span>
           </button>
 
           <button
             onClick={() => setActiveTab("lancamentos")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all ${
-              activeTab === "lancamentos"
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground"
-            }`}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl
+              transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer
+              ${
+                activeTab === "lancamentos"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground"
+              }`}
           >
-            <FileText className="h-5 w-5" />
+            {activeTab === "lancamentos" ? (
+              <DocumentTextSolid className="h-5 w-5" />
+            ) : (
+              <DocumentTextIcon className="h-5 w-5" />
+            )}
             <span className="text-[10px] mt-1 font-medium">Lanç.</span>
           </button>
 
           <button
             onClick={() => setActiveTab("receitas")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all ${
-              activeTab === "receitas"
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground"
-            }`}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl
+              transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer
+              ${
+                activeTab === "receitas"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground"
+              }`}
           >
-            <PieChart className="h-5 w-5" />
+            {activeTab === "receitas" ? (
+              <ChartPieSolid className="h-5 w-5" />
+            ) : (
+              <ChartPieIcon className="h-5 w-5" />
+            )}
             <span className="text-[10px] mt-1 font-medium">Planos</span>
           </button>
 
           <button
             onClick={() => setActiveTab("configuracoes")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all ${
-              activeTab === "configuracoes" || activeTab === "despesas_fixas"
-                ? "text-primary bg-primary/10"
-                : "text-muted-foreground"
-            }`}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl
+              transition-all duration-200 ease-out active:scale-[0.97] cursor-pointer
+              ${
+                activeTab === "configuracoes" || activeTab === "despesas_fixas"
+                  ? "text-primary bg-primary/10"
+                  : "text-muted-foreground"
+              }`}
           >
-            <Cog className="h-5 w-5" />
+            {activeTab === "configuracoes" || activeTab === "despesas_fixas" ? (
+              <CogSolid className="h-5 w-5" />
+            ) : (
+              <Cog6ToothIcon className="h-5 w-5" />
+            )}
             <span className="text-[10px] mt-1 font-medium">Config</span>
           </button>
         </div>

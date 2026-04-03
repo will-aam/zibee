@@ -1,11 +1,27 @@
 "use client";
 
 import * as React from "react";
+import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
-import { Filter } from "lucide-react";
+import { Filter, Target, LogOut, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { Sora } from "next/font/google";
+import { Sora, Audiowide } from "next/font/google";
+import Image from "next/image";
+
+import {
+  HomeIcon as HomeSolid,
+  DocumentTextIcon as DocumentTextSolid,
+  ChartPieIcon as ChartPieSolid,
+  Cog6ToothIcon as CogSolid,
+} from "@heroicons/react/24/solid";
+
+import {
+  HomeIcon,
+  DocumentTextIcon,
+  ChartPieIcon,
+  Cog6ToothIcon,
+} from "@heroicons/react/24/outline";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import DateRangeFilterDrawer, {
@@ -20,8 +36,10 @@ import ProfileAvatarModal, {
 import { Button } from "@/components/ui/button";
 
 const sora = Sora({ subsets: ["latin"] });
+const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
 
 interface HeaderProps {
+  activeTab?: string;
   onNavigate?: (tab: string) => void;
 }
 
@@ -52,9 +70,7 @@ function MobileDashboardSummarySkeleton() {
             <div className="shrink-0 h-10 w-10 rounded-2xl bg-muted animate-pulse" />
           </div>
         </div>
-
         <div className="h-px bg-border" />
-
         <div className="px-2 py-2">
           {[0, 1, 2].map((i) => (
             <div
@@ -75,7 +91,11 @@ function MobileDashboardSummarySkeleton() {
   );
 }
 
-export default function Header({ onNavigate }: HeaderProps) {
+export default function Header({
+  activeTab = "dashboard",
+  onNavigate,
+}: HeaderProps) {
+  const router = useRouter();
   const session = authClient.useSession();
   const { toast } = useToast();
 
@@ -85,6 +105,9 @@ export default function Header({ onNavigate }: HeaderProps) {
 
   const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
   const [openFilterDrawer, setOpenFilterDrawer] = React.useState(false);
+
+  // Logout state
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   // Avatar
   const [loadingAvatar, setLoadingAvatar] = React.useState(true);
@@ -98,7 +121,7 @@ export default function Header({ onNavigate }: HeaderProps) {
     seed: `${baseSeed}-1`,
   });
 
-  // Totais do painel (MobileDashboardSummary)
+  // Totais do painel
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
   const [totalDespesas, setTotalDespesas] = React.useState(0);
@@ -109,40 +132,46 @@ export default function Header({ onNavigate }: HeaderProps) {
     return totalReceitas - totalDespesas;
   }, [totalReceitas, totalDespesas]);
 
-  // ====== Avatar ======
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authClient.signOut({
+        fetchOptions: {
+          onSuccess: () => router.push("/login"),
+          onError: () => setIsLoggingOut(false),
+        },
+      });
+    } catch {
+      setIsLoggingOut(false);
+    }
+  };
+
+  // Avatar Fetch
   React.useEffect(() => {
     let cancelled = false;
-
     async function loadAvatar() {
       setLoadingAvatar(true);
       try {
         const res = await fetch("/api/profile/avatar", { method: "GET" });
-
         if (!res.ok) {
           setLoadingAvatar(false);
           return;
         }
-
         const data = (await res.json()) as {
           avatar_style?: AvatarStyle;
           avatar_seed?: string;
         };
-
         if (cancelled) return;
-
         setAvatar({
           style: (data.avatar_style || DEFAULT_STYLE) as AvatarStyle,
           seed: data.avatar_seed?.trim() ? data.avatar_seed : `${baseSeed}-1`,
         });
       } catch {
-        // ignore
       } finally {
         if (!cancelled) setLoadingAvatar(false);
       }
     }
-
     loadAvatar();
-
     return () => {
       cancelled = true;
     };
@@ -151,10 +180,8 @@ export default function Header({ onNavigate }: HeaderProps) {
   const handleAvatarChange = React.useCallback(
     async (next: AvatarSelection) => {
       if (savingAvatar) return;
-
       setSaveErrorMessage(null);
       setAvatar(next);
-
       setSavingAvatar(true);
       try {
         const res = await fetch("/api/profile/avatar", {
@@ -165,22 +192,7 @@ export default function Header({ onNavigate }: HeaderProps) {
             avatar_seed: next.seed,
           }),
         });
-
-        if (!res.ok) {
-          const payload = await res.json().catch(() => null);
-          const msg =
-            payload?.error ||
-            "Não foi possível salvar agora. Verifique sua conexão e tente novamente.";
-
-          setSaveErrorMessage(msg);
-          toast({
-            title: "Erro ao salvar",
-            description: msg,
-            variant: "destructive",
-          });
-          return;
-        }
-
+        if (!res.ok) throw new Error();
         toast({
           title: "Salvo!",
           description: "Sua foto de perfil foi atualizada.",
@@ -201,7 +213,7 @@ export default function Header({ onNavigate }: HeaderProps) {
     [savingAvatar, toast],
   );
 
-  // ====== Totais (respondem ao filtro de período) ======
+  // Totais Fetch
   const readRange = React.useCallback(() => {
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
@@ -213,7 +225,6 @@ export default function Header({ onNavigate }: HeaderProps) {
       setLoadingTotals(false);
       return;
     }
-
     setLoadingTotals(true);
     const { from, to } = readRange();
 
@@ -224,13 +235,11 @@ export default function Header({ onNavigate }: HeaderProps) {
         .eq("user_id", userId)
         .eq("tipo", "Receita")
         .eq("pago", true);
-
       let despesasQuery = supabase
         .from("lancamentos")
         .select("valor")
         .eq("user_id", userId)
         .eq("tipo", "Despesa");
-
       const fixasQuery = supabase
         .from("despesas_fixas")
         .select("valor")
@@ -245,30 +254,18 @@ export default function Header({ onNavigate }: HeaderProps) {
         despesasQuery = despesasQuery.lte("data_vencimento", to);
       }
 
-      const [
-        { data: receitasData, error: receitasError },
-        { data: despesasData, error: despesasError },
-        { data: fixasData, error: fixasError },
-      ] = await Promise.all([receitasQuery, despesasQuery, fixasQuery]);
-
-      if (receitasError) throw receitasError;
-      if (despesasError) throw despesasError;
-      if (fixasError) throw fixasError;
-
-      const rec =
-        receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-      const desp =
-        despesasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-      const fix =
-        fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-
-      setTotalReceitas(rec);
-      setTotalDespesas(desp);
-      setTotalDespesasFixas(fix);
+      const [{ data: rData }, { data: dData }, { data: fData }] =
+        await Promise.all([receitasQuery, despesasQuery, fixasQuery]);
+      setTotalReceitas(
+        rData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
+      );
+      setTotalDespesas(
+        dData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
+      );
+      setTotalDespesasFixas(
+        fData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
+      );
     } catch {
-      setTotalReceitas(0);
-      setTotalDespesas(0);
-      setTotalDespesasFixas(0);
     } finally {
       setLoadingTotals(false);
     }
@@ -286,99 +283,170 @@ export default function Header({ onNavigate }: HeaderProps) {
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [loadTotals]);
 
+  const navButtonClass = (isActive: boolean) =>
+    `flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
+      isActive
+        ? "bg-primary/10 text-primary"
+        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+    }`;
+
   return (
     <>
-      {/* Desktop header */}
+      {/* =========================================
+          DESKTOP HEADER (Substitui o Sidebar antigo)
+          ========================================= */}
       <header
-        className={`hidden md:flex items-center justify-between px-6 py-4 border-b bg-background/70 backdrop-blur ${sora.className}`}
+        className={`hidden md:flex items-center justify-between px-6 py-3 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
       >
-        <div className="min-w-0">
-          <p className="text-sm text-muted-foreground">{getGreeting()},</p>
-          <p className="text-xl font-semibold truncate">{userName}</p>
+        {/* ESQUERDA: Logo e Saudação */}
+        <div
+          className="flex items-center gap-3 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
+          onClick={() => onNavigate?.("dashboard")}
+        >
+          <Image
+            src="/icons8-abelha-64.png"
+            alt="Zibee Logo"
+            width={36}
+            height={36}
+            className="shrink-0"
+            priority
+          />
+          <div className="hidden lg:block flex-1 min-w-0">
+            <h1
+              className={`text-lg text-primary truncate ${audiowide.className}`}
+            >
+              Zibee - {userName}
+            </h1>
+            <p className="text-[11px] text-muted-foreground uppercase tracking-wide -mb-1 font-medium">
+              {getGreeting()}!
+            </p>
+          </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        {/* CENTRO: Navegação */}
+        <nav className="flex flex-1 items-center gap-2 max-w-2xl">
+          <button
+            onClick={() => onNavigate?.("dashboard")}
+            className={navButtonClass(activeTab === "dashboard")}
+          >
+            {activeTab === "dashboard" ? (
+              <HomeSolid className="h-5 w-5" />
+            ) : (
+              <HomeIcon className="h-5 w-5" />
+            )}
+            Dashboard
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("lancamentos")}
+            className={navButtonClass(activeTab === "lancamentos")}
+          >
+            {activeTab === "lancamentos" ? (
+              <DocumentTextSolid className="h-5 w-5" />
+            ) : (
+              <DocumentTextIcon className="h-5 w-5" />
+            )}
+            Lançamentos
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("receitas")}
+            className={navButtonClass(activeTab === "receitas")}
+          >
+            {activeTab === "receitas" ? (
+              <ChartPieSolid className="h-5 w-5" />
+            ) : (
+              <ChartPieIcon className="h-5 w-5" />
+            )}
+            Planos
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("metas")}
+            className={navButtonClass(activeTab === "metas")}
+          >
+            <Target
+              className={`h-5 w-5 ${activeTab === "metas" ? "text-primary" : ""}`}
+            />
+            Metas
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("configuracoes")}
+            className={navButtonClass(activeTab === "configuracoes")}
+          >
+            {activeTab === "configuracoes" ? (
+              <CogSolid className="h-5 w-5" />
+            ) : (
+              <Cog6ToothIcon className="h-5 w-5" />
+            )}
+            Config
+          </button>
+        </nav>
+
+        {/* DIREITA: Filtro, Perfil e Sair */}
+        <div className="flex items-center gap-4 ml-4">
           <Button
-            type="button"
             variant="outline"
-            className="rounded-2xl"
+            className="rounded-xl h-10"
             onClick={() => setOpenFilterDrawer(true)}
           >
-            <Filter className="h-4 w-4 mr-2" />
-            Filtrar
+            <Filter className="h-4 w-4 mr-2" /> Filtrar
           </Button>
 
           <button
-            type="button"
             onClick={() => setOpenProfileDrawer(true)}
-            className="h-10 w-10 rounded-full overflow-hidden ring-1 ring-border hover:ring-2 hover:ring-primary/30 transition"
-            aria-label="Abrir perfil"
+            className="h-10 w-10 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-primary/50 transition"
           >
             <img
               src={avatarUrl(avatar.style, avatar.seed)}
-              alt="Avatar do perfil"
-              className={[
-                "h-full w-full object-cover",
-                loadingAvatar ? "opacity-80" : "opacity-100",
-              ].join(" ")}
+              alt="Avatar"
+              className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
             />
+          </button>
+
+          <div className="h-6 w-px bg-border mx-1" />
+
+          <button
+            onClick={handleLogout}
+            disabled={isLoggingOut}
+            className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+            title="Sair da conta"
+          >
+            {isLoggingOut ? (
+              <Loader2 className="h-5 w-5 animate-spin" />
+            ) : (
+              <LogOut className="h-5 w-5" />
+            )}
           </button>
         </div>
       </header>
 
-      {/* Mobile header + summary */}
+      {/* =========================================
+          MOBILE HEADER (Já estava aqui e mantido)
+          ========================================= */}
       <section className={`md:hidden ${sora.className}`}>
-        <header
-          className="
-            bg-primary text-primary-foreground
-            px-4
-            pt-[max(22px,env(safe-area-inset-top))]
-            pb-20
-          "
-        >
+        <header className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20">
           <div className="flex items-center gap-4">
             <button
-              type="button"
               onClick={() => setOpenProfileDrawer(true)}
-              className="
-    shrink-0
-    h-16 w-16
-    rounded-full
-    overflow-hidden
-    flex items-center justify-center
-
-    ring-2 ring-white/80       /* separa do avatar (funciona com qualquer cor) */
-    ring-offset-2
-    ring-offset-primary        /* integra com o fundo azul */
-    
-    hover:scale-105
-    active:scale-95
-    transition
-  "
-              aria-label="Abrir configurações do perfil"
+              className="shrink-0 h-16 w-16 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
             >
               <img
                 src={avatarUrl(avatar.style, avatar.seed)}
-                alt="Avatar do perfil"
-                className={[
-                  "h-full w-full object-cover",
-                  loadingAvatar ? "opacity-80" : "opacity-100",
-                ].join(" ")}
+                alt="Avatar"
+                className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
               />
             </button>
-
             <div className="flex-1 min-w-0">
               <p className="text-sm text-white/85">{getGreeting()},</p>
               <p className="font-semibold text-xl leading-tight truncate text-white">
                 {userName}!
               </p>
             </div>
-
             <button
-              type="button"
               onClick={() => setOpenFilterDrawer(true)}
               className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
-              aria-label="Abrir filtros"
             >
               <Filter className="h-5 w-5 text-white" />
             </button>
@@ -398,11 +466,65 @@ export default function Header({ onNavigate }: HeaderProps) {
         )}
       </section>
 
+      {/* =========================================
+          MOBILE BOTTOM NAV (Migrado do antigo Sidebar)
+          ========================================= */}
+      <div className="fixed bottom-4 left-1/2 z-50 w-[95%] max-w-sm -translate-x-1/2 md:hidden">
+        <div className="bg-card/95 backdrop-blur-sm border rounded-2xl px-2 py-2 flex items-center justify-between shadow-xl">
+          <button
+            onClick={() => onNavigate?.("dashboard")}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "dashboard" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+          >
+            {activeTab === "dashboard" ? (
+              <HomeSolid className="h-5 w-5" />
+            ) : (
+              <HomeIcon className="h-5 w-5" />
+            )}
+            <span className="text-[10px] mt-1 font-medium">Home</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("lancamentos")}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "lancamentos" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+          >
+            {activeTab === "lancamentos" ? (
+              <DocumentTextSolid className="h-5 w-5" />
+            ) : (
+              <DocumentTextIcon className="h-5 w-5" />
+            )}
+            <span className="text-[10px] mt-1 font-medium">Lanç.</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("receitas")}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "receitas" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+          >
+            {activeTab === "receitas" ? (
+              <ChartPieSolid className="h-5 w-5" />
+            ) : (
+              <ChartPieIcon className="h-5 w-5" />
+            )}
+            <span className="text-[10px] mt-1 font-medium">Planos</span>
+          </button>
+
+          <button
+            onClick={() => onNavigate?.("configuracoes")}
+            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+          >
+            {activeTab === "configuracoes" || activeTab === "despesas_fixas" ? (
+              <CogSolid className="h-5 w-5" />
+            ) : (
+              <Cog6ToothIcon className="h-5 w-5" />
+            )}
+            <span className="text-[10px] mt-1 font-medium">Config</span>
+          </button>
+        </div>
+      </div>
+
       <DateRangeFilterDrawer
         open={openFilterDrawer}
         onClose={() => setOpenFilterDrawer(false)}
       />
-
       <ProfileAvatarModal
         open={openProfileDrawer}
         onClose={() => setOpenProfileDrawer(false)}

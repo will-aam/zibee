@@ -1,4 +1,3 @@
-// app/layout.tsx
 import type React from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -7,7 +6,6 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
-// Configurei as variáveis para o Tailwind reconhecer as fontes corretamente
 const geist = Geist({
   subsets: ["latin"],
   variable: "--font-sans",
@@ -17,9 +15,8 @@ const geistMono = Geist_Mono({
   variable: "--font-mono",
 });
 
-// Configuração de Viewport (importante para o tema do navegador no celular)
 export const viewport: Viewport = {
-  themeColor: "#09090b", // Cor escura do seu tema (bg-background)
+  themeColor: "#09090b", // Cor do background
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -29,20 +26,15 @@ export const metadata: Metadata = {
   title: "Zibee",
   description:
     "Gerencie suas finanças pessoais, controle receitas, despesas e planeje suas metas financeiras",
-
-  // Apontando para o arquivo manifest que você já tem na pasta public
-  // Isso é OBRIGATÓRIO para aparecer o botão de instalar no Android/Chrome
   manifest: "/manifest.json",
-  // Mapeando os ícones que aparecem na sua imagem
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
       { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
       { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { url: "/icon.png", type: "image/png", sizes: "192x192" }, // Geralmente o icon.png é 192x192 ou 512x512
+      { url: "/icon.png", type: "image/png", sizes: "192x192" },
     ],
     apple: [{ url: "/apple-icon.png", type: "image/png" }],
-    // Ícone específico para Android (atalho na tela inicial)
     other: [
       {
         rel: "icon",
@@ -64,17 +56,16 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    // <--- 2. IMPORTANTE: Remova a classe "dark" da tag HTML e adicione suppressHydrationWarning
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        className={`${geist.variable} ${geistMono.variable} font-sans antialiased`}
+        // Adicionado bg-background text-foreground para garantir as cores do tema baseadas na UI
+        className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
       >
-        {/* <--- 3. IMPORTANTE: Adicione o ThemeProvider envolvendo os children */}
         <ThemeProvider
           attribute="class"
-          defaultTheme="system" // Começa com o tema do sistema do usuário
-          enableSystem // Permite que o usuário escolha "system"
-          disableTransitionOnChange // Evita animações estranhas ao mudar o tema
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
         >
           {children}
           <Toaster />

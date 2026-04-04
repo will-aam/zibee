@@ -1,4 +1,4 @@
-// app/components/lancamentos/MonthSelector.tsx
+// app/components/releases/MonthSelector.tsx
 "use client";
 
 import { useState, useEffect } from "react";

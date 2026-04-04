@@ -13,10 +13,10 @@ import { Plus, Trash2, Filter, Loader2, Search } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 
 // COMPONENTES
-import { MonthSelector } from "./lancamentos/MonthSelector";
-import { LancamentoItem } from "./lancamentos/LancamentoItem";
-import { LancamentosFilters } from "./lancamentos/LancamentosFilters";
-import { LancamentoFormDialog } from "./lancamentos/LancamentoFormDialog";
+import { MonthSelector } from "./releases/MonthSelector";
+import { LancamentoItem } from "./releases/LancamentoItem";
+import { LancamentosFilters } from "./releases/LancamentosFilters";
+import { LancamentoFormDialog } from "./releases/LancamentoFormDialog";
 
 // CACHE EM MEMÓRIA (Stale-While-Revalidate)
 // Guarda os dados para evitar telas de loading ao trocar de abas

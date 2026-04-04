@@ -1,4 +1,4 @@
-// components/lancamentos/LancamentoFormDialog.tsx
+// components/releases/LancamentoFormDialog.tsx
 "use client";
 
 import type React from "react";
@@ -131,7 +131,11 @@ export function LancamentoFormDialog({
 
     if (recurrenceEndType === "ate_data") {
       const end = parseDateLocal(recurrenceEndDate);
-      for (let monthOffset = 1; monthOffset <= MAX_RECURRENCE_MONTHS; monthOffset++) {
+      for (
+        let monthOffset = 1;
+        monthOffset <= MAX_RECURRENCE_MONTHS;
+        monthOffset++
+      ) {
         const nextDate = addMonthsKeepingDay(baseDate, monthOffset);
         if (nextDate > end) break;
         items.push({
@@ -174,7 +178,10 @@ export function LancamentoFormDialog({
         });
         return false;
       }
-      if (parseDateLocal(recurrenceEndDate) < parseDateLocal(formData.data_vencimento)) {
+      if (
+        parseDateLocal(recurrenceEndDate) <
+        parseDateLocal(formData.data_vencimento)
+      ) {
         toast({
           title: "Recorrência inválida",
           description:
@@ -252,7 +259,9 @@ export function LancamentoFormDialog({
         // --- MODO CRIAÇÃO ---
         if (isRecorrente && formData.tipo === "Despesa") {
           if (recurrenceEndType === "infinito") {
-            const { error } = await supabase.from("lancamentos").insert([basePayload]);
+            const { error } = await supabase
+              .from("lancamentos")
+              .insert([basePayload]);
             if (error) throw error;
 
             const diaDoVencimento = Number(
@@ -285,7 +294,9 @@ export function LancamentoFormDialog({
             description: "Recorrência aplicada ao lançamento com sucesso.",
           });
         } else {
-          const { error } = await supabase.from("lancamentos").insert([basePayload]);
+          const { error } = await supabase
+            .from("lancamentos")
+            .insert([basePayload]);
           if (error) throw error;
           toast({ title: "Criado!" });
         }

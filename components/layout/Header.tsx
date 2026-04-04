@@ -111,7 +111,8 @@ export default function Header({
   const { toast } = useToast();
 
   const userId = session.data?.user?.id;
-  const userName = "Zibee";
+  // Fallback para o nome real se existir na sessão
+  const userName = session.data?.user?.name || "Zibee";
   const baseSeed = userName;
 
   const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
@@ -426,7 +427,7 @@ export default function Header({
             <h1
               className={`text-xl text-primary truncate ${audiowide.className}`}
             >
-              Zibee
+              Zibee - {userName}
             </h1>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
               {getGreeting()}!
@@ -478,7 +479,7 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Resumo
+              Planos
             </span>
           </button>
           <button
@@ -554,7 +555,7 @@ export default function Header({
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-100"
+              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-[100]"
             >
               <ProfileMenuContent />
             </PopoverContent>
@@ -621,7 +622,13 @@ export default function Header({
             ) : (
               <HomeIcon className="h-7 w-7 shrink-0" />
             )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "dashboard" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Home
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={mobileNavButtonClass(activeTab === "lancamentos")}
@@ -631,7 +638,13 @@ export default function Header({
             ) : (
               <DocumentTextIcon className="h-7 w-7 shrink-0" />
             )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Lançamentos
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("grupos")}
             className={mobileNavButtonClass(activeTab === "grupos")}
@@ -641,7 +654,13 @@ export default function Header({
             ) : (
               <UserGroupOutline className="h-7 w-7 shrink-0" />
             )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "grupos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Grupos
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("receitas")}
             className={mobileNavButtonClass(activeTab === "receitas")}
@@ -651,7 +670,13 @@ export default function Header({
             ) : (
               <ChartPieIcon className="h-7 w-7 shrink-0" />
             )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Planos
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={mobileNavButtonClass(
@@ -663,6 +688,11 @@ export default function Header({
             ) : (
               <Cog6ToothIcon className="h-7 w-7 shrink-0" />
             )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Configurações
+            </span>
           </button>
         </div>
       </div>

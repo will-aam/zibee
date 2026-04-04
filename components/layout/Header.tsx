@@ -15,6 +15,8 @@ import {
   ChartPieIcon as ChartPieSolid,
   Cog6ToothIcon as CogSolid,
   UserGroupIcon as UserGroupSolid,
+  UserIcon as UserSolid,
+  LockClosedIcon as LockClosedSolid,
 } from "@heroicons/react/24/solid";
 
 import {
@@ -25,13 +27,14 @@ import {
   UserGroupIcon as UserGroupOutline,
 } from "@heroicons/react/24/outline";
 
+// UI Components do Shadcn
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import DateRangeFilterDrawer, {
@@ -43,7 +46,6 @@ import ProfileAvatarModal, {
   type AvatarSelection,
   type AvatarStyle,
 } from "@/components/profile/ProfileAvatarModal";
-import { Button } from "@/components/ui/button";
 
 const sora = Sora({ subsets: ["latin"] });
 const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
@@ -126,7 +128,9 @@ export default function Header({
     seed: `${baseSeed}-1`,
   });
 
+  // ESTADOS DE CONTEXTO (Workspaces)
   const [activeContext, setActiveContext] = React.useState("pessoal");
+  const hasPremiumAccess = false; // Mude para true no banco para testar liberado
 
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
@@ -179,7 +183,7 @@ export default function Header({
     return () => window.removeEventListener("resize", updateThemeColor);
   }, [activeTab]);
 
-  // Avatar
+  // Carregar Avatar
   React.useEffect(() => {
     let cancelled = false;
     async function loadAvatar() {
@@ -228,8 +232,7 @@ export default function Header({
           description: "Sua foto de perfil foi atualizada.",
         });
       } catch {
-        const msg =
-          "Falha de conexão. Tente novamente quando sua internet estabilizar.";
+        const msg = "Falha de conexão. Tente novamente.";
         setSaveErrorMessage(msg);
         toast({
           title: "Erro ao salvar",
@@ -243,7 +246,6 @@ export default function Header({
     [savingAvatar, toast],
   );
 
-  // Filtros Globais e Totais do Dashboard
   const readRange = React.useCallback(() => {
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
@@ -310,7 +312,6 @@ export default function Header({
     return () => window.removeEventListener(FILTER_EVENT, loadTotals);
   }, [loadTotals]);
 
-  // Classes de Botões
   const navButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${
       isActive
@@ -324,6 +325,86 @@ export default function Header({
         ? "bg-primary/15 text-primary px-5 py-2.5"
         : "text-muted-foreground px-4 py-2.5"
     }`;
+
+  // ==========================================================================
+  // CONTEÚDO DO MENU DO PERFIL (Reutilizado no Popover e no Modal)
+  // ==========================================================================
+  const ProfileMenuContent = () => (
+    <div className="flex flex-col gap-6">
+      <div>
+        <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
+          Seu Espaço
+        </p>
+        <div className="grid grid-cols-1 gap-2">
+          <button
+            onClick={() => setActiveContext("pessoal")}
+            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
+              activeContext === "pessoal"
+                ? "bg-primary/10 border-primary text-primary"
+                : "hover:bg-muted border-transparent text-muted-foreground"
+            }`}
+          >
+            <UserSolid className="w-5 h-5" />
+            <span className="font-semibold text-sm">Meu Pessoal</span>
+          </button>
+
+          <button
+            onClick={() => {
+              if (hasPremiumAccess) setActiveContext("grupo");
+              else
+                window.open(
+                  `https://wa.me/5579999365157?text=Quero+liberar+os+Grupos`,
+                  "_blank",
+                );
+            }}
+            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+              activeContext === "grupo"
+                ? "bg-primary/10 border-primary text-primary"
+                : "hover:bg-muted border-transparent text-muted-foreground"
+            }`}
+          >
+            <div className="flex items-center gap-3">
+              {hasPremiumAccess ? (
+                <UserGroupSolid className="w-5 h-5" />
+              ) : (
+                <LockClosedSolid className="w-5 h-5 text-amber-500" />
+              )}
+              <span className="font-semibold text-sm">Casa / Grupo</span>
+            </div>
+            {!hasPremiumAccess && (
+              <Badge className="bg-amber-500 text-[10px] h-4 px-1.5">PRO</Badge>
+            )}
+          </button>
+        </div>
+      </div>
+
+      <div className="pt-4 border-t border-border/50">
+        <Button
+          variant="outline"
+          className="w-full justify-start rounded-xl gap-3 h-12 border-border/60"
+          onClick={() => setOpenProfileDrawer(true)}
+        >
+          <div className="w-7 h-7 rounded-full overflow-hidden bg-muted shrink-0">
+            <img
+              src={avatarUrl(avatar.style, avatar.seed)}
+              alt="Mini"
+              className="w-full h-full object-cover"
+            />
+          </div>
+          <span className="text-sm font-medium">Mudar Foto do Perfil</span>
+        </Button>
+      </div>
+
+      <Button
+        variant="ghost"
+        className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl gap-3 h-11"
+        onClick={handleLogout}
+      >
+        <LogOut className="w-5 h-5" />
+        <span className="text-sm font-bold">Sair da Conta</span>
+      </Button>
+    </div>
+  );
 
   return (
     <>
@@ -403,8 +484,6 @@ export default function Header({
               Resumo
             </span>
           </button>
-
-          {/* NOVO BOTÃO: GRUPOS */}
           <button
             onClick={() => onNavigate?.("grupos")}
             className={navButtonClass(activeTab === "grupos")}
@@ -420,7 +499,6 @@ export default function Header({
               Grupos
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("metas")}
             className={navButtonClass(activeTab === "metas")}
@@ -451,8 +529,8 @@ export default function Header({
           </button>
         </nav>
 
-        {/* CONTROLES DIREITA */}
-        <div className="flex items-center gap-5 ml-4">
+        {/* CONTROLES DIREITA DESKTOP */}
+        <div className="flex items-center gap-4 ml-4">
           {activeTab === "dashboard" && (
             <Button
               variant="outline"
@@ -464,62 +542,37 @@ export default function Header({
             </Button>
           )}
 
-          {/* NOVO: SELETOR DE CONTEXTO (MOCK) */}
-          <div className="hidden lg:block w-40">
-            <Select value={activeContext} onValueChange={setActiveContext}>
-              <SelectTrigger className="h-11 rounded-2xl bg-muted/50 border-transparent hover:bg-muted transition-colors">
-                <SelectValue placeholder="Contexto" />
-              </SelectTrigger>
-              <SelectContent className="rounded-2xl">
-                <SelectItem
-                  value="pessoal"
-                  className="rounded-xl cursor-pointer"
-                >
-                  Meu Pessoal
-                </SelectItem>
-                <SelectItem
-                  value="casa_henrique"
-                  className="rounded-xl cursor-pointer"
-                >
-                  Casa do Dexter
-                </SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-
-          <button
-            onClick={() => setOpenProfileDrawer(true)}
-            className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition shadow-sm"
-          >
-            <img
-              src={avatarUrl(avatar.style, avatar.seed)}
-              alt="Avatar"
-              className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
-            />
-          </button>
           <div className="h-8 w-px bg-border mx-1" />
-          <button
-            onClick={handleLogout}
-            disabled={isLoggingOut}
-            className="p-3 rounded-2xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-          >
-            {isLoggingOut ? (
-              <Loader2 className="h-6 w-6 animate-spin" />
-            ) : (
-              <LogOut className="h-6 w-6" />
-            )}
-          </button>
+
+          {/* POPOVER DO PERFIL DESKTOP */}
+          <Popover>
+            <PopoverTrigger asChild>
+              <button className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition-all shadow-sm outline-none active:scale-95">
+                <img
+                  src={avatarUrl(avatar.style, avatar.seed)}
+                  alt="Avatar"
+                  className="h-full w-full object-cover"
+                />
+              </button>
+            </PopoverTrigger>
+            <PopoverContent
+              align="end"
+              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-[100]"
+            >
+              <ProfileMenuContent />
+            </PopoverContent>
+          </Popover>
         </div>
       </header>
 
-      {/* ======================= MOBILE HEADER (DASHBOARD APENAS) ======================= */}
+      {/* ======================= MOBILE HEADER ======================= */}
       {activeTab === "dashboard" && (
         <section className={`md:hidden ${sora.className}`}>
           <header
             id="mobile-header-top"
             className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
           >
-            <div className="flex items-center gap-4 mb-4">
+            <div className="flex items-center gap-4 mb-2">
               <button
                 onClick={() => setOpenProfileDrawer(true)}
                 className="shrink-0 h-16 w-16 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
@@ -527,7 +580,7 @@ export default function Header({
                 <img
                   src={avatarUrl(avatar.style, avatar.seed)}
                   alt="Avatar"
-                  className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
+                  className="h-full w-full object-cover"
                 />
               </button>
               <div className="flex-1 min-w-0">
@@ -536,23 +589,12 @@ export default function Header({
                   {userName}!
                 </p>
               </div>
-            </div>
-
-            {/* NOVO: SELETOR DE CONTEXTO MOBILE */}
-            <div className="flex justify-between items-center bg-white/10 rounded-2xl p-1 mb-2">
-              <Select value={activeContext} onValueChange={setActiveContext}>
-                <SelectTrigger className="h-10 border-none bg-transparent text-white focus:ring-0 shadow-none">
-                  <SelectValue placeholder="Contexto" />
-                </SelectTrigger>
-                <SelectContent className="rounded-2xl">
-                  <SelectItem value="pessoal" className="rounded-xl">
-                    Meu Pessoal
-                  </SelectItem>
-                  <SelectItem value="casa_henrique" className="rounded-xl">
-                    Casa do Dexter
-                  </SelectItem>
-                </SelectContent>
-              </Select>
+              <button
+                onClick={() => setOpenFilterDrawer(true)}
+                className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
+              >
+                <Filter className="h-5 w-5 text-white" />
+              </button>
             </div>
           </header>
 
@@ -582,13 +624,7 @@ export default function Header({
             ) : (
               <HomeIcon className="h-7 w-7 shrink-0" />
             )}
-            <span
-              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "dashboard" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
-            >
-              Home
-            </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={mobileNavButtonClass(activeTab === "lancamentos")}
@@ -598,14 +634,7 @@ export default function Header({
             ) : (
               <DocumentTextIcon className="h-7 w-7 shrink-0" />
             )}
-            <span
-              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
-            >
-              Lançamentos
-            </span>
           </button>
-
-          {/* NOVO BOTÃO GRUPOS MOBILE */}
           <button
             onClick={() => onNavigate?.("grupos")}
             className={mobileNavButtonClass(activeTab === "grupos")}
@@ -615,13 +644,7 @@ export default function Header({
             ) : (
               <UserGroupOutline className="h-7 w-7 shrink-0" />
             )}
-            <span
-              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "grupos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
-            >
-              Grupos
-            </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("receitas")}
             className={mobileNavButtonClass(activeTab === "receitas")}
@@ -631,13 +654,7 @@ export default function Header({
             ) : (
               <ChartPieIcon className="h-7 w-7 shrink-0" />
             )}
-            <span
-              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
-            >
-              Planos
-            </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={mobileNavButtonClass(
@@ -649,20 +666,16 @@ export default function Header({
             ) : (
               <Cog6ToothIcon className="h-7 w-7 shrink-0" />
             )}
-            <span
-              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
-            >
-              Configurações
-            </span>
           </button>
         </div>
       </div>
 
-      {/* DRAWERS E MODAIS */}
+      {/* MODAIS E DRAWERS */}
       <DateRangeFilterDrawer
         open={openFilterDrawer}
         onClose={() => setOpenFilterDrawer(false)}
       />
+
       <ProfileAvatarModal
         open={openProfileDrawer}
         onClose={() => setOpenProfileDrawer(false)}
@@ -671,6 +684,10 @@ export default function Header({
         onChange={handleAvatarChange}
         saving={savingAvatar}
         errorMessage={saveErrorMessage}
+        // No mobile, o switcher de contexto pode aparecer dentro do modal de fotos se você quiser
+        activeContext={activeContext}
+        onContextChange={setActiveContext}
+        hasPremiumAccess={hasPremiumAccess}
       />
     </>
   );

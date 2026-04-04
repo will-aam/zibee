@@ -1,3 +1,4 @@
+// components/groups/PaywallView.tsx
 "use client";
 
 import React from "react";
@@ -8,19 +9,20 @@ import {
   Squares2X2Icon as Squares2X2Solid,
   CalculatorIcon as CalculatorSolid,
   ClockIcon as ClockSolid,
+  SparklesIcon as SparklesSolid,
+  ChatBubbleLeftEllipsisIcon as ChatBubbleSolid,
 } from "@heroicons/react/24/solid";
 
-export default function GruposConfig() {
+export default function PaywallView() {
   const handleWhatsAppClick = () => {
     const message = encodeURIComponent(
       "Fala Will! Quero liberar o acesso antecipado aos Grupos no Zibee.",
     );
-
     window.open(`https://wa.me/5579999365157?text=${message}`, "_blank");
   };
 
   return (
-    <div className="w-full max-w-3xl mx-auto p-4 pt-8 pb-24 md:pb-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
+    <div className="w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
       <div className="text-center space-y-3 mb-8 md:mb-10">
         <Badge
           variant="secondary"
@@ -41,13 +43,13 @@ export default function GruposConfig() {
       <div className="md:hidden space-y-8">
         <div className="relative bg-primary/10 rounded-3xl p-6">
           <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 rounded-bl-2xl rounded-tr-3xl font-bold text-xs flex items-center gap-1">
-            Acesso Antecipado
+            <SparklesSolid className="w-3.5 h-3.5" /> Acesso Antecipado
           </div>
           <div className="mt-2 space-y-1">
             <h2 className="text-3xl font-bold tracking-tight flex items-baseline gap-2">
               R$ 47,90{" "}
               <span className="text-sm text-muted-foreground font-normal line-through">
-                ~R$ 97,00
+                R$ 97,00
               </span>
             </h2>
             <p className="text-sm font-medium text-foreground">
@@ -104,7 +106,8 @@ export default function GruposConfig() {
 
         <div className="bg-amber-50 dark:bg-amber-950/30 p-5 rounded-3xl border border-amber-200 dark:border-amber-900/50">
           <h4 className="font-bold flex items-center gap-2 text-amber-800 dark:text-amber-500 mb-2 text-base">
-            Regra de uso: Só o Criador Paga!
+            <SparklesSolid className="w-5 h-5 shrink-0" />
+            Regra de Ouro: Só o Criador Paga!
           </h4>
           <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
             Você adquire o acesso, cria o seu grupo e pode convidar sua galera.{" "}
@@ -118,6 +121,7 @@ export default function GruposConfig() {
           className="w-full h-14 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
           onClick={handleWhatsAppClick}
         >
+          <ChatBubbleSolid className="w-5 h-5 mr-2" />
           Solicitar Acesso
         </Button>
       </div>
@@ -126,7 +130,7 @@ export default function GruposConfig() {
       <div className="hidden md:block">
         <div className="border-2 border-primary/20 shadow-xl rounded-3xl overflow-hidden relative bg-background">
           <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-4 py-1.5 rounded-bl-2xl rounded-tr-3xl font-bold text-sm flex items-center gap-1.5 z-10">
-            Acesso Antecipado
+            <SparklesSolid className="w-4 h-4" /> Acesso Antecipado
           </div>
 
           <div className="bg-muted/30 p-8 pb-10">
@@ -198,7 +202,8 @@ export default function GruposConfig() {
 
             <div className="bg-amber-50 dark:bg-amber-950/30 p-5 rounded-2xl border border-amber-200 dark:border-amber-900/50">
               <h4 className="font-bold flex items-center gap-2 text-amber-800 dark:text-amber-500 mb-2">
-                Regra de uso: Só o Criador Paga!
+                <SparklesSolid className="w-5 h-5 shrink-0" />
+                Regra de Ouro: Só o Criador Paga!
               </h4>
               <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
                 Você adquire o acesso, cria o seu grupo e pode convidar sua
@@ -213,6 +218,7 @@ export default function GruposConfig() {
               className="w-full h-14 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
               onClick={handleWhatsAppClick}
             >
+              <ChatBubbleSolid className="w-5 h-5 mr-2" />
               Solicitar Acesso
             </Button>
           </div>

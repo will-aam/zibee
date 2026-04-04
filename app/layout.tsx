@@ -16,10 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#09090b", // Cor do background
+  themeColor: "#2563eb", // Cor da barra de status no mobile
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
+  userScalable: false, // Evita que o usuário dê zoom sem querer no app
+  viewportFit: "cover", // <--- O SEGREDO ESTÁ AQUI: Faz o app invadir a área do topo (Notch/Dynamic Island)
 };
 
 export const metadata: Metadata = {
@@ -45,6 +47,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
+    // "black-translucent" faz o iOS renderizar o site por trás da barra de status (texto branco)
     statusBarStyle: "black-translucent",
     title: "Zibee",
   },

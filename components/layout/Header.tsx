@@ -313,14 +313,14 @@ export default function Header({
             priority
           />
           <div className="hidden lg:block flex-1 min-w-0">
-            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
-              {getGreeting()},
-            </p>
             <h1
               className={`text-xl text-primary truncate ${audiowide.className}`}
             >
               Zibee - {userName}
             </h1>
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+              {getGreeting()}!
+            </p>
           </div>
         </div>
 

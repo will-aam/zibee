@@ -317,7 +317,7 @@ export default function Header({
     <>
       {/* ======================= DESKTOP HEADER ======================= */}
       <header
-        className={`hidden md:flex items-center justify-between px-8 py-5 bg-background/80 backdrop-blur-md sticky top-0 z-50 border-b border-border/50 ${sora.className}`}
+        className={`hidden md:flex items-center justify-between px-8 py-5 bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
       >
         {/* LOGO */}
         <div
@@ -506,7 +506,7 @@ export default function Header({
       )}
 
       {/* ======================= MOBILE BOTTOM NAV ======================= */}
-      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] border-t border-border/50">
+      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-around px-2 h-20">
           <button
             onClick={() => onNavigate?.("dashboard")}

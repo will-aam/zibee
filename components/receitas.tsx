@@ -230,9 +230,9 @@ export default function Receitas() {
   return (
     <div className="space-y-8 p-4 md:p-6 pb-24 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4">
       <div className="flex flex-col gap-1">
-        <h1 className="text-2xl font-bold">Planos</h1>
+        <h1 className="text-2xl font-bold">Resumo Financeiro</h1>
         <p className="text-muted-foreground text-sm">
-          Planejamento financeiro mensal
+          Visão mensal das suas finanças
         </p>
       </div>
 

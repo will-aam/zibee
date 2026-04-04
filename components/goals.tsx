@@ -372,10 +372,10 @@ export default function Metas() {
       <div className="space-y-6 p-4 md:p-6 lg:p-8 max-w-7xl mx-auto pb-24 animate-in fade-in slide-in-from-bottom-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl md:text-3xl font-bold">
+            <h1 className="text-2xl font-bold tracking-tight">
               Metas Financeiras
             </h1>
-            <p className="text-sm md:text-base text-muted-foreground mt-1">
+            <p className="text-muted-foreground text-sm">
               Planeje e acompanhe suas conquistas
             </p>
           </div>

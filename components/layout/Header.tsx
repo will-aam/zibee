@@ -367,7 +367,7 @@ export default function Header({
               ) : (
                 <LockClosedSolid className="w-5 h-5 text-amber-500" />
               )}
-              <span className="font-semibold text-sm">Casa / Grupo</span>
+              <span className="font-semibold text-sm">Grupo</span>
             </div>
             {!hasPremiumAccess && (
               <Badge className="bg-amber-500 text-[10px] h-4 px-1.5">PRO</Badge>
@@ -555,7 +555,7 @@ export default function Header({
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-[100]"
+              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-100"
             >
               <ProfileMenuContent />
             </PopoverContent>

@@ -55,7 +55,7 @@ export default function GroupManagerView() {
   const [members, setMembers] = useState<Member[]>([
     {
       id: "1",
-      name: "Henrique (Você)",
+      name: "Henrique ",
       email: "henrique@teste.com",
       role: "Admin",
       seed: "Henrique",

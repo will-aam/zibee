@@ -177,7 +177,7 @@ export default function ProfileAvatarModal({
                     <LockClosedSolid className="w-7 h-7 text-amber-500/80" />
                   )}
                   <span className="font-bold text-xs uppercase tracking-wide">
-                    Casa / Grupo
+                    Grupo
                   </span>
                 </button>
               </div>

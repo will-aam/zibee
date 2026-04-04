@@ -105,8 +105,6 @@ export default function Header({
 
   const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
   const [openFilterDrawer, setOpenFilterDrawer] = React.useState(false);
-
-  // Logout state
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   // Avatar
@@ -145,6 +143,37 @@ export default function Header({
       setIsLoggingOut(false);
     }
   };
+
+  // --- SINCRONIZAÇÃO DINÂMICA DO THEME-COLOR PARA O PWA ---
+  React.useEffect(() => {
+    const updateThemeColor = () => {
+      const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
+      const setMetaColor = (color: string) => {
+        metaThemes.forEach((meta) => meta.setAttribute("content", color));
+      };
+
+      // Se for mobile e a aba for Dashboard, pinta o topo inteiro de azul primário
+      if (activeTab === "dashboard" && window.innerWidth < 768) {
+        const headerEl = document.getElementById("mobile-header-top");
+        if (headerEl) {
+          // Pega a exata cor computada do bg-primary para evitar diferença de tom
+          const bgColor = window.getComputedStyle(headerEl).backgroundColor;
+          setMetaColor(bgColor);
+          // OdocumentElement pinta o fundo do notch/borda do iOS
+          document.documentElement.style.backgroundColor = bgColor;
+        }
+      } else {
+        // Nas outras telas, volta para a cor de fundo padrão (branco ou preto)
+        const bodyBg = window.getComputedStyle(document.body).backgroundColor;
+        setMetaColor(bodyBg);
+        document.documentElement.style.backgroundColor = ""; // Reseta o fundo
+      }
+    };
+
+    updateThemeColor();
+    window.addEventListener("resize", updateThemeColor);
+    return () => window.removeEventListener("resize", updateThemeColor);
+  }, [activeTab]);
 
   // Avatar Fetch
   React.useEffect(() => {
@@ -213,7 +242,6 @@ export default function Header({
     [savingAvatar, toast],
   );
 
-  // Totais Fetch
   const readRange = React.useCallback(() => {
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
@@ -283,23 +311,19 @@ export default function Header({
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [loadTotals]);
 
-  // Nova classe para a navegação retrátil
   const navButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-2xl transition-all duration-300 ease-out active:scale-[0.96] ${
       isActive
-        ? "bg-primary/10 text-primary px-5 py-3" // Expandido com padding
-        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground p-3" // Retraído (só ícone)
+        ? "bg-primary/10 text-primary px-5 py-3"
+        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground p-3"
     }`;
 
   return (
     <>
-      {/* =========================================
-          DESKTOP HEADER (Ampliado e mais limpo)
-          ========================================= */}
+      {/* DESKTOP HEADER */}
       <header
         className={`hidden md:flex items-center justify-between px-8 py-5 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
       >
-        {/* ESQUERDA: Logo e Saudação */}
         <div
           className="flex items-center gap-4 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
           onClick={() => onNavigate?.("dashboard")}
@@ -324,7 +348,6 @@ export default function Header({
           </div>
         </div>
 
-        {/* CENTRO: Navegação (Somente Ícones, exceto o ativo) */}
         <nav className="flex flex-1 items-center gap-2 justify-center">
           <button
             onClick={() => onNavigate?.("dashboard")}
@@ -342,7 +365,6 @@ export default function Header({
               </span>
             )}
           </button>
-
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={navButtonClass(activeTab === "lancamentos")}
@@ -359,7 +381,6 @@ export default function Header({
               </span>
             )}
           </button>
-
           <button
             onClick={() => onNavigate?.("receitas")}
             className={navButtonClass(activeTab === "receitas")}
@@ -376,7 +397,6 @@ export default function Header({
               </span>
             )}
           </button>
-
           <button
             onClick={() => onNavigate?.("metas")}
             className={navButtonClass(activeTab === "metas")}
@@ -391,7 +411,6 @@ export default function Header({
               </span>
             )}
           </button>
-
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={navButtonClass(activeTab === "configuracoes")}
@@ -410,7 +429,6 @@ export default function Header({
           </button>
         </nav>
 
-        {/* DIREITA: Filtro, Perfil e Sair (Botões mais visíveis) */}
         <div className="flex items-center gap-5 ml-4">
           {activeTab === "dashboard" && (
             <Button
@@ -422,7 +440,6 @@ export default function Header({
               <span className="text-base font-medium">Filtrar</span>
             </Button>
           )}
-
           <button
             onClick={() => setOpenProfileDrawer(true)}
             className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition shadow-sm"
@@ -434,9 +451,7 @@ export default function Header({
               className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
             />
           </button>
-
           <div className="h-8 w-px bg-border mx-1" />
-
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
@@ -452,12 +467,14 @@ export default function Header({
         </div>
       </header>
 
-      {/* =========================================
-          MOBILE HEADER (Agora oculto fora do Dashboard)
-          ========================================= */}
+      {/* MOBILE HEADER (Oculto fora do Dashboard) */}
       {activeTab === "dashboard" && (
         <section className={`md:hidden ${sora.className}`}>
-          <header className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20">
+          {/* AQUI FOI ADICIONADO O ID "mobile-header-top" PARA O SCRIPT LER A COR */}
+          <header
+            id="mobile-header-top"
+            className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
+          >
             <div className="flex items-center gap-4">
               <button
                 onClick={() => setOpenProfileDrawer(true)}
@@ -498,9 +515,7 @@ export default function Header({
         </section>
       )}
 
-      {/* =========================================
-          MOBILE BOTTOM NAV 
-          ========================================= */}
+      {/* MOBILE BOTTOM NAV */}
       <div className="fixed bottom-4 left-1/2 z-50 w-[95%] max-w-sm -translate-x-1/2 md:hidden">
         <div className="bg-card/95 backdrop-blur-sm border rounded-2xl px-2 py-2 flex items-center justify-between shadow-xl">
           <button
@@ -514,7 +529,6 @@ export default function Header({
             )}
             <span className="text-[10px] mt-1 font-medium">Home</span>
           </button>
-
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "lancamentos" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
@@ -526,7 +540,6 @@ export default function Header({
             )}
             <span className="text-[10px] mt-1 font-medium">Lanç.</span>
           </button>
-
           <button
             onClick={() => onNavigate?.("receitas")}
             className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "receitas" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
@@ -538,7 +551,6 @@ export default function Header({
             )}
             <span className="text-[10px] mt-1 font-medium">Planos</span>
           </button>
-
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}

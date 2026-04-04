@@ -6,17 +6,15 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import "./globals.css";
 
-const geist = Geist({
-  subsets: ["latin"],
-  variable: "--font-sans",
-});
-const geistMono = Geist_Mono({
-  subsets: ["latin"],
-  variable: "--font-mono",
-});
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
+const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const viewport: Viewport = {
-  themeColor: "#009ed8", // O azul exato do seu topo
+  // Agora usamos a EXATA cor do seu globals.css (--primary)
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "oklch(0.55 0.18 230)" },
+    { media: "(prefers-color-scheme: dark)", color: "oklch(0.65 0.15 230)" },
+  ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
@@ -26,8 +24,7 @@ export const viewport: Viewport = {
 
 export const metadata: Metadata = {
   title: "Zibee",
-  description:
-    "Gerencie suas finanças pessoais, controle receitas, despesas e planeje suas metas financeiras",
+  description: "Gerencie suas finanças pessoais",
   manifest: "/manifest.json",
   icons: {
     icon: [
@@ -37,26 +34,17 @@ export const metadata: Metadata = {
       { url: "/icon.png", type: "image/png", sizes: "192x192" },
     ],
     apple: [{ url: "/apple-icon.png", type: "image/png" }],
-    other: [
-      {
-        rel: "icon",
-        url: "/android-chrome-512x512.png",
-        sizes: "512x512",
-      },
-    ],
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default", // Mudamos para default como no Countifly
+    statusBarStyle: "default", // Isso permite que a barra adote a cor do themeColor
     title: "Zibee",
   },
 };
 
 export default function RootLayout({
   children,
-}: Readonly<{
-  children: React.ReactNode;
-}>) {
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body

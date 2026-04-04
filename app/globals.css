@@ -170,12 +170,10 @@
 }
 
 @layer base {
-  /* Essa trava garante que o app não tenha efeito elástico, revelando o fundo */
   html,
   body {
     height: 100%;
     width: 100%;
-    overscroll-behavior-y: none; /* Bloqueia o "puxar para atualizar" nativo que gera linha */
   }
 
   * {
@@ -183,15 +181,6 @@
   }
   body {
     @apply bg-background text-foreground;
-  }
-
-  /* Esconde a barra de rolagem globalmente */
-  *::-webkit-scrollbar {
-    display: none;
-  }
-  * {
-    -ms-overflow-style: none;
-    scrollbar-width: none;
   }
 }
 

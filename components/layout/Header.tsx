@@ -98,7 +98,7 @@ export default function Header({
   const { toast } = useToast();
 
   const userId = session.data?.user?.id;
-  const userName = session.data?.user?.name || "Zibee";
+  const userName = "Zibee";
   const baseSeed = userName;
 
   const [openProfileDrawer, setOpenProfileDrawer] = React.useState(false);
@@ -336,7 +336,7 @@ export default function Header({
             <h1
               className={`text-xl text-primary truncate ${audiowide.className}`}
             >
-              Zibee - {userName}
+              Zibee
             </h1>
             <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
               {getGreeting()}!

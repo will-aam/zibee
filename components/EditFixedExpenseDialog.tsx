@@ -1,7 +1,7 @@
-// components/EditFixedExpenseDialog.tsx
 "use client";
 
-import { useState, useEffect } from "react";
+import * as React from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -29,7 +29,7 @@ interface ItemOpcao {
   nome: string;
 }
 
-interface DespesaFixa {
+export interface DespesaFixa {
   id: number;
   nome: string;
   valor: number;
@@ -42,17 +42,27 @@ interface EditFixedExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   expense: DespesaFixa | null;
-  onSuccess: () => void;
-  // Adicionamos as props que estavam faltando
+
+  // substitui onSuccess() por onSaved(updated)
+  onSaved: (updated: DespesaFixa) => void;
+
   categorias: ItemOpcao[];
   formasPagamento: ItemOpcao[];
 }
+
+type FormState = {
+  nome: string;
+  valor: string;
+  dia: string;
+  categoria: string;
+  pagamento: string;
+};
 
 export function EditFixedExpenseDialog({
   open,
   onOpenChange,
   expense,
-  onSuccess,
+  onSaved,
   categorias,
   formasPagamento,
 }: EditFixedExpenseDialogProps) {
@@ -61,25 +71,41 @@ export function EditFixedExpenseDialog({
   const userId = session.data?.user.id;
 
   const [loading, setLoading] = useState(false);
-  const [nome, setNome] = useState("");
-  const [valor, setValor] = useState("");
-  const [dia, setDia] = useState("");
-  const [categoria, setCategoria] = useState("");
-  const [pagamento, setPagamento] = useState("");
+
+  const initialForm: FormState = useMemo(
+    () => ({
+      nome: expense?.nome ?? "",
+      valor: expense?.valor != null ? String(expense.valor) : "",
+      dia:
+        expense?.dia_vencimento != null ? String(expense.dia_vencimento) : "",
+      categoria: expense?.categoria ?? "",
+      pagamento: expense?.forma_pagamento ?? "",
+    }),
+    [expense],
+  );
+
+  const [form, setForm] = useState<FormState>(initialForm);
 
   useEffect(() => {
-    if (expense) {
-      setNome(expense.nome);
-      setValor(String(expense.valor));
-      setDia(String(expense.dia_vencimento));
-      setCategoria(expense.categoria || "");
-      setPagamento(expense.forma_pagamento || "");
-    }
-  }, [expense]);
+    if (!open) return;
+    setForm(initialForm);
+  }, [open, initialForm]);
 
-  const handleSave = async () => {
+  const setField = useCallback(
+    <K extends keyof FormState>(key: K, value: FormState[K]) => {
+      setForm((prev) => ({ ...prev, [key]: value }));
+    },
+    [],
+  );
+
+  const canSave = useMemo(() => {
+    return !!form.nome.trim() && !!form.valor && !!form.dia && !loading;
+  }, [form.nome, form.valor, form.dia, loading]);
+
+  const handleSave = useCallback(async () => {
     if (!userId || !expense) return;
-    if (!nome || !valor || !dia) {
+
+    if (!form.nome.trim() || !form.valor || !form.dia) {
       toast({
         title: "Campos obrigatórios",
         description: "Nome, Valor e Dia são obrigatórios.",
@@ -88,73 +114,110 @@ export function EditFixedExpenseDialog({
       return;
     }
 
+    setLoading(true);
     try {
-      setLoading(true);
+      const payload = {
+        nome: form.nome.trim(),
+        valor: Number(form.valor),
+        dia_vencimento: Number(form.dia),
+        categoria: form.categoria?.trim() ? form.categoria.trim() : null,
+        forma_pagamento: form.pagamento?.trim() ? form.pagamento.trim() : null,
+      };
+
       const { error } = await supabase
         .from("despesas_fixas")
-        .update({
-          nome,
-          valor: Number(valor),
-          dia_vencimento: Number(dia),
-          categoria: categoria || null,
-          forma_pagamento: pagamento || null,
-        })
+        .update(payload)
         .eq("id", expense.id)
         .eq("user_id", userId);
 
       if (error) throw error;
 
-      toast({ title: "Despesa atualizada com sucesso!" });
-      onSuccess();
+      const updated: DespesaFixa = {
+        ...expense,
+        nome: payload.nome,
+        valor: payload.valor,
+        dia_vencimento: payload.dia_vencimento,
+        categoria: payload.categoria ?? undefined,
+        forma_pagamento: payload.forma_pagamento ?? undefined,
+      };
+
+      toast({ title: "Despesa atualizada!" });
+
+      // Atualiza o pai (otimista + cache) e fecha
+      onSaved(updated);
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (err: any) {
       toast({
         title: "Erro ao atualizar",
-        description: error.message,
+        description: err?.message,
         variant: "destructive",
       });
     } finally {
       setLoading(false);
     }
-  };
+  }, [expense, form, onOpenChange, onSaved, toast, userId]);
 
   return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+    <Dialog
+      open={open}
+      onOpenChange={(next) => {
+        if (loading) return;
+        onOpenChange(next);
+      }}
+    >
+      <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>Editar Despesa Fixa</DialogTitle>
         </DialogHeader>
-        <div className="grid gap-4 py-4">
+
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (canSave) handleSave();
+          }}
+          className="grid gap-4 py-4"
+        >
           <div className="space-y-2">
             <Label>Nome</Label>
-            <Input value={nome} onChange={(e) => setNome(e.target.value)} />
+            <Input
+              value={form.nome}
+              onChange={(e) => setField("nome", e.target.value)}
+              autoFocus
+            />
           </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label>Valor (R$)</Label>
               <Input
                 type="number"
                 step="0.01"
-                value={valor}
-                onChange={(e) => setValor(e.target.value)}
+                inputMode="decimal"
+                value={form.valor}
+                onChange={(e) => setField("valor", e.target.value)}
               />
             </div>
+
             <div className="space-y-2">
-              <Label>Dia Vencimento</Label>
+              <Label>Dia vencimento</Label>
               <Input
                 type="number"
                 min="1"
                 max="31"
-                value={dia}
-                onChange={(e) => setDia(e.target.value)}
+                inputMode="numeric"
+                value={form.dia}
+                onChange={(e) => setField("dia", e.target.value)}
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Categoria (Padrão)</Label>
-              <Select value={categoria} onValueChange={setCategoria}>
+              <Label>Categoria (padrão)</Label>
+              <Select
+                value={form.categoria}
+                onValueChange={(v) => setField("categoria", v)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
@@ -167,9 +230,13 @@ export function EditFixedExpenseDialog({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
-              <Label>Pagamento (Padrão)</Label>
-              <Select value={pagamento} onValueChange={setPagamento}>
+              <Label>Pagamento (padrão)</Label>
+              <Select
+                value={form.pagamento}
+                onValueChange={(v) => setField("pagamento", v)}
+              >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
@@ -183,16 +250,22 @@ export function EditFixedExpenseDialog({
               </Select>
             </div>
           </div>
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={loading}>
-            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
-          </Button>
-        </DialogFooter>
+
+          <DialogFooter className="pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => onOpenChange(false)}
+              disabled={loading}
+            >
+              Cancelar
+            </Button>
+            <Button type="submit" disabled={!canSave}>
+              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Salvar
+            </Button>
+          </DialogFooter>
+        </form>
       </DialogContent>
     </Dialog>
   );

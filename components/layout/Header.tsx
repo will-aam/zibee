@@ -8,6 +8,7 @@ import { Filter, Target, LogOut, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { Sora, Audiowide } from "next/font/google";
 import Image from "next/image";
+import { handleWhatsAppContact } from "@/lib/utils";
 
 import {
   HomeIcon as HomeSolid,
@@ -351,11 +352,7 @@ export default function Header({
           <button
             onClick={() => {
               if (hasPremiumAccess) setActiveContext("grupo");
-              else
-                window.open(
-                  `https://wa.me/5579999365157?text=Quero+liberar+os+Grupos`,
-                  "_blank",
-                );
+              else handleWhatsAppContact();
             }}
             className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
               activeContext === "grupo"
@@ -557,7 +554,7 @@ export default function Header({
             </PopoverTrigger>
             <PopoverContent
               align="end"
-              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-[100]"
+              className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-100"
             >
               <ProfileMenuContent />
             </PopoverContent>
@@ -684,7 +681,6 @@ export default function Header({
         onChange={handleAvatarChange}
         saving={savingAvatar}
         errorMessage={saveErrorMessage}
-        // No mobile, o switcher de contexto pode aparecer dentro do modal de fotos se você quiser
         activeContext={activeContext}
         onContextChange={setActiveContext}
         hasPremiumAccess={hasPremiumAccess}

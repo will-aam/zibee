@@ -1,28 +1,21 @@
-// components/groups/PaywallView.tsx
 "use client";
 
 import React from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { handleWhatsAppContact } from "@/lib/utils";
 
 import {
   Squares2X2Icon as Squares2X2Solid,
   CalculatorIcon as CalculatorSolid,
   ClockIcon as ClockSolid,
   SparklesIcon as SparklesSolid,
-  ChatBubbleLeftEllipsisIcon as ChatBubbleSolid,
 } from "@heroicons/react/24/solid";
 
 export default function PaywallView() {
-  const handleWhatsAppClick = () => {
-    const message = encodeURIComponent(
-      "Fala Will! Quero liberar o acesso antecipado aos Grupos no Zibee.",
-    );
-    window.open(`https://wa.me/5579999365157?text=${message}`, "_blank");
-  };
-
   return (
     <div className="w-full max-w-3xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-500">
+      {/* Cabeçalho de Venda */}
       <div className="text-center space-y-3 mb-8 md:mb-10">
         <Badge
           variant="secondary"
@@ -34,14 +27,15 @@ export default function PaywallView() {
           Desbloqueie os Grupos
         </h1>
         <p className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-          Chega de planilhas confusas e prints de Pix perdidos. Divida as contas
-          de forma inteligente e sem estresse.
+          Chega de planilhas confusas e prints de Pix perdidos no WhatsApp.
+          Divida as contas de forma inteligente e sem estresse.
         </p>
       </div>
 
-      {/* ======================= LAYOUT MOBILE (SEM CARD) ======================= */}
+      {/* ======================= LAYOUT MOBILE (ESTILO CARDS SOLTOS) ======================= */}
       <div className="md:hidden space-y-8">
-        <div className="relative bg-primary/10 rounded-3xl p-6">
+        {/* Card de Preço Mobile */}
+        <div className="relative bg-primary/10 rounded-3xl p-6 border border-primary/20">
           <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-3 py-1 rounded-bl-2xl rounded-tr-3xl font-bold text-xs flex items-center gap-1">
             <SparklesSolid className="w-3.5 h-3.5" /> Acesso Antecipado
           </div>
@@ -58,10 +52,11 @@ export default function PaywallView() {
           </div>
         </div>
 
+        {/* Lista de Benefícios Mobile */}
         <div className="space-y-4">
           <h3 className="font-semibold text-lg px-1">O que você ganha:</h3>
           <ul className="space-y-4">
-            <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50">
+            <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50 shadow-sm">
               <div className="p-2 bg-primary/10 rounded-xl shrink-0">
                 <Squares2X2Solid className="w-5 h-5 text-primary" />
               </div>
@@ -75,7 +70,7 @@ export default function PaywallView() {
                 </span>
               </div>
             </li>
-            <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50">
+            <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50 shadow-sm">
               <div className="p-2 bg-primary/10 rounded-xl shrink-0">
                 <CalculatorSolid className="w-5 h-5 text-primary" />
               </div>
@@ -89,7 +84,7 @@ export default function PaywallView() {
                 </span>
               </div>
             </li>
-            <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50">
+            <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50 shadow-sm">
               <div className="p-2 bg-primary/10 rounded-xl shrink-0">
                 <ClockSolid className="w-5 h-5 text-primary" />
               </div>
@@ -104,10 +99,10 @@ export default function PaywallView() {
           </ul>
         </div>
 
+        {/* Regra de uso Mobile */}
         <div className="bg-amber-50 dark:bg-amber-950/30 p-5 rounded-3xl border border-amber-200 dark:border-amber-900/50">
           <h4 className="font-bold flex items-center gap-2 text-amber-800 dark:text-amber-500 mb-2 text-base">
-            <SparklesSolid className="w-5 h-5 shrink-0" />
-            Regra de Ouro: Só o Criador Paga!
+            Regra de uso: Só o Criador Paga!
           </h4>
           <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
             Você adquire o acesso, cria o seu grupo e pode convidar sua galera.{" "}
@@ -116,24 +111,25 @@ export default function PaywallView() {
           </p>
         </div>
 
+        {/* Botão de Ação Mobile */}
         <Button
           size="lg"
-          className="w-full h-14 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
-          onClick={handleWhatsAppClick}
+          className="w-full h-14 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform"
+          onClick={handleWhatsAppContact}
         >
-          <ChatBubbleSolid className="w-5 h-5 mr-2" />
           Solicitar Acesso
         </Button>
       </div>
 
-      {/* ======================= LAYOUT DESKTOP (COM CARD) ======================= */}
+      {/* ======================= LAYOUT DESKTOP (ESTILO CARD ÚNICO) ======================= */}
       <div className="hidden md:block">
-        <div className="border-2 border-primary/20 shadow-xl rounded-3xl overflow-hidden relative bg-background">
-          <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-4 py-1.5 rounded-bl-2xl rounded-tr-3xl font-bold text-sm flex items-center gap-1.5 z-10">
+        <div className="border-2 border-primary/20 shadow-xl rounded-4xl overflow-hidden relative bg-background">
+          <div className="absolute top-0 right-0 bg-primary text-primary-foreground px-4 py-1.5 rounded-bl-2xl rounded-tr-4xl font-bold text-sm flex items-center gap-1.5 z-10">
             <SparklesSolid className="w-4 h-4" /> Acesso Antecipado
           </div>
 
-          <div className="bg-muted/30 p-8 pb-10">
+          {/* Header do Card Desktop */}
+          <div className="bg-muted/30 p-8 pb-10 border-b border-border/50">
             <h2 className="text-3xl font-bold tracking-tight flex items-baseline gap-3">
               R$ 47,90{" "}
               <span className="text-base text-muted-foreground font-normal line-through">
@@ -149,6 +145,7 @@ export default function PaywallView() {
             </p>
           </div>
 
+          {/* Conteúdo do Card Desktop */}
           <div className="p-8 space-y-8">
             <div className="space-y-5">
               <h3 className="font-semibold text-lg border-b border-border pb-2">
@@ -200,10 +197,10 @@ export default function PaywallView() {
               </ul>
             </div>
 
+            {/* Alerta de Regra de uso Desktop */}
             <div className="bg-amber-50 dark:bg-amber-950/30 p-5 rounded-2xl border border-amber-200 dark:border-amber-900/50">
               <h4 className="font-bold flex items-center gap-2 text-amber-800 dark:text-amber-500 mb-2">
-                <SparklesSolid className="w-5 h-5 shrink-0" />
-                Regra de Ouro: Só o Criador Paga!
+                Regra de uso: Só o Criador Paga!
               </h4>
               <p className="text-sm text-amber-700 dark:text-amber-400 leading-relaxed">
                 Você adquire o acesso, cria o seu grupo e pode convidar sua
@@ -213,13 +210,14 @@ export default function PaywallView() {
               </p>
             </div>
 
+            {/* Botão de Ação Desktop */}
             <Button
               size="lg"
-              className="w-full h-14 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform shadow-lg shadow-primary/20"
-              onClick={handleWhatsAppClick}
+              className="w-full h-16 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform"
+              onClick={handleWhatsAppContact}
             >
-              <ChatBubbleSolid className="w-5 h-5 mr-2" />
-              Solicitar Acesso
+         
+              Solicitar Acesso Premium
             </Button>
           </div>
         </div>

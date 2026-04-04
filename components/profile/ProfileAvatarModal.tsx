@@ -2,7 +2,8 @@
 
 import * as React from "react";
 import { X } from "lucide-react";
-import { useIsMobile } from "@/hooks/use-mobile"; // Importando seu hook de mobile
+import { useIsMobile } from "@/hooks/use-mobile";
+import { handleWhatsAppContact } from "@/lib/utils"; // Importando a função centralizada
 import {
   UserIcon as UserSolid,
   UserGroupIcon as UserGroupSolid,
@@ -38,7 +39,7 @@ interface ProfileAvatarModalProps {
   errorMessage?: string | null;
   optionsCount?: number;
 
-  // Propriedades de contexto
+  // Propriedades de contexto para o Switcher Mobile
   activeContext?: string;
   onContextChange?: (ctx: string) => void;
   hasPremiumAccess?: boolean;
@@ -57,7 +58,7 @@ export default function ProfileAvatarModal({
   onContextChange,
   hasPremiumAccess = false,
 }: ProfileAvatarModalProps) {
-  const isMobile = useIsMobile(); // Detecta se é mobile
+  const isMobile = useIsMobile();
 
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -75,35 +76,35 @@ export default function ProfileAvatarModal({
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[110]" aria-modal="true" role="dialog">
-      {/* Overlay */}
+    <div className="fixed inset-0 z-110" aria-modal="true" role="dialog">
+      {/* Overlay Escuro com Blur */}
       <button
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-label="Fechar"
       />
 
-      {/* Drawer / Modal Container */}
+      {/* Drawer (Mobile) ou Modal (Desktop) */}
       <aside
         className={`
           absolute bg-background shadow-2xl flex flex-col transition-all duration-300
           ${
             isMobile
               ? "left-0 top-0 h-full w-full animate-in slide-in-from-left"
-              : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[600px] rounded-[32px] border border-border/50 animate-in zoom-in-95"
+              : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[640px] rounded-[40px] border border-border/50 animate-in zoom-in-95"
           }
         `}
         aria-label="Configurações da Conta"
       >
-        {/* Header */}
-        <div className="px-6 py-5 border-b flex items-center justify-between">
+        {/* Header do Painel */}
+        <div className="px-6 py-6 border-b flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold tracking-tight">
               {isMobile ? "Conta e Perfil" : "Mudar Foto do Perfil"}
             </h2>
           </div>
           <button
-            className="p-2 rounded-full hover:bg-muted transition shrink-0"
+            className="p-2.5 rounded-full hover:bg-muted transition-colors shrink-0"
             onClick={onClose}
             aria-label="Fechar"
             disabled={saving}
@@ -112,7 +113,7 @@ export default function ProfileAvatarModal({
           </button>
         </div>
 
-        {/* Erro (se houver) */}
+        {/* Alerta de Erro */}
         {errorMessage && (
           <div className="px-6 pt-4">
             <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
@@ -122,13 +123,14 @@ export default function ProfileAvatarModal({
         )}
 
         <div className="overflow-y-auto flex-1 custom-scrollbar">
-          {/* SEÇÃO: ALTERNAR ESPAÇO (SÓ APARECE NO MOBILE) */}
+          {/* SEÇÃO: WORKSPACES (EXCLUSIVA MOBILE) */}
           {isMobile && (
             <div className="px-6 py-6 border-b border-border/50 bg-muted/10">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">
                 Seu Espaço de Trabalho
               </p>
               <div className="grid grid-cols-2 gap-3">
+                {/* Espaço Pessoal */}
                 <button
                   type="button"
                   onClick={() => {
@@ -137,7 +139,7 @@ export default function ProfileAvatarModal({
                   }}
                   className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
                     activeContext === "pessoal"
-                      ? "border-primary bg-primary/10 text-primary"
+                      ? "border-primary bg-primary/10 text-primary shadow-sm"
                       : "border-border bg-background hover:border-primary/50 text-muted-foreground"
                   }`}
                 >
@@ -147,6 +149,7 @@ export default function ProfileAvatarModal({
                   </span>
                 </button>
 
+                {/* Espaço de Grupo */}
                 <button
                   type="button"
                   onClick={() => {
@@ -154,15 +157,12 @@ export default function ProfileAvatarModal({
                       onContextChange?.("grupo");
                       onClose();
                     } else {
-                      window.open(
-                        `https://wa.me/5579999365157?text=Quero+liberar+os+Grupos`,
-                        "_blank",
-                      );
+                      handleWhatsAppContact(); // Lógica centralizada
                     }
                   }}
                   className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${
                     activeContext === "grupo"
-                      ? "border-primary bg-primary/10 text-primary"
+                      ? "border-primary bg-primary/10 text-primary shadow-sm"
                       : "border-border bg-background hover:border-primary/50 text-muted-foreground"
                   }`}
                 >
@@ -181,16 +181,20 @@ export default function ProfileAvatarModal({
                   </span>
                 </button>
               </div>
+              {!hasPremiumAccess && (
+                <p className="text-[11px] text-muted-foreground mt-4 text-center font-medium leading-relaxed">
+                  Você ainda não possui um grupo ativo. <br />
+                  Clique no cadeado para solicitar o acesso.
+                </p>
+              )}
             </div>
           )}
 
-          {/* SEÇÃO: GRID DE AVATARES */}
+          {/* SEÇÃO: SELEÇÃO DE AVATAR (MOBILE E DESKTOP) */}
           <div className="px-6 py-8">
-            {isMobile && (
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6">
-                Escolha seu novo avatar
-              </p>
-            )}
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6">
+              {isMobile ? "Escolha seu novo avatar" : "Selecione um robô"}
+            </p>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
               {seedOptions.map((seed) => {
                 const selected =
@@ -224,25 +228,27 @@ export default function ProfileAvatarModal({
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-8 text-center bg-muted/30 py-2 rounded-full font-medium">
-              Role para ver mais variações de robôs
+            <p className="text-[11px] text-muted-foreground mt-10 text-center bg-muted/40 py-2.5 rounded-full font-medium">
+              Role para ver todas as 120 variações
             </p>
           </div>
         </div>
 
-        {/* Footer */}
-        <div className="px-6 py-5 border-t bg-background rounded-b-4xl">
+        {/* Rodapé de Ação */}
+        <div
+          className={`px-6 py-6 border-t bg-background ${!isMobile ? "rounded-b-[40px]" : ""}`}
+        >
           <button
             type="button"
             className={`
-              w-full px-4 py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm
-              hover:opacity-90 transition-all active:scale-[0.98] shadow-lg shadow-primary/20
-              ${saving ? "opacity-70 cursor-not-allowed" : ""}
-            `}
+  w-full px-4 py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm
+  hover:opacity-90 transition-all active:scale-[0.98]
+  ${saving ? "opacity-70 cursor-not-allowed" : ""}
+`}
             onClick={onClose}
             disabled={saving}
           >
-            {saving ? "Salvando..." : "Concluir Seleção"}
+            {saving ? "Salvando Alterações..." : "Concluir e Salvar"}
           </button>
         </div>
       </aside>

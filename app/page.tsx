@@ -1,10 +1,11 @@
+// app/page.tsx
 "use client";
 
 import { useState } from "react";
 import Header from "@/components/layout/Header";
 import Dashboard from "@/components/dashboard";
 import Lancamentos from "@/components/releases";
-import Metas from "@/components/metas";
+import Metas from "@/components/goals";
 import Configuracoes from "@/components/configuracoes";
 import DespesasFixas from "@/components/despesas-fixas";
 import Receitas from "@/components/receitas";

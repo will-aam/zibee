@@ -303,9 +303,6 @@ export default function DateRangeFilterDrawer({
               <CalendarIcon className="h-5 w-5" />
               Período
             </p>
-            <p className="text-xs text-muted-foreground truncate">
-              Defina um atalho ou selecione datas.
-            </p>
           </div>
 
           <button
@@ -376,10 +373,6 @@ export default function DateRangeFilterDrawer({
               {error}
             </div>
           ) : null}
-
-          <p className="text-xs text-muted-foreground">
-            Dica: use “Este mês” / “Mês passado” para comparar rápido.
-          </p>
         </div>
 
         {/* footer (stacked) */}

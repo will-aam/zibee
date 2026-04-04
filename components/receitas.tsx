@@ -1,10 +1,8 @@
-// app/components/receitas.tsx
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
-import { authClient } from "@/lib/auth-client"; // <--- NOVO IMPORT
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -14,15 +12,12 @@ import {
   Trash2,
   Loader2,
   TrendingUp,
-  Wallet,
   Calculator,
   Pencil,
   X,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-
-// Importamos o mesmo seletor de mês bonito da outra página
 import { MonthSelector } from "./lancamentos/MonthSelector";
 
 interface ReceitaFixa {
@@ -32,19 +27,31 @@ interface ReceitaFixa {
   dia_recebimento: number;
 }
 
+// CACHE EM MEMÓRIA (Stale-While-Revalidate)
+// Garante que a transição entre abas seja instantânea, consultando o banco só em background
+const memoryCache = {
+  receitas: null as ReceitaFixa[] | null,
+  totalDespesasFixas: null as number | null,
+  variaveisPorMes: {} as Record<string, number>,
+};
+
 export default function Receitas() {
   const { toast } = useToast();
-
-  // --- USER SESSION ---
   const session = authClient.useSession();
   const userId = session.data?.user.id;
 
-  const [receitas, setReceitas] = useState<ReceitaFixa[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  // Estados para a "Calculadora"
-  const [totalDespesasFixas, setTotalDespesasFixas] = useState(0);
+  // Estados com inicialização pelo cache (se existir)
+  const [receitas, setReceitas] = useState<ReceitaFixa[]>(
+    memoryCache.receitas || [],
+  );
+  const [totalDespesasFixas, setTotalDespesasFixas] = useState(
+    memoryCache.totalDespesasFixas || 0,
+  );
   const [totalVariaveis, setTotalVariaveis] = useState(0);
+
+  // Loading inicial (só mostra se não tiver nada no cache)
+  const [loading, setLoading] = useState(!memoryCache.receitas);
+  const [isSaving, setIsSaving] = useState(false);
 
   // Controle de Data
   const [date, setDate] = useState<Date>(new Date());
@@ -52,163 +59,162 @@ export default function Receitas() {
     new Date().toISOString().slice(0, 7),
   );
 
-  // Formulário de Nova/Edição Receita
+  // Formulário
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
-
   const [novoNome, setNovoNome] = useState("");
   const [novoValor, setNovoValor] = useState("");
-  const [novoDia, setNovoDia] = useState("");
 
-  // Sincroniza a data do seletor
+  // Atualiza a string do mês referência quando a data muda
   useEffect(() => {
     if (date) {
       const ano = date.getFullYear();
       const mes = String(date.getMonth() + 1).padStart(2, "0");
-      setMesReferencia(`${ano}-${mes}`);
+      const novoMes = `${ano}-${mes}`;
+      setMesReferencia(novoMes);
+
+      // Se já tivermos o total variável deste mês no cache, aplicamos imediatamente
+      if (memoryCache.variaveisPorMes[novoMes] !== undefined) {
+        setTotalVariaveis(memoryCache.variaveisPorMes[novoMes]);
+      }
     }
   }, [date]);
 
-  // 1. Carregar Receitas Fixas
-  const fetchReceitas = useCallback(async () => {
-    if (!userId) return; // Só busca se tiver usuário
+  // Busca Inteligente em Paralelo
+  const fetchAllData = useCallback(async () => {
+    if (!userId) return;
 
     try {
-      const { data, error } = await supabase
-        .from("receitas_fixas")
-        .select("*")
-        .eq("user_id", userId) // <--- SEGURANÇA
-        .order("valor", { ascending: false });
-      if (error) throw error;
-      setReceitas(data || []);
-    } catch (error: any) {
-      console.error("Erro ao carregar receitas", error);
-    }
-  }, [userId]);
-
-  // 2. Carregar Totais para a Calculadora
-  const fetchTotaisCalculadora = useCallback(async () => {
-    if (!userId) return; // Só busca se tiver usuário
-
-    try {
-      setLoading(true);
-
-      // A. Buscar Total de Despesas Fixas DO USUÁRIO
-      const { data: fixasData } = await supabase
-        .from("despesas_fixas")
-        .select("valor")
-        .eq("user_id", userId); // <--- SEGURANÇA
-
-      const somaFixas =
-        fixasData?.reduce((acc, item) => acc + Number(item.valor), 0) || 0;
-      setTotalDespesasFixas(somaFixas);
-
-      // B. Buscar Despesas Variáveis DO USUÁRIO
       const [ano, mes] = mesReferencia.split("-");
       const inicio = `${mesReferencia}-01`;
       const fim = `${mesReferencia}-${new Date(Number(ano), Number(mes), 0).getDate()}`;
 
-      const { data: variaveisData } = await supabase
-        .from("lancamentos")
-        .select("valor")
-        .eq("user_id", userId) // <--- SEGURANÇA
-        .eq("tipo", "Despesa")
-        .gte("data_vencimento", inicio)
-        .lte("data_vencimento", fim);
+      // Executa as 3 queries ao mesmo tempo para máxima velocidade
+      const [resReceitas, resFixas, resVariaveis] = await Promise.all([
+        supabase
+          .from("receitas_fixas")
+          .select("*")
+          .eq("user_id", userId)
+          .order("valor", { ascending: false }),
+        supabase.from("despesas_fixas").select("valor").eq("user_id", userId),
+        supabase
+          .from("lancamentos")
+          .select("valor")
+          .eq("user_id", userId)
+          .eq("tipo", "Despesa")
+          .gte("data_vencimento", inicio)
+          .lte("data_vencimento", fim),
+      ]);
 
-      const somaVariaveis =
-        variaveisData?.reduce((acc, item) => acc + Number(item.valor), 0) || 0;
-      setTotalVariaveis(somaVariaveis);
+      // Atualiza Receitas
+      if (resReceitas.data) {
+        memoryCache.receitas = resReceitas.data;
+        setReceitas(resReceitas.data);
+      }
+
+      // Atualiza Fixas
+      if (resFixas.data) {
+        const somaFixas = resFixas.data.reduce(
+          (acc, item) => acc + Number(item.valor),
+          0,
+        );
+        memoryCache.totalDespesasFixas = somaFixas;
+        setTotalDespesasFixas(somaFixas);
+      }
+
+      // Atualiza Variáveis do Mês Selecionado
+      if (resVariaveis.data) {
+        const somaVariaveis = resVariaveis.data.reduce(
+          (acc, item) => acc + Number(item.valor),
+          0,
+        );
+        memoryCache.variaveisPorMes[mesReferencia] = somaVariaveis;
+        setTotalVariaveis(somaVariaveis);
+      }
     } catch (error) {
-      console.error("Erro na calculadora", error);
+      console.error("Erro ao sincronizar dados", error);
     } finally {
       setLoading(false);
     }
-  }, [mesReferencia, userId]);
+  }, [userId, mesReferencia]);
 
+  // Dispara a busca silenciosa toda vez que a aba ou o mês muda
   useEffect(() => {
-    if (userId) {
-      fetchReceitas();
-      fetchTotaisCalculadora();
-    }
-  }, [fetchReceitas, fetchTotaisCalculadora, userId]);
+    fetchAllData();
+  }, [fetchAllData]);
 
-  // Limpar formulário
   const resetForm = () => {
     setNovoNome("");
     setNovoValor("");
-    setNovoDia("");
     setEditingId(null);
     setIsFormOpen(false);
   };
 
-  // Preparar Edição
   const handleEdit = (item: ReceitaFixa) => {
     setNovoNome(item.nome);
     setNovoValor(String(item.valor));
-    setNovoDia(item.dia_recebimento ? String(item.dia_recebimento) : "");
     setEditingId(item.id);
     setIsFormOpen(true);
   };
 
-  // Salvar (Criar ou Atualizar)
   const handleSave = async () => {
-    if (!userId) return;
-    if (!novoNome || !novoValor) {
+    if (!userId || !novoNome || !novoValor) {
       toast({ title: "Preencha nome e valor", variant: "destructive" });
       return;
     }
 
+    setIsSaving(true);
     try {
       const payload = {
-        user_id: userId, // <--- SEGURANÇA: Vincula ao usuário
+        user_id: userId,
         nome: novoNome,
         valor: Number(novoValor),
-        dia_recebimento: novoDia ? Number(novoDia) : null,
       };
 
       if (editingId) {
-        // ATUALIZAR
-        const { error } = await supabase
+        await supabase
           .from("receitas_fixas")
           .update(payload)
           .eq("id", editingId)
-          .eq("user_id", userId); // <--- SEGURANÇA
-        if (error) throw error;
+          .eq("user_id", userId);
         toast({ title: "Renda atualizada!" });
       } else {
-        // CRIAR NOVO
-        const { error } = await supabase
-          .from("receitas_fixas")
-          .insert([payload]);
-        if (error) throw error;
+        await supabase.from("receitas_fixas").insert([payload]);
         toast({ title: "Renda adicionada!" });
       }
 
       resetForm();
-      fetchReceitas();
+      fetchAllData(); // Refetch silencioso para atualizar listas
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleExcluir = async (id: number) => {
     if (!userId) return;
-    if (!confirm("Remover esta renda?")) return;
     try {
+      // Otimização UI (Remove instantaneamente da tela)
+      setReceitas((prev) => prev.filter((r) => r.id !== id));
+
+      // Remove do banco em background
       await supabase
         .from("receitas_fixas")
         .delete()
         .eq("id", id)
-        .eq("user_id", userId); // <--- SEGURANÇA
-
-      setReceitas(receitas.filter((r) => r.id !== id));
+        .eq("user_id", userId);
       toast({ title: "Removido" });
+
+      // Atualiza o cache para refletir
+      memoryCache.receitas =
+        memoryCache.receitas?.filter((r) => r.id !== id) || null;
     } catch (error) {
+      fetchAllData(); // Se der erro, restaura o dado original
       toast({ title: "Erro ao excluir", variant: "destructive" });
     }
   };
@@ -222,202 +228,186 @@ export default function Receitas() {
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
-    <div className="space-y-6 p-4 md:p-6 pb-24 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Planos</h1>
-          <p className="text-muted-foreground text-sm">Planeje suas finanças</p>
-        </div>
+    <div className="space-y-8 p-4 md:p-6 pb-24 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-2xl font-bold">Planos</h1>
+        <p className="text-muted-foreground text-sm">
+          Planejamento financeiro mensal
+        </p>
       </div>
 
-      {/* --- BLOCO 1: CALCULADORA AUTOMÁTICA --- */}
-      <Card className="border-l-4 border-l-primary bg-card/50 backdrop-blur-sm shadow-md">
-        <CardHeader className="pb-2">
-          <div className="flex items-center justify-between gap-4">
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Calculator className="h-5 w-5 text-primary" />
-              Resumo
-            </CardTitle>
-
-            {/* SELETOR DE MÊS */}
-            <div className="w-auto">
-              <MonthSelector date={date} setDate={setDate} />
-            </div>
+      {/* --- BLOCO 1: RESUMO FINANCEIRO (Flat Design) --- */}
+      <section className="bg-primary/5 rounded-2xl p-5 border border-primary/10">
+        <div className="flex items-center justify-between mb-5">
+          <h2 className="flex items-center gap-2 font-semibold text-primary">
+            <Calculator className="h-5 w-5" />
+            Balanço Mensal
+          </h2>
+          <div className="w-auto scale-90 origin-right -mr-2">
+            <MonthSelector date={date} setDate={setDate} />
           </div>
-        </CardHeader>
-        <CardContent className="space-y-4 pt-2">
-          <div className="space-y-3 text-sm">
-            {/* 1. Entradas */}
-            <div className="flex justify-between items-center text-green-500">
-              <span className="flex items-center gap-2">
-                <TrendingUp className="h-4 w-4" /> Total Receitas
-              </span>
-              <span className="font-bold text-base">
-                {formatMoney(totalReceitas)}
-              </span>
-            </div>
+        </div>
 
-            {/* 2. Menos Fixas */}
-            <div className="flex justify-between items-center text-red-400/80">
-              <span className="flex items-center gap-2 pl-2 border-l-2 border-red-400/20">
-                (-) Contas Fixas
-              </span>
-              <span>{formatMoney(totalDespesasFixas)}</span>
-            </div>
-
-            {/* Linha Divisória */}
-            <div className="flex justify-between items-center py-2 border-t border-dashed border-border/50 opacity-80">
-              <span className="text-xs text-muted-foreground uppercase tracking-wider">
-                Sobra após fixas
-              </span>
-              <span className="font-medium">{formatMoney(sobraAposFixas)}</span>
-            </div>
-
-            {/* 3. Menos Variáveis */}
-            <div className="flex justify-between items-center text-orange-400/80">
-              <span className="flex items-center gap-2 pl-2 border-l-2 border-orange-400/20">
-                (-) Variáveis ({format(date, "MMM/yy", { locale: ptBR })})
-              </span>
-              <span>{formatMoney(totalVariaveis)}</span>
-            </div>
+        <div className="space-y-3 text-sm">
+          <div className="flex justify-between items-center text-green-600 dark:text-green-500 font-medium">
+            <span className="flex items-center gap-2">
+              <TrendingUp className="h-4 w-4" /> Entradas Fixas
+            </span>
+            <span>{formatMoney(totalReceitas)}</span>
           </div>
 
-          {/* Resultado Final */}
+          <div className="flex justify-between items-center text-destructive/90">
+            <span className="flex items-center gap-2 pl-2 border-l-2 border-destructive/20">
+              (-) Contas Fixas
+            </span>
+            <span>{formatMoney(totalDespesasFixas)}</span>
+          </div>
+
+          <div className="flex justify-between items-center text-orange-500/90">
+            <span className="flex items-center gap-2 pl-2 border-l-2 border-orange-500/20">
+              (-) Gastos do Mês ({format(date, "MMM/yy", { locale: ptBR })})
+            </span>
+            <span>{formatMoney(totalVariaveis)}</span>
+          </div>
+        </div>
+
+        <div className="mt-5 pt-4 border-t border-primary/10 flex items-end justify-between">
+          <div>
+            <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
+              Saldo Previsto
+            </p>
+          </div>
           <div
-            className={`mt-4 p-4 rounded-xl flex items-center justify-between border ${saldoFinal >= 0 ? "bg-green-500/10 border-green-500/20" : "bg-red-500/10 border-red-500/20"}`}
+            className={`text-2xl font-bold tracking-tight ${saldoFinal >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"}`}
           >
-            <div>
-              <p className="text-xs font-bold uppercase tracking-widest text-muted-foreground">
-                Saldo Livre
-              </p>
-              <p className="text-xs text-muted-foreground">Previsão final</p>
-            </div>
-            <div
-              className={`text-2xl font-bold ${saldoFinal >= 0 ? "text-green-500" : "text-red-500"}`}
-            >
-              {formatMoney(saldoFinal)}
-            </div>
+            {formatMoney(saldoFinal)}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </section>
 
-      {/* --- BLOCO 2: CADASTRO DE RENDAS FIXAS --- */}
-      <div className="space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-semibold text-lg">Minhas Rendas Fixas</h3>
-
+      {/* --- BLOCO 2: RENDAS FIXAS --- */}
+      <section className="space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-border/50">
+          <h3 className="font-semibold text-lg tracking-tight">
+            Minhas Rendas Fixas
+          </h3>
           {!isFormOpen ? (
             <Button
-              variant="outline"
+              variant="ghost"
               size="sm"
               onClick={() => {
                 resetForm();
                 setIsFormOpen(true);
               }}
-              className="gap-2"
+              className="text-primary hover:text-primary hover:bg-primary/10"
             >
-              <Plus className="h-4 w-4" />
-              Nova Renda
+              <Plus className="h-4 w-4 mr-1.5" /> Adicionar
             </Button>
           ) : (
             <Button variant="ghost" size="sm" onClick={resetForm}>
-              <X className="h-4 w-4 mr-1" /> Cancelar
+              <X className="h-4 w-4 mr-1.5" /> Cancelar
             </Button>
           )}
         </div>
 
-        {/* Formulário Expansível */}
+        {/* Formulário Inline */}
         {isFormOpen && (
-          <Card className="animate-in slide-in-from-top-2 border-primary/20">
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-semibold text-muted-foreground">
-                  {editingId ? "Editar Renda" : "Adicionar Nova Renda"}
-                </span>
+          <div className="bg-card border rounded-xl p-4 shadow-sm animate-in slide-in-from-top-2">
+            <p className="text-sm font-semibold text-muted-foreground mb-3">
+              {editingId ? "Editar Renda" : "Nova Renda"}
+            </p>
+            <div className="grid gap-3 sm:grid-cols-3 items-end">
+              <div className="space-y-1.5">
+                <Label className="text-xs">Descrição</Label>
+                <Input
+                  value={novoNome}
+                  onChange={(e) => setNovoNome(e.target.value)}
+                  placeholder="ex: Salário"
+                  autoFocus
+                  className="h-10"
+                />
               </div>
-              <div className="grid gap-4 md:grid-cols-3 items-end">
-                <div className="space-y-2">
-                  <Label>Nome (ex: Salário, Estágio)</Label>
-                  <Input
-                    value={novoNome}
-                    onChange={(e) => setNovoNome(e.target.value)}
-                    placeholder="Descrição"
-                    autoFocus
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label>Valor (R$)</Label>
-                  <Input
-                    type="number"
-                    value={novoValor}
-                    onChange={(e) => setNovoValor(e.target.value)}
-                    placeholder="0.00"
-                  />
-                </div>
-                <Button onClick={handleSave}>
-                  {editingId ? "Salvar Alterações" : "Adicionar"}
-                </Button>
+              <div className="space-y-1.5">
+                <Label className="text-xs">Valor (R$)</Label>
+                <Input
+                  type="number"
+                  value={novoValor}
+                  onChange={(e) => setNovoValor(e.target.value)}
+                  placeholder="0.00"
+                  className="h-10"
+                />
               </div>
-            </CardContent>
-          </Card>
+              <Button
+                onClick={handleSave}
+                disabled={isSaving}
+                className="h-10 w-full sm:w-auto"
+              >
+                {isSaving ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : editingId ? (
+                  "Salvar"
+                ) : (
+                  "Adicionar"
+                )}
+              </Button>
+            </div>
+          </div>
         )}
 
-        {/* Lista de Rendas */}
-        <div className="grid gap-3 md:grid-cols-2">
-          {receitas.map((item) => (
-            <Card
-              key={item.id}
-              className="hover:bg-accent/50 transition-colors group"
-            >
-              <CardContent className="p-4 flex items-center justify-between">
+        {/* Lista Limpa */}
+        <div className="flex flex-col">
+          {loading ? (
+            <div className="flex justify-center py-6">
+              <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+            </div>
+          ) : receitas.length === 0 ? (
+            <div className="py-8 text-center text-sm text-muted-foreground bg-accent/30 rounded-xl border border-dashed">
+              Nenhuma renda fixa cadastrada.
+            </div>
+          ) : (
+            receitas.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between py-3 border-b border-border/50 group last:border-0"
+              >
                 <div className="flex items-center gap-3">
-                  <div className="h-10 w-10 rounded-full bg-green-500/10 flex items-center justify-center text-green-500">
-                    <Wallet className="h-5 w-5" />
+                  <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 dark:text-green-500 shrink-0">
+                    <TrendingUp className="h-4 w-4" />
                   </div>
-                  <div>
-                    <p className="font-medium">{item.nome}</p>
-                    {item.dia_recebimento && (
-                      <p className="text-xs text-muted-foreground">
-                        Dia {item.dia_recebimento}
-                      </p>
-                    )}
-                  </div>
+                  <p className="font-medium text-sm sm:text-base">
+                    {item.nome}
+                  </p>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="font-bold text-green-600 mr-2">
+
+                <div className="flex items-center gap-3">
+                  <span className="font-semibold text-sm sm:text-base text-foreground">
                     {formatMoney(item.valor)}
                   </span>
 
-                  {/* Botão Editar */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-primary"
-                    onClick={() => handleEdit(item)}
-                  >
-                    <Pencil className="h-4 w-4" />
-                  </Button>
-
-                  {/* Botão Excluir */}
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-muted-foreground hover:text-red-500"
-                    onClick={() => handleExcluir(item.id)}
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
+                  <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                      onClick={() => handleEdit(item)}
+                    >
+                      <Pencil className="h-3.5 w-3.5" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                      onClick={() => handleExcluir(item.id)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 </div>
-              </CardContent>
-            </Card>
-          ))}
-          {receitas.length === 0 && !loading && (
-            <div className="col-span-full py-8 text-center text-muted-foreground border border-dashed rounded-lg">
-              Nenhuma renda fixa cadastrada.
-            </div>
+              </div>
+            ))
           )}
         </div>
-      </div>
+      </section>
     </div>
   );
 }

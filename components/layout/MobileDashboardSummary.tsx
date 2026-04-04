@@ -9,6 +9,7 @@ import {
   Wallet,
   ArrowRight,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 function formatMoneyBRL(value: number) {
   return (value ?? 0).toLocaleString("pt-BR", {
@@ -53,13 +54,17 @@ export default function MobileDashboardSummary({
     }
   }, []);
 
-  React.useEffect(() => {
-    try {
-      localStorage.setItem(STORAGE_KEY, String(hidden));
-    } catch {
-      // ignore
-    }
-  }, [hidden]);
+  const toggleHidden = () => {
+    setHidden((prev) => {
+      const newVal = !prev;
+      try {
+        localStorage.setItem(STORAGE_KEY, String(newVal));
+      } catch {
+        // ignore
+      }
+      return newVal;
+    });
+  };
 
   const displaySaldoGeral = !hasEntradas
     ? "****"
@@ -69,20 +74,26 @@ export default function MobileDashboardSummary({
   const displayFixas = maskMoney(hidden, contasFixasMensais);
 
   return (
-    <section className="-mt-12 px-4 md:hidden">
-      <div className="rounded-2xl bg-background shadow-sm border overflow-hidden">
+    <section className="-mt-12 px-4 md:hidden relative z-10">
+      <div className="rounded-3xl bg-card shadow-sm border border-border/50 overflow-hidden">
         {/* Topo: Saldo geral + olho */}
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-sm text-muted-foreground">Saldo geral</p>
-
-              <p className="text-2xl font-bold tracking-tight">
+              <p className="text-sm text-muted-foreground font-medium">
+                Saldo geral
+              </p>
+              <p
+                className={cn(
+                  "text-3xl font-bold tracking-tight mt-0.5",
+                  saldoGeral >= 0 ? "text-foreground" : "text-destructive",
+                )}
+              >
                 {displaySaldoGeral}
               </p>
 
               {!hasEntradas && (
-                <p className="text-xs text-muted-foreground mt-1">
+                <p className="text-xs text-muted-foreground mt-1.5">
                   Sem entradas confirmadas no período
                 </p>
               )}
@@ -90,8 +101,8 @@ export default function MobileDashboardSummary({
 
             <button
               type="button"
-              onClick={() => setHidden((prev) => !prev)}
-              className="shrink-0 h-10 w-10 rounded-2xl hover:bg-muted/50 transition flex items-center justify-center"
+              onClick={toggleHidden}
+              className="shrink-0 h-12 w-12 rounded-full hover:bg-muted/50 active:bg-muted transition flex items-center justify-center text-muted-foreground"
               aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
             >
               {hidden ? (
@@ -103,63 +114,69 @@ export default function MobileDashboardSummary({
           </div>
         </div>
 
-        <div className="h-px bg-linear-to-r from-transparent via-border to-transparent mx-4 my-2" />
+        {/* Linha Divisória com sintaxe correta do Tailwind */}
+        <div className="h-px bg-linear-to-r from-transparent via-border to-transparent mx-4" />
 
         <div className="px-2 py-2">
           {/* Entradas confirmadas */}
-          <div className="w-full text-left px-3 py-3 rounded-2xl hover:bg-muted/40 transition flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full    h bg-green-500/10 text-green-600 flex items-center justify-center">
+          <div className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-green-500/10 text-green-600 dark:text-green-500 flex items-center justify-center">
               <TrendingUp className="h-5 w-5" />
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Entradas Confirmadas</p>
+              <p className="text-sm font-medium text-foreground">
+                Entradas Confirmadas
+              </p>
               <p className="text-xs text-muted-foreground">
                 Já recebido em conta
               </p>
             </div>
 
-            <p className="text-sm font-semibold text-green-600">
+            <p className="text-sm font-bold text-green-600 dark:text-green-500 tracking-tight shrink-0">
               {displayEntradas}
             </p>
           </div>
 
           {/* Gastos variáveis */}
-          <div className="w-full text-left px-3 py-3 rounded-2xl hover:bg-muted/40 transition flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-red-500/10 text-red-600 flex items-center justify-center">
+          <div className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3">
+            <div className="h-10 w-10 shrink-0 rounded-full bg-red-500/10 text-destructive flex items-center justify-center">
               <TrendingDown className="h-5 w-5" />
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Gastos Variáveis</p>
+              <p className="text-sm font-medium text-foreground">
+                Gastos Variáveis
+              </p>
               <p className="text-xs text-muted-foreground">Total acumulado</p>
             </div>
 
-            <p className="text-sm font-semibold text-red-600">
+            <p className="text-sm font-bold text-destructive tracking-tight shrink-0">
               {displayGastos}
             </p>
           </div>
 
-          {/* Contas fixas mensais */}
-          <div className="w-full text-left px-3 py-3 rounded-2xl hover:bg-muted/40 transition flex items-center gap-3">
-            <div className="h-10 w-10 rounded-full bg-blue-500/10 text-blue-600 flex items-center justify-center">
+          {/* Contas fixas mensais - AGORA A LINHA INTEIRA É CLICÁVEL */}
+          <div
+            role="button"
+            onClick={() => onNavigate?.("despesas_fixas")}
+            className="w-full text-left px-3 py-3 rounded-2xl hover:bg-muted/50 active:bg-muted/80 transition flex items-center gap-3 cursor-pointer group"
+          >
+            <div className="h-10 w-10 shrink-0 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors group-hover:bg-blue-500/20">
               <Wallet className="h-5 w-5" />
             </div>
 
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium">Contas Fixas Mensais</p>
-
-              <button
-                type="button"
-                onClick={() => onNavigate?.("despesas_fixas")}
-                className="text-xs text-muted-foreground flex items-center gap-1 hover:underline"
-              >
+              <p className="text-sm font-medium text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
+                Contas Fixas Mensais
+              </p>
+              <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 Recorrência mensal
-                <ArrowRight className="h-3.5 w-3.5" />
-              </button>
+                <ArrowRight className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+              </p>
             </div>
 
-            <p className="text-sm font-semibold text-blue-600">
+            <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-tight shrink-0">
               {displayFixas}
             </p>
           </div>

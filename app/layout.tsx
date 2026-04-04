@@ -1,3 +1,4 @@
+// app/layout.tsx
 import type React from "react";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
@@ -10,7 +11,6 @@ const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const viewport: Viewport = {
-  // Agora usamos a EXATA cor do seu globals.css (--primary)
   themeColor: [
     { media: "(prefers-color-scheme: light)", color: "oklch(0.55 0.18 230)" },
     { media: "(prefers-color-scheme: dark)", color: "oklch(0.65 0.15 230)" },
@@ -37,7 +37,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default", // Isso permite que a barra adote a cor do themeColor
+    statusBarStyle: "default",
     title: "Zibee",
   },
 };

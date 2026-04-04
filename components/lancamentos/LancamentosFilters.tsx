@@ -1,8 +1,6 @@
-// app/components/lancamentos/LancamentosFilters.tsx
 "use client";
 
 import * as React from "react";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -21,7 +19,7 @@ import {
 } from "@/components/ui/popover";
 import { ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useMediaQuery } from "@/hooks/use-media-query"; // Importe o hook que criamos
+import { useMediaQuery } from "@/hooks/use-media-query";
 
 // --- TIPAGENS ---
 interface LancamentosFiltersProps {
@@ -42,7 +40,7 @@ const FilterPill = ({ label, isActive, count, onClick }: any) => (
   <button
     onClick={onClick}
     className={cn(
-      "flex items-center gap-1 rounded-full border px-3 py-1.5 text-sm font-medium transition-colors whitespace-nowrap select-none",
+      "flex items-center gap-1 rounded-full border px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap select-none shrink-0",
       isActive
         ? "bg-primary text-primary-foreground border-primary"
         : "bg-background hover:bg-accent text-muted-foreground",
@@ -50,16 +48,15 @@ const FilterPill = ({ label, isActive, count, onClick }: any) => (
   >
     {label}
     {typeof count === "number" && count > 0 && (
-      <span className="ml-1 flex h-4 w-4 items-center justify-center rounded-full bg-background/20 text-[10px]">
+      <span className="ml-1.5 flex h-4 w-4 items-center justify-center rounded-full bg-background/20 text-[10px]">
         {count}
       </span>
     )}
-    <ChevronDown className="h-3 w-3 opacity-50" />
+    <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
   </button>
 );
 
 // --- CONTEÚDO DO FILTRO (LISTA DE OPÇÕES) ---
-// Extraímos isso para não repetir código dentro do Popover e da Sheet
 const FilterContent = ({
   options,
   selectedValues,
@@ -109,11 +106,11 @@ const ResponsiveFilter = ({
 }: {
   title: string;
   label: string;
-  options: string[]; // Lista de strings simples para exibir
+  options: string[];
   selectedValues: string[];
   setSelectedValues: React.Dispatch<React.SetStateAction<string[]>>;
 }) => {
-  const isDesktop = useMediaQuery("(min-width: 768px)"); // Detecta Desktop
+  const isDesktop = useMediaQuery("(min-width: 768px)");
   const [open, setOpen] = React.useState(false);
 
   const toggleSelection = (item: string) => {
@@ -166,9 +163,10 @@ const ResponsiveFilter = ({
           />
         </div>
       </SheetTrigger>
+      {/* Adicionado w-full e px-4 para proteger o conteúdo de colar nas bordas do aparelho */}
       <SheetContent
         side="bottom"
-        className="rounded-t-xl h-auto max-h-[85vh] overflow-y-auto"
+        className="rounded-t-2xl w-full px-5 py-6 h-auto max-h-[85vh] overflow-y-auto"
       >
         <SheetHeader className="mb-4 text-left">
           <SheetTitle>{title}</SheetTitle>
@@ -181,7 +179,9 @@ const ResponsiveFilter = ({
         />
         <SheetFooter className="mt-6">
           <SheetClose asChild>
-            <Button className="w-full">Concluir</Button>
+            <Button className="w-full h-12 text-base rounded-xl">
+              Concluir
+            </Button>
           </SheetClose>
         </SheetFooter>
       </SheetContent>
@@ -202,36 +202,10 @@ export function LancamentosFilters({
   categoriasOptions,
   pagamentoOptions,
 }: LancamentosFiltersProps) {
-  // Wrapper simples para o filtro de status (já que ele é string | null e não array)
-  // Vamos tratar "pago" e "pendente" como array de 1 item visualmente para reusar o componente
-  const statusOptions = ["Pago", "Pendente"];
-  const statusSelected = filtroStatus
-    ? [filtroStatus === "pago" ? "Pago" : "Pendente"]
-    : [];
-
-  const setStatusFromSelection = (
-    newSelection: React.SetStateAction<string[]>,
-  ) => {
-    // Lógica para transformar array de volta em string única (comportamento de rádio)
-    if (typeof newSelection === "function") {
-      // Ignoramos updates funcionais complexos para simplificar aqui
-      return;
-    }
-    // Se o usuário clicou em algo que já estava selecionado, limpa. Se clicou em novo, define.
-    // O componente ResponsiveFilter sempre adiciona, então pegamos o último clicado
-    const lastSelected = newSelection[newSelection.length - 1];
-
-    if (!lastSelected) setFiltroStatus(null);
-    else if (lastSelected === "Pago") setFiltroStatus("pago");
-    else if (lastSelected === "Pendente") setFiltroStatus("pendente");
-
-    // Hack visual: Se o usuário tentar selecionar os dois, mantemos só o último clicado
-    // O componente ResponsiveFilter vai receber o estado atualizado na próxima renderização
-  };
-
   return (
-    <ScrollArea className="w-full whitespace-nowrap [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-      <div className="flex w-max space-x-2 pb-2">
+    // Removida a margem negativa problemática e aplicado max-w-full limpo
+    <div className="max-w-full overflow-x-auto scrollbar-hide pb-3">
+      <div className="flex items-center w-max gap-2 pr-4">
         {/* TIPO */}
         <ResponsiveFilter
           label="Tipo"
@@ -259,19 +233,18 @@ export function LancamentosFilters({
           setSelectedValues={setFiltrosPagamento}
         />
 
-        {/* STATUS (Customizado) */}
-        {/* Como Status tem lógica diferente (única seleção), mantemos a lógica manual ou adaptamos */}
+        {/* STATUS */}
         <ResponsiveFilterStatus
           label="Status"
           currentStatus={filtroStatus}
           setStatus={setFiltroStatus}
         />
       </div>
-    </ScrollArea>
+    </div>
   );
 }
 
-// Criamos um componente separado para o Status pois a lógica dele é "Single Select" (único)
+// COMPONENTE DO STATUS (Single Select)
 const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [open, setOpen] = React.useState(false);
@@ -320,14 +293,19 @@ const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>{trigger}</SheetTrigger>
-      <SheetContent side="bottom" className="rounded-t-xl h-auto">
+      <SheetContent
+        side="bottom"
+        className="rounded-t-2xl w-full px-5 py-6 h-auto"
+      >
         <SheetHeader className="mb-4 text-left">
           <SheetTitle>Status</SheetTitle>
         </SheetHeader>
         {content}
         <SheetFooter className="mt-6">
           <SheetClose asChild>
-            <Button className="w-full">Concluir</Button>
+            <Button className="w-full h-12 text-base rounded-xl">
+              Concluir
+            </Button>
           </SheetClose>
         </SheetFooter>
       </SheetContent>

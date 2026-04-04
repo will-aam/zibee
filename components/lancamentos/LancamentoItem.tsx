@@ -1,15 +1,15 @@
-// components/lancamentos/LancamentoItem.tsx
 "use client";
 
-import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   Pencil,
   Trash2,
-  CreditCard,
-  CheckCircle,
-  XCircle,
   CalendarIcon,
+  CheckCircle2,
+  Circle,
+  ArrowUpRight,
+  ArrowDownRight,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Lancamento } from "@/types";
@@ -31,103 +31,114 @@ export function LancamentoItem({
   onEdit,
   onDelete,
 }: LancamentoItemProps) {
+  const isReceita = lancamento.tipo === "Receita";
+
   return (
-    <Card
+    <div
       className={cn(
-        "transition-all border-l-4 hover:shadow-sm",
+        "group flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-2xl border transition-all duration-200",
         isSelected
-          ? "bg-accent/50 border-primary shadow-sm"
-          : "border-transparent",
+          ? "bg-primary/5 border-primary/30"
+          : "bg-card border-border/50 hover:border-border hover:shadow-sm",
       )}
     >
-      <CardContent className="p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div className="flex-1 space-y-1">
-            <div className="flex items-center gap-2">
-              {/* BOTÃO DE TOGGLE DE PAGAMENTO */}
-              <button
-                onClick={onTogglePago}
-                title={
-                  lancamento.pago ? "Marcar como pendente" : "Marcar como pago"
-                }
-                className="hover:scale-110 transition-transform"
-              >
-                {lancamento.pago ? (
-                  <CheckCircle className="h-5 w-5 text-green-500" />
-                ) : (
-                  <XCircle className="h-5 w-5 text-muted-foreground/50 hover:text-yellow-500" />
-                )}
-              </button>
+      {/* ESQUERDA: Checkbox, Status e Info */}
+      <div className="flex items-start sm:items-center gap-3 sm:gap-4">
+        {/* 2. Botão de Status (Pago / Pendente) */}
+        <button
+          onClick={onTogglePago}
+          title={lancamento.pago ? "Marcar como pendente" : "Marcar como pago"}
+          className="pt-0.5 sm:pt-0 shrink-0 transition-transform active:scale-90"
+        >
+          {lancamento.pago ? (
+            <CheckCircle2 className="h-6 w-6 text-green-500" />
+          ) : (
+            <Circle className="h-6 w-6 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors" />
+          )}
+        </button>
 
-              <h3 className="font-semibold leading-none">
-                {lancamento.descricao}
-              </h3>
-            </div>
-
-            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground pl-7">
-              <span
-                className={cn(
-                  "font-medium",
-                  lancamento.tipo === "Receita"
-                    ? "text-green-600"
-                    : "text-red-500",
-                )}
-              >
-                {lancamento.tipo}
-              </span>
-              <span>•</span>
-              <span>{lancamento.categoria}</span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <CreditCard className="h-3 w-3" />
-                {lancamento.forma_pagamento}
-              </span>
-              <span>•</span>
-              <span className="flex items-center gap-1">
-                <CalendarIcon className="h-3 w-3" />
-                {new Date(lancamento.data_vencimento).toLocaleDateString(
-                  "pt-BR",
-                  { timeZone: "UTC" }, // Correção de fuso horário
-                )}
-              </span>
-            </div>
-          </div>
-
-          <div className="flex flex-col items-end gap-1">
-            <div
+        {/* 3. Textos e Detalhes */}
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-2">
+            <h3
               className={cn(
-                "font-bold text-sm",
-                lancamento.tipo === "Receita" ? "text-green-600" : "",
+                "font-semibold text-sm sm:text-base truncate",
+                lancamento.pago ? "text-foreground" : "text-foreground/80",
               )}
             >
-              {lancamento.tipo === "Receita" ? "+" : "-"}{" "}
-              {Number(lancamento.valor).toLocaleString("pt-BR", {
-                style: "currency",
-                currency: "BRL",
-              })}
-            </div>
+              {lancamento.descricao}
+            </h3>
+          </div>
 
-            <div className="flex gap-1">
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6"
-                onClick={onEdit}
-              >
-                <Pencil className="h-3 w-3" />
-              </Button>
-              <Button
-                size="icon"
-                variant="ghost"
-                className="h-6 w-6 text-red-400 hover:text-red-500"
-                onClick={onDelete}
-              >
-                <Trash2 className="h-3 w-3" />
-              </Button>
-            </div>
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+            <span
+              className={cn(
+                "font-medium flex items-center gap-0.5",
+                isReceita
+                  ? "text-green-600 dark:text-green-500"
+                  : "text-destructive/80",
+              )}
+            >
+              {isReceita ? (
+                <ArrowUpRight className="h-3 w-3" />
+              ) : (
+                <ArrowDownRight className="h-3 w-3" />
+              )}
+              {lancamento.categoria}
+            </span>
+            <span className="opacity-50">•</span>
+            <span>{lancamento.forma_pagamento}</span>
+            <span className="opacity-50">•</span>
+            <span className="flex items-center gap-1">
+              <CalendarIcon className="h-3 w-3 opacity-70" />
+              {new Date(lancamento.data_vencimento).toLocaleDateString(
+                "pt-BR",
+                { timeZone: "UTC" },
+              )}
+            </span>
           </div>
         </div>
-      </CardContent>
-    </Card>
+      </div>
+
+      {/* DIREITA: Valor e Ações */}
+      <div className="flex items-center justify-between sm:justify-end gap-4 mt-3 sm:mt-0 pl-10 sm:pl-0 w-full sm:w-auto">
+        {/* Valor */}
+        <div
+          className={cn(
+            "font-bold text-sm sm:text-base tracking-tight",
+            isReceita
+              ? "text-green-600 dark:text-green-500"
+              : "text-foreground",
+            !lancamento.pago && "opacity-70",
+          )}
+        >
+          {isReceita ? "+" : "-"}{" "}
+          {Number(lancamento.valor).toLocaleString("pt-BR", {
+            style: "currency",
+            currency: "BRL",
+          })}
+        </div>
+
+        {/* Ações (Editar / Excluir) */}
+        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+            onClick={onEdit}
+          >
+            <Pencil className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+            onClick={onDelete}
+          >
+            <Trash2 className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

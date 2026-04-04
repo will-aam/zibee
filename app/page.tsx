@@ -14,12 +14,9 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-background pb-24 md:pb-0 flex flex-col">
-      {/* O Header agora é global e controla a navegação em todas as abas */}
       <Header activeTab={activeTab} onNavigate={setActiveTab} />
 
-      {/* ÁREA PRINCIPAL DA APLICAÇÃO */}
-      <main className="flex-1 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 transition-all duration-300">
-        {/* Renderização condicional das abas */}
+      <main className="flex-1 w-full max-w-7xl mx-auto sm:px-6 lg:px-8 py-6 md:py-8 transition-all duration-300">
         {activeTab === "dashboard" && <Dashboard onNavigate={setActiveTab} />}
         {activeTab === "lancamentos" && <Lancamentos />}
         {activeTab === "receitas" && <Receitas />}

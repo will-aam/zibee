@@ -60,29 +60,27 @@ function avatarUrl(style: AvatarStyle, seed: string) {
 function MobileDashboardSummarySkeleton() {
   return (
     <section className="-mt-12 px-4 md:hidden">
-      <div className="rounded-3xl bg-background shadow-sm border overflow-hidden">
-        <div className="px-5 pt-5 pb-4">
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0 flex-1">
-              <div className="h-4 w-24 rounded bg-muted animate-pulse" />
-              <div className="mt-3 h-8 w-44 rounded bg-muted animate-pulse" />
-            </div>
-            <div className="shrink-0 h-10 w-10 rounded-2xl bg-muted animate-pulse" />
+      <div className="rounded-3xl bg-background shadow-sm border overflow-hidden animate-pulse">
+        <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3">
+          <div className="flex-1">
+            <div className="h-4 w-24 rounded bg-muted" />
+            <div className="mt-3 h-8 w-44 rounded bg-muted" />
           </div>
+          <div className="h-10 w-10 rounded-2xl bg-muted" />
         </div>
         <div className="h-px bg-border" />
-        <div className="px-2 py-2">
-          {[0, 1, 2].map((i) => (
+        <div className="p-2 space-y-1">
+          {[1, 2, 3].map((i) => (
             <div
               key={i}
-              className="w-full px-3 py-3 rounded-2xl flex items-center gap-3"
+              className="w-full p-3 rounded-2xl flex items-center gap-3"
             >
-              <div className="h-10 w-10 rounded-2xl bg-muted animate-pulse" />
-              <div className="flex-1 min-w-0">
-                <div className="h-4 w-40 rounded bg-muted animate-pulse" />
-                <div className="mt-2 h-3 w-28 rounded bg-muted animate-pulse" />
+              <div className="h-10 w-10 rounded-2xl bg-muted" />
+              <div className="flex-1">
+                <div className="h-4 w-32 rounded bg-muted" />
+                <div className="mt-2 h-3 w-20 rounded bg-muted" />
               </div>
-              <div className="h-4 w-16 rounded bg-muted animate-pulse" />
+              <div className="h-4 w-16 rounded bg-muted" />
             </div>
           ))}
         </div>
@@ -142,6 +140,7 @@ export default function Header({
     }
   };
 
+  // Sincronização de Tema PWA
   React.useEffect(() => {
     const updateThemeColor = () => {
       const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
@@ -168,16 +167,14 @@ export default function Header({
     return () => window.removeEventListener("resize", updateThemeColor);
   }, [activeTab]);
 
+  // Avatar
   React.useEffect(() => {
     let cancelled = false;
     async function loadAvatar() {
       setLoadingAvatar(true);
       try {
         const res = await fetch("/api/profile/avatar", { method: "GET" });
-        if (!res.ok) {
-          setLoadingAvatar(false);
-          return;
-        }
+        if (!res.ok) return;
         const data = (await res.json()) as {
           avatar_style?: AvatarStyle;
           avatar_seed?: string;
@@ -234,6 +231,7 @@ export default function Header({
     [savingAvatar, toast],
   );
 
+  // Filtros Globais e Totais do Dashboard
   const readRange = React.useCallback(() => {
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
@@ -276,6 +274,7 @@ export default function Header({
 
       const [{ data: rData }, { data: dData }, { data: fData }] =
         await Promise.all([receitasQuery, despesasQuery, fixasQuery]);
+
       setTotalReceitas(
         rData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
       );
@@ -294,16 +293,12 @@ export default function Header({
   React.useEffect(() => {
     loadTotals();
   }, [loadTotals]);
-
   React.useEffect(() => {
-    function onFilterChanged() {
-      loadTotals();
-    }
-    window.addEventListener(FILTER_EVENT, onFilterChanged);
-    return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
+    window.addEventListener(FILTER_EVENT, loadTotals);
+    return () => window.removeEventListener(FILTER_EVENT, loadTotals);
   }, [loadTotals]);
 
-  // Desktop animado suavemente
+  // Classes de Botões
   const navButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${
       isActive
@@ -311,7 +306,6 @@ export default function Header({
         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground px-4 py-3"
     }`;
 
-  // Mobile animado suavemente
   const mobileNavButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-full transition-all duration-300 ease-in-out active:scale-95 ${
       isActive
@@ -321,10 +315,11 @@ export default function Header({
 
   return (
     <>
-      {/* DESKTOP HEADER */}
+      {/* ======================= DESKTOP HEADER ======================= */}
       <header
-        className={`hidden md:flex items-center justify-between px-8 py-5  bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
+        className={`hidden md:flex items-center justify-between px-8 py-5 bg-background/80 backdrop-blur-md sticky top-0 z-50 border-b border-border/50 ${sora.className}`}
       >
+        {/* LOGO */}
         <div
           className="flex items-center gap-4 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
           onClick={() => onNavigate?.("dashboard")}
@@ -349,7 +344,7 @@ export default function Header({
           </div>
         </div>
 
-        {/* NAVEGAÇÃO DESKTOP: Animação Smooth com max-width */}
+        {/* NAVEGAÇÃO DESKTOP */}
         <nav className="flex flex-1 items-center gap-2 justify-center">
           <button
             onClick={() => onNavigate?.("dashboard")}
@@ -366,7 +361,6 @@ export default function Header({
               Dashboard
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={navButtonClass(activeTab === "lancamentos")}
@@ -382,7 +376,6 @@ export default function Header({
               Lançamentos
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("receitas")}
             className={navButtonClass(activeTab === "receitas")}
@@ -398,7 +391,6 @@ export default function Header({
               Planos
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("metas")}
             className={navButtonClass(activeTab === "metas")}
@@ -412,7 +404,6 @@ export default function Header({
               Metas
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={navButtonClass(activeTab === "configuracoes")}
@@ -430,6 +421,7 @@ export default function Header({
           </button>
         </nav>
 
+        {/* CONTROLES DIREITA */}
         <div className="flex items-center gap-5 ml-4">
           {activeTab === "dashboard" && (
             <Button
@@ -466,7 +458,7 @@ export default function Header({
         </div>
       </header>
 
-      {/* MOBILE HEADER */}
+      {/* ======================= MOBILE HEADER (DASHBOARD APENAS) ======================= */}
       {activeTab === "dashboard" && (
         <section className={`md:hidden ${sora.className}`}>
           <header
@@ -513,8 +505,8 @@ export default function Header({
         </section>
       )}
 
-      {/* MOBILE BOTTOM NAV: Animação Smooth com max-width */}
-      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+      {/* ======================= MOBILE BOTTOM NAV ======================= */}
+      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] border-t border-border/50">
         <div className="flex items-center justify-around px-2 h-20">
           <button
             onClick={() => onNavigate?.("dashboard")}
@@ -544,7 +536,8 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Lanç.
+              Lançamentos{" "}
+              {/* Atualizei de "Lanç." para "Lançamentos" caso caiba, senão pode voltar */}
             </span>
           </button>
 
@@ -578,12 +571,13 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Config
+              Configurações
             </span>
           </button>
         </div>
       </div>
 
+      {/* DRAWERS E MODAIS */}
       <DateRangeFilterDrawer
         open={openFilterDrawer}
         onClose={() => setOpenFilterDrawer(false)}

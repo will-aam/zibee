@@ -181,8 +181,12 @@ export default function DespesasFixas() {
           fixasCache.despesas = resFixas.data;
         }
 
+        // CORREÇÃO AQUI: À prova de falhas (aceita tanto objeto do Supabase quanto string do cache)
         if (resLancados?.data) {
-          const nomes = (resLancados.data as any[]).map((l) => l.descricao);
+          const nomes = (resLancados.data as any[])
+            .map((l) => (typeof l === "string" ? l : l?.descricao))
+            .filter(Boolean); // Remove nulos caso existam
+
           setNomesLancadosEsteMes(nomes);
           fixasCache.nomesLancadosEsteMes = nomes;
           fixasCache.nomesLancadosMesKey = thisKey;

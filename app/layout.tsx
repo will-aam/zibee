@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#2563eb", // Cor da barra de status no mobile
+  themeColor: "#009ed8",
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,

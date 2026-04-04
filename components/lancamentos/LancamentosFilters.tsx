@@ -283,7 +283,7 @@ const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
         className="cursor-pointer px-3 py-1.5"
         onClick={() => setStatus(currentStatus === "pago" ? null : "pago")}
       >
-        Pago / Realizado
+        Realizado
       </Badge>
       <Badge
         variant={currentStatus === "pendente" ? "default" : "outline"}

@@ -283,120 +283,150 @@ export default function Header({
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [loadTotals]);
 
+  // Nova classe para a navegação retrátil
   const navButtonClass = (isActive: boolean) =>
-    `flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium transition-all duration-200 active:scale-[0.98] ${
+    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-out active:scale-[0.96] ${
       isActive
-        ? "bg-primary/10 text-primary"
-        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+        ? "bg-primary/10 text-primary px-5 py-3" // Expandido com padding
+        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground p-3" // Retraído (só ícone)
     }`;
 
   return (
     <>
       {/* =========================================
-          DESKTOP HEADER (Substitui o Sidebar antigo)
+          DESKTOP HEADER (Ampliado e mais limpo)
           ========================================= */}
       <header
-        className={`hidden md:flex items-center justify-between px-6 py-3 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
+        className={`hidden md:flex items-center justify-between px-8 py-5 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
       >
         {/* ESQUERDA: Logo e Saudação */}
         <div
-          className="flex items-center gap-3 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
+          className="flex items-center gap-4 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
           onClick={() => onNavigate?.("dashboard")}
         >
           <Image
             src="/icons8-abelha-64.png"
             alt="Zibee Logo"
-            width={36}
-            height={36}
+            width={44}
+            height={44}
             className="shrink-0"
             priority
           />
           <div className="hidden lg:block flex-1 min-w-0">
+            <p className="text-xs text-muted-foreground uppercase tracking-wide font-medium">
+              {getGreeting()},
+            </p>
             <h1
-              className={`text-lg text-primary truncate ${audiowide.className}`}
+              className={`text-xl text-primary truncate ${audiowide.className}`}
             >
               Zibee - {userName}
             </h1>
-            <p className="text-[11px] text-muted-foreground uppercase tracking-wide -mb-1 font-medium">
-              {getGreeting()}!
-            </p>
           </div>
         </div>
 
-        {/* CENTRO: Navegação */}
-        <nav className="flex flex-1 items-center gap-2 max-w-2xl">
+        {/* CENTRO: Navegação (Somente Ícones, exceto o ativo) */}
+        <nav className="flex flex-1 items-center gap-2 justify-center">
           <button
             onClick={() => onNavigate?.("dashboard")}
             className={navButtonClass(activeTab === "dashboard")}
+            title="Dashboard"
           >
             {activeTab === "dashboard" ? (
-              <HomeSolid className="h-5 w-5" />
+              <HomeSolid className="h-6 w-6 shrink-0" />
             ) : (
-              <HomeIcon className="h-5 w-5" />
+              <HomeIcon className="h-6 w-6 shrink-0" />
             )}
-            Dashboard
+            {activeTab === "dashboard" && (
+              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
+                Dashboard
+              </span>
+            )}
           </button>
 
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={navButtonClass(activeTab === "lancamentos")}
+            title="Lançamentos"
           >
             {activeTab === "lancamentos" ? (
-              <DocumentTextSolid className="h-5 w-5" />
+              <DocumentTextSolid className="h-6 w-6 shrink-0" />
             ) : (
-              <DocumentTextIcon className="h-5 w-5" />
+              <DocumentTextIcon className="h-6 w-6 shrink-0" />
             )}
-            Lançamentos
+            {activeTab === "lancamentos" && (
+              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
+                Lançamentos
+              </span>
+            )}
           </button>
 
           <button
             onClick={() => onNavigate?.("receitas")}
             className={navButtonClass(activeTab === "receitas")}
+            title="Planos"
           >
             {activeTab === "receitas" ? (
-              <ChartPieSolid className="h-5 w-5" />
+              <ChartPieSolid className="h-6 w-6 shrink-0" />
             ) : (
-              <ChartPieIcon className="h-5 w-5" />
+              <ChartPieIcon className="h-6 w-6 shrink-0" />
             )}
-            Planos
+            {activeTab === "receitas" && (
+              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
+                Planos
+              </span>
+            )}
           </button>
 
           <button
             onClick={() => onNavigate?.("metas")}
             className={navButtonClass(activeTab === "metas")}
+            title="Metas"
           >
             <Target
-              className={`h-5 w-5 ${activeTab === "metas" ? "text-primary" : ""}`}
+              className={`h-6 w-6 shrink-0 ${activeTab === "metas" ? "text-primary" : ""}`}
             />
-            Metas
+            {activeTab === "metas" && (
+              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
+                Metas
+              </span>
+            )}
           </button>
 
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={navButtonClass(activeTab === "configuracoes")}
+            title="Configurações"
           >
             {activeTab === "configuracoes" ? (
-              <CogSolid className="h-5 w-5" />
+              <CogSolid className="h-6 w-6 shrink-0" />
             ) : (
-              <Cog6ToothIcon className="h-5 w-5" />
+              <Cog6ToothIcon className="h-6 w-6 shrink-0" />
             )}
-            Config
+            {activeTab === "configuracoes" && (
+              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
+                Configurações
+              </span>
+            )}
           </button>
         </nav>
 
-        {/* DIREITA: Filtro, Perfil e Sair */}
-        <div className="flex items-center gap-4 ml-4">
-          <Button
-            variant="outline"
-            className="rounded-xl h-10"
-            onClick={() => setOpenFilterDrawer(true)}
-          >
-            <Filter className="h-4 w-4 mr-2" /> Filtrar
-          </Button>
+        {/* DIREITA: Filtro, Perfil e Sair (Botões mais visíveis) */}
+        <div className="flex items-center gap-5 ml-4">
+          {activeTab === "dashboard" && (
+            <Button
+              variant="outline"
+              className="rounded-2xl h-11 px-5"
+              onClick={() => setOpenFilterDrawer(true)}
+            >
+              <Filter className="h-5 w-5 mr-2" />
+              <span className="text-base font-medium">Filtrar</span>
+            </Button>
+          )}
 
           <button
             onClick={() => setOpenProfileDrawer(true)}
-            className="h-10 w-10 rounded-full overflow-hidden ring-2 ring-transparent hover:ring-primary/50 transition"
+            className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition shadow-sm"
+            title="Seu Perfil"
           >
             <img
               src={avatarUrl(avatar.style, avatar.seed)}
@@ -405,69 +435,71 @@ export default function Header({
             />
           </button>
 
-          <div className="h-6 w-px bg-border mx-1" />
+          <div className="h-8 w-px bg-border mx-1" />
 
           <button
             onClick={handleLogout}
             disabled={isLoggingOut}
-            className="p-2 rounded-xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
+            className="p-3 rounded-2xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
             title="Sair da conta"
           >
             {isLoggingOut ? (
-              <Loader2 className="h-5 w-5 animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin" />
             ) : (
-              <LogOut className="h-5 w-5" />
+              <LogOut className="h-6 w-6" />
             )}
           </button>
         </div>
       </header>
 
       {/* =========================================
-          MOBILE HEADER (Já estava aqui e mantido)
+          MOBILE HEADER (Agora oculto fora do Dashboard)
           ========================================= */}
-      <section className={`md:hidden ${sora.className}`}>
-        <header className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20">
-          <div className="flex items-center gap-4">
-            <button
-              onClick={() => setOpenProfileDrawer(true)}
-              className="shrink-0 h-16 w-16 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
-            >
-              <img
-                src={avatarUrl(avatar.style, avatar.seed)}
-                alt="Avatar"
-                className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
-              />
-            </button>
-            <div className="flex-1 min-w-0">
-              <p className="text-sm text-white/85">{getGreeting()},</p>
-              <p className="font-semibold text-xl leading-tight truncate text-white">
-                {userName}!
-              </p>
+      {activeTab === "dashboard" && (
+        <section className={`md:hidden ${sora.className}`}>
+          <header className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20">
+            <div className="flex items-center gap-4">
+              <button
+                onClick={() => setOpenProfileDrawer(true)}
+                className="shrink-0 h-16 w-16 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
+              >
+                <img
+                  src={avatarUrl(avatar.style, avatar.seed)}
+                  alt="Avatar"
+                  className={`h-full w-full object-cover ${loadingAvatar ? "opacity-80" : "opacity-100"}`}
+                />
+              </button>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-white/85">{getGreeting()},</p>
+                <p className="font-semibold text-xl leading-tight truncate text-white">
+                  {userName}!
+                </p>
+              </div>
+              <button
+                onClick={() => setOpenFilterDrawer(true)}
+                className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
+              >
+                <Filter className="h-5 w-5 text-white" />
+              </button>
             </div>
-            <button
-              onClick={() => setOpenFilterDrawer(true)}
-              className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
-            >
-              <Filter className="h-5 w-5 text-white" />
-            </button>
-          </div>
-        </header>
+          </header>
 
-        {loadingTotals ? (
-          <MobileDashboardSummarySkeleton />
-        ) : (
-          <MobileDashboardSummary
-            saldoGeral={saldoGeral}
-            entradasConfirmadas={totalReceitas}
-            gastosVariaveis={totalDespesas}
-            contasFixasMensais={totalDespesasFixas}
-            onNavigate={(target) => onNavigate?.(target)}
-          />
-        )}
-      </section>
+          {loadingTotals ? (
+            <MobileDashboardSummarySkeleton />
+          ) : (
+            <MobileDashboardSummary
+              saldoGeral={saldoGeral}
+              entradasConfirmadas={totalReceitas}
+              gastosVariaveis={totalDespesas}
+              contasFixasMensais={totalDespesasFixas}
+              onNavigate={(target) => onNavigate?.(target)}
+            />
+          )}
+        </section>
+      )}
 
       {/* =========================================
-          MOBILE BOTTOM NAV (Migrado do antigo Sidebar)
+          MOBILE BOTTOM NAV 
           ========================================= */}
       <div className="fixed bottom-4 left-1/2 z-50 w-[95%] max-w-sm -translate-x-1/2 md:hidden">
         <div className="bg-card/95 backdrop-blur-sm border rounded-2xl px-2 py-2 flex items-center justify-between shadow-xl">
@@ -516,7 +548,9 @@ export default function Header({
             ) : (
               <Cog6ToothIcon className="h-5 w-5" />
             )}
-            <span className="text-[10px] mt-1 font-medium">Config</span>
+            <span className="text-[10px] mt-1 font-medium truncate max-w-full px-1">
+              Configurações
+            </span>
           </button>
         </div>
       </div>

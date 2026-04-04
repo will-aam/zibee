@@ -9,6 +9,7 @@ import Metas from "@/components/goals";
 import Configuracoes from "@/components/configuracoes";
 import DespesasFixas from "@/components/features/fixed-expenses";
 import Receitas from "@/components/receitas";
+import GruposConfig from "@/components/groups";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -26,6 +27,7 @@ export default function Home() {
           <Configuracoes onNavigate={setActiveTab} />
         )}
         {activeTab === "despesas_fixas" && <DespesasFixas />}
+        {activeTab === "grupos" && <GruposConfig />}
       </main>
     </div>
   );

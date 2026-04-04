@@ -14,6 +14,7 @@ import {
   DocumentTextIcon as DocumentTextSolid,
   ChartPieIcon as ChartPieSolid,
   Cog6ToothIcon as CogSolid,
+  UserGroupIcon as UserGroupSolid,
 } from "@heroicons/react/24/solid";
 
 import {
@@ -21,7 +22,16 @@ import {
   DocumentTextIcon,
   ChartPieIcon,
   Cog6ToothIcon,
+  UserGroupIcon as UserGroupOutline,
 } from "@heroicons/react/24/outline";
+
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import DateRangeFilterDrawer, {
@@ -115,6 +125,8 @@ export default function Header({
     style: DEFAULT_STYLE,
     seed: `${baseSeed}-1`,
   });
+
+  const [activeContext, setActiveContext] = React.useState("pessoal");
 
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
@@ -391,6 +403,24 @@ export default function Header({
               Resumo
             </span>
           </button>
+
+          {/* NOVO BOTÃO: GRUPOS */}
+          <button
+            onClick={() => onNavigate?.("grupos")}
+            className={navButtonClass(activeTab === "grupos")}
+          >
+            {activeTab === "grupos" ? (
+              <UserGroupSolid className="h-6 w-6 shrink-0" />
+            ) : (
+              <UserGroupOutline className="h-6 w-6 shrink-0" />
+            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "grupos" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Grupos
+            </span>
+          </button>
+
           <button
             onClick={() => onNavigate?.("metas")}
             className={navButtonClass(activeTab === "metas")}
@@ -433,6 +463,30 @@ export default function Header({
               <span className="text-base font-medium">Filtrar</span>
             </Button>
           )}
+
+          {/* NOVO: SELETOR DE CONTEXTO (MOCK) */}
+          <div className="hidden lg:block w-40">
+            <Select value={activeContext} onValueChange={setActiveContext}>
+              <SelectTrigger className="h-11 rounded-2xl bg-muted/50 border-transparent hover:bg-muted transition-colors">
+                <SelectValue placeholder="Contexto" />
+              </SelectTrigger>
+              <SelectContent className="rounded-2xl">
+                <SelectItem
+                  value="pessoal"
+                  className="rounded-xl cursor-pointer"
+                >
+                  Meu Pessoal
+                </SelectItem>
+                <SelectItem
+                  value="casa_henrique"
+                  className="rounded-xl cursor-pointer"
+                >
+                  Casa do Dexter
+                </SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+
           <button
             onClick={() => setOpenProfileDrawer(true)}
             className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition shadow-sm"
@@ -465,7 +519,7 @@ export default function Header({
             id="mobile-header-top"
             className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
           >
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-4 mb-4">
               <button
                 onClick={() => setOpenProfileDrawer(true)}
                 className="shrink-0 h-16 w-16 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
@@ -482,12 +536,23 @@ export default function Header({
                   {userName}!
                 </p>
               </div>
-              <button
-                onClick={() => setOpenFilterDrawer(true)}
-                className="shrink-0 p-3 rounded-2xl active:scale-95 transition"
-              >
-                <Filter className="h-5 w-5 text-white" />
-              </button>
+            </div>
+
+            {/* NOVO: SELETOR DE CONTEXTO MOBILE */}
+            <div className="flex justify-between items-center bg-white/10 rounded-2xl p-1 mb-2">
+              <Select value={activeContext} onValueChange={setActiveContext}>
+                <SelectTrigger className="h-10 border-none bg-transparent text-white focus:ring-0 shadow-none">
+                  <SelectValue placeholder="Contexto" />
+                </SelectTrigger>
+                <SelectContent className="rounded-2xl">
+                  <SelectItem value="pessoal" className="rounded-xl">
+                    Meu Pessoal
+                  </SelectItem>
+                  <SelectItem value="casa_henrique" className="rounded-xl">
+                    Casa do Dexter
+                  </SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </header>
 
@@ -536,8 +601,24 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Lançamentos{" "}
-              {/* Atualizei de "Lanç." para "Lançamentos" caso caiba, senão pode voltar */}
+              Lançamentos
+            </span>
+          </button>
+
+          {/* NOVO BOTÃO GRUPOS MOBILE */}
+          <button
+            onClick={() => onNavigate?.("grupos")}
+            className={mobileNavButtonClass(activeTab === "grupos")}
+          >
+            {activeTab === "grupos" ? (
+              <UserGroupSolid className="h-7 w-7 shrink-0" />
+            ) : (
+              <UserGroupOutline className="h-7 w-7 shrink-0" />
+            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "grupos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Grupos
             </span>
           </button>
 

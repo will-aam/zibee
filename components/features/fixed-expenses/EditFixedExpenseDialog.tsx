@@ -1,3 +1,4 @@
+// components/features/fixed-expenses/EditFixedExpenseDialog.tsx
 "use client";
 
 import * as React from "react";

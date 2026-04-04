@@ -35,7 +35,7 @@ export interface Meta {
   auto_deposito_ativo?: boolean;
   auto_valor?: number;
   auto_dia_cobranca?: number;
-  auto_horario?: string; // <-- NOVO CAMPO ADICIONADO
+  auto_horario?: string;
   auto_data_inicio?: string;
   auto_meses_duracao?: number;
   auto_ultimo_processamento?: string;

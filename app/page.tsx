@@ -7,7 +7,7 @@ import Dashboard from "@/components/dashboard";
 import Lancamentos from "@/components/releases";
 import Metas from "@/components/goals";
 import Configuracoes from "@/components/configuracoes";
-import DespesasFixas from "@/components/despesas-fixas";
+import DespesasFixas from "@/components/fixed-expenses";
 import Receitas from "@/components/receitas";
 
 export default function Home() {

@@ -170,16 +170,28 @@
 }
 
 @layer base {
+  /* Essa trava garante que o app não tenha efeito elástico, revelando o fundo */
+  html,
+  body {
+    height: 100%;
+    width: 100%;
+    overscroll-behavior-y: none; /* Bloqueia o "puxar para atualizar" nativo que gera linha */
+  }
+
   * {
     @apply border-border outline-ring/50;
   }
   body {
     @apply bg-background text-foreground;
   }
-  /* Melhorando transições globais */
-  button,
-  a {
-    @apply transition-colors duration-200;
+
+  /* Esconde a barra de rolagem globalmente */
+  *::-webkit-scrollbar {
+    display: none;
+  }
+  * {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 }
 
@@ -225,19 +237,5 @@
   * {
     -ms-overflow-style: none; /* IE and Edge */
     scrollbar-width: none; /* Firefox */
-  }
-}
-
-@supports (padding-top: env(safe-area-inset-top)) {
-  /* Isso cria um "teto" invisível da exata cor do seu Header no iOS */
-  html::before {
-    content: "";
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    height: env(safe-area-inset-top);
-    background-color: #009ed8; /* O SEU AZUL EXATO */
-    z-index: 99999;
   }
 }

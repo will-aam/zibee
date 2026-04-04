@@ -16,12 +16,12 @@ const geistMono = Geist_Mono({
 });
 
 export const viewport: Viewport = {
-  themeColor: "#009ed8",
+  themeColor: "#009ed8", // O azul exato do seu topo
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
-  userScalable: false, // Evita que o usuário dê zoom sem querer no app
-  viewportFit: "cover", // <--- O SEGREDO ESTÁ AQUI: Faz o app invadir a área do topo (Notch/Dynamic Island)
+  userScalable: false,
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -47,8 +47,7 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    // "black-translucent" faz o iOS renderizar o site por trás da barra de status (texto branco)
-    statusBarStyle: "black-translucent",
+    statusBarStyle: "default", // Mudamos para default como no Countifly
     title: "Zibee",
   },
 };
@@ -61,7 +60,6 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
-        // Adicionado bg-background text-foreground para garantir as cores do tema baseadas na UI
         className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
       >
         <ThemeProvider

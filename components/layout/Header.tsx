@@ -107,7 +107,6 @@ export default function Header({
   const [openFilterDrawer, setOpenFilterDrawer] = React.useState(false);
   const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
-  // Avatar
   const [loadingAvatar, setLoadingAvatar] = React.useState(true);
   const [savingAvatar, setSavingAvatar] = React.useState(false);
   const [saveErrorMessage, setSaveErrorMessage] = React.useState<string | null>(
@@ -119,7 +118,6 @@ export default function Header({
     seed: `${baseSeed}-1`,
   });
 
-  // Totais do painel
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
   const [totalDespesas, setTotalDespesas] = React.useState(0);
@@ -144,7 +142,6 @@ export default function Header({
     }
   };
 
-  // --- SINCRONIZAÇÃO DINÂMICA DO THEME-COLOR PARA O PWA ---
   React.useEffect(() => {
     const updateThemeColor = () => {
       const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
@@ -152,21 +149,17 @@ export default function Header({
         metaThemes.forEach((meta) => meta.setAttribute("content", color));
       };
 
-      // Se for mobile e a aba for Dashboard, pinta o topo inteiro de azul primário
       if (activeTab === "dashboard" && window.innerWidth < 768) {
         const headerEl = document.getElementById("mobile-header-top");
         if (headerEl) {
-          // Pega a exata cor computada do bg-primary para evitar diferença de tom
           const bgColor = window.getComputedStyle(headerEl).backgroundColor;
           setMetaColor(bgColor);
-          // OdocumentElement pinta o fundo do notch/borda do iOS
           document.documentElement.style.backgroundColor = bgColor;
         }
       } else {
-        // Nas outras telas, volta para a cor de fundo padrão (branco ou preto)
         const bodyBg = window.getComputedStyle(document.body).backgroundColor;
         setMetaColor(bodyBg);
-        document.documentElement.style.backgroundColor = ""; // Reseta o fundo
+        document.documentElement.style.backgroundColor = "";
       }
     };
 
@@ -175,7 +168,6 @@ export default function Header({
     return () => window.removeEventListener("resize", updateThemeColor);
   }, [activeTab]);
 
-  // Avatar Fetch
   React.useEffect(() => {
     let cancelled = false;
     async function loadAvatar() {
@@ -311,18 +303,27 @@ export default function Header({
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [loadTotals]);
 
+  // Desktop animado suavemente
   const navButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-out active:scale-[0.96] ${
+    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${
       isActive
         ? "bg-primary/10 text-primary px-5 py-3"
-        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground p-3"
+        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground px-4 py-3"
+    }`;
+
+  // Mobile animado suavemente
+  const mobileNavButtonClass = (isActive: boolean) =>
+    `flex items-center justify-center rounded-full transition-all duration-300 ease-in-out active:scale-95 ${
+      isActive
+        ? "bg-primary/15 text-primary px-5 py-2.5"
+        : "text-muted-foreground px-4 py-2.5"
     }`;
 
   return (
     <>
       {/* DESKTOP HEADER */}
       <header
-        className={`hidden md:flex items-center justify-between px-8 py-5 border-b bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
+        className={`hidden md:flex items-center justify-between px-8 py-5  bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
       >
         <div
           className="flex items-center gap-4 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
@@ -348,84 +349,84 @@ export default function Header({
           </div>
         </div>
 
+        {/* NAVEGAÇÃO DESKTOP: Animação Smooth com max-width */}
         <nav className="flex flex-1 items-center gap-2 justify-center">
           <button
             onClick={() => onNavigate?.("dashboard")}
             className={navButtonClass(activeTab === "dashboard")}
-            title="Dashboard"
           >
             {activeTab === "dashboard" ? (
               <HomeSolid className="h-6 w-6 shrink-0" />
             ) : (
               <HomeIcon className="h-6 w-6 shrink-0" />
             )}
-            {activeTab === "dashboard" && (
-              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
-                Dashboard
-              </span>
-            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "dashboard" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Dashboard
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={navButtonClass(activeTab === "lancamentos")}
-            title="Lançamentos"
           >
             {activeTab === "lancamentos" ? (
               <DocumentTextSolid className="h-6 w-6 shrink-0" />
             ) : (
               <DocumentTextIcon className="h-6 w-6 shrink-0" />
             )}
-            {activeTab === "lancamentos" && (
-              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
-                Lançamentos
-              </span>
-            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Lançamentos
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("receitas")}
             className={navButtonClass(activeTab === "receitas")}
-            title="Planos"
           >
             {activeTab === "receitas" ? (
               <ChartPieSolid className="h-6 w-6 shrink-0" />
             ) : (
               <ChartPieIcon className="h-6 w-6 shrink-0" />
             )}
-            {activeTab === "receitas" && (
-              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
-                Planos
-              </span>
-            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Planos
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("metas")}
             className={navButtonClass(activeTab === "metas")}
-            title="Metas"
           >
             <Target
               className={`h-6 w-6 shrink-0 ${activeTab === "metas" ? "text-primary" : ""}`}
             />
-            {activeTab === "metas" && (
-              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
-                Metas
-              </span>
-            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "metas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Metas
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={navButtonClass(activeTab === "configuracoes")}
-            title="Configurações"
           >
             {activeTab === "configuracoes" ? (
               <CogSolid className="h-6 w-6 shrink-0" />
             ) : (
               <Cog6ToothIcon className="h-6 w-6 shrink-0" />
             )}
-            {activeTab === "configuracoes" && (
-              <span className="ml-2.5 font-semibold text-base whitespace-nowrap animate-in fade-in zoom-in-95 duration-200">
-                Configurações
-              </span>
-            )}
+            <span
+              className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "configuracoes" ? "max-w-[150px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Configurações
+            </span>
           </button>
         </nav>
 
@@ -443,7 +444,6 @@ export default function Header({
           <button
             onClick={() => setOpenProfileDrawer(true)}
             className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition shadow-sm"
-            title="Seu Perfil"
           >
             <img
               src={avatarUrl(avatar.style, avatar.seed)}
@@ -456,7 +456,6 @@ export default function Header({
             onClick={handleLogout}
             disabled={isLoggingOut}
             className="p-3 rounded-2xl text-muted-foreground hover:text-red-500 hover:bg-red-500/10 transition-colors"
-            title="Sair da conta"
           >
             {isLoggingOut ? (
               <Loader2 className="h-6 w-6 animate-spin" />
@@ -467,10 +466,9 @@ export default function Header({
         </div>
       </header>
 
-      {/* MOBILE HEADER (Oculto fora do Dashboard) */}
+      {/* MOBILE HEADER */}
       {activeTab === "dashboard" && (
         <section className={`md:hidden ${sora.className}`}>
-          {/* AQUI FOI ADICIONADO O ID "mobile-header-top" PARA O SCRIPT LER A COR */}
           <header
             id="mobile-header-top"
             className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
@@ -515,53 +513,72 @@ export default function Header({
         </section>
       )}
 
-      {/* MOBILE BOTTOM NAV */}
-      <div className="fixed bottom-4 left-1/2 z-50 w-[95%] max-w-sm -translate-x-1/2 md:hidden">
-        <div className="bg-card/95 backdrop-blur-sm border rounded-2xl px-2 py-2 flex items-center justify-between shadow-xl">
+      {/* MOBILE BOTTOM NAV: Animação Smooth com max-width */}
+      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+        <div className="flex items-center justify-around px-2 h-20">
           <button
             onClick={() => onNavigate?.("dashboard")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "dashboard" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+            className={mobileNavButtonClass(activeTab === "dashboard")}
           >
             {activeTab === "dashboard" ? (
-              <HomeSolid className="h-5 w-5" />
+              <HomeSolid className="h-7 w-7 shrink-0" />
             ) : (
-              <HomeIcon className="h-5 w-5" />
+              <HomeIcon className="h-7 w-7 shrink-0" />
             )}
-            <span className="text-[10px] mt-1 font-medium">Home</span>
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "dashboard" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Home
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("lancamentos")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "lancamentos" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+            className={mobileNavButtonClass(activeTab === "lancamentos")}
           >
             {activeTab === "lancamentos" ? (
-              <DocumentTextSolid className="h-5 w-5" />
+              <DocumentTextSolid className="h-7 w-7 shrink-0" />
             ) : (
-              <DocumentTextIcon className="h-5 w-5" />
+              <DocumentTextIcon className="h-7 w-7 shrink-0" />
             )}
-            <span className="text-[10px] mt-1 font-medium">Lanç.</span>
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Lanç.
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("receitas")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "receitas" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+            className={mobileNavButtonClass(activeTab === "receitas")}
           >
             {activeTab === "receitas" ? (
-              <ChartPieSolid className="h-5 w-5" />
+              <ChartPieSolid className="h-7 w-7 shrink-0" />
             ) : (
-              <ChartPieIcon className="h-5 w-5" />
+              <ChartPieIcon className="h-7 w-7 shrink-0" />
             )}
-            <span className="text-[10px] mt-1 font-medium">Planos</span>
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Planos
+            </span>
           </button>
+
           <button
             onClick={() => onNavigate?.("configuracoes")}
-            className={`flex-1 h-14 flex flex-col items-center justify-center rounded-xl transition-all duration-200 ease-out active:scale-[0.97] ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "text-primary bg-primary/10" : "text-muted-foreground"}`}
+            className={mobileNavButtonClass(
+              activeTab === "configuracoes" || activeTab === "despesas_fixas",
+            )}
           >
             {activeTab === "configuracoes" || activeTab === "despesas_fixas" ? (
-              <CogSolid className="h-5 w-5" />
+              <CogSolid className="h-7 w-7 shrink-0" />
             ) : (
-              <Cog6ToothIcon className="h-5 w-5" />
+              <Cog6ToothIcon className="h-7 w-7 shrink-0" />
             )}
-            <span className="text-[10px] mt-1 font-medium truncate max-w-full px-1">
-              Configurações
+            <span
+              className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "configuracoes" || activeTab === "despesas_fixas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
+            >
+              Config
             </span>
           </button>
         </div>

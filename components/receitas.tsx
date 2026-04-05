@@ -12,7 +12,6 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MonthSelector } from "./releases/MonthSelector";
 
-import { Loader2 } from "lucide-react";
 import {
   PlusIcon as PlusSolid,
   TrashIcon as TrashSolid,
@@ -21,6 +20,7 @@ import {
   PencilIcon as PencilSolid,
   XMarkIcon as XSolid,
   UserGroupIcon as UserGroupSolid,
+  ArrowPathIcon,
 } from "@heroicons/react/24/solid";
 
 interface ReceitaFixa {
@@ -295,7 +295,7 @@ export default function Receitas() {
   if (loading && !memoryCache.receitas && activeContext === "pessoal") {
     return (
       <div className="flex justify-center items-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+        <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
       </div>
     );
   }
@@ -306,7 +306,7 @@ export default function Receitas() {
         <h1 className="text-2xl font-bold">
           {activeContext === "pessoal"
             ? "Resumo Financeiro"
-            : "Orçamento da Casa"}
+            : "Orçamento da Grupo"}
         </h1>
         <p className="text-muted-foreground text-sm">
           {activeContext === "pessoal"
@@ -355,7 +355,7 @@ export default function Receitas() {
         <div className="mt-5 pt-4 border-t border-primary/10 flex items-end justify-between">
           <div>
             <p className="text-[11px] font-bold uppercase tracking-widest text-muted-foreground">
-              Saldo Previsto {activeContext === "grupo" && "da Casa"}
+              Saldo Previsto {activeContext === "grupo" && "do Grupo"}
             </p>
           </div>
           <div
@@ -372,7 +372,7 @@ export default function Receitas() {
           <h3 className="font-semibold text-lg tracking-tight">
             {activeContext === "pessoal"
               ? "Minhas Rendas Fixas"
-              : "Rendas da Casa"}
+              : "Rendas do Grupo"}
           </h3>
           {!isFormOpen ? (
             <Button
@@ -400,7 +400,7 @@ export default function Receitas() {
                 ? "Editar Renda"
                 : activeContext === "pessoal"
                   ? "Nova Renda"
-                  : "Adicionar Renda à Casa"}
+                  : "Adicionar Renda ao Grupo"}
             </p>
             <div className="grid gap-3 sm:grid-cols-3 items-end">
               <div className="space-y-1.5">
@@ -429,7 +429,7 @@ export default function Receitas() {
                 className="h-10 w-full sm:w-auto"
               >
                 {isSaving ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
                 ) : editingId ? (
                   "Salvar"
                 ) : (
@@ -445,7 +445,7 @@ export default function Receitas() {
             <div className="py-8 text-center text-sm text-muted-foreground bg-accent/30 rounded-xl border border-dashed">
               {activeContext === "pessoal"
                 ? "Nenhuma renda fixa cadastrada."
-                : "Nenhuma renda adicionada à casa ainda."}
+                : "Nenhuma renda adicionada ao grupo ainda."}
             </div>
           ) : (
             receitas.map((item) => {

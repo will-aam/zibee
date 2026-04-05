@@ -20,7 +20,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { Loader2 } from "lucide-react";
+import { ArrowPathIcon } from "@heroicons/react/24/solid";
 
 interface MetaFormSheetProps {
   metaToEdit: Meta | null;
@@ -53,7 +53,6 @@ export function MetaFormSheet({
 
   const [isSaving, setIsSaving] = useState(false);
 
-  // Mantém parcelamento separado (bom UX)
   const [parcelamentoConfig, setParcelamentoConfig] = useState({
     totalParcelas: metaToEdit?.auto_meses_duracao
       ? String(metaToEdit.auto_meses_duracao)
@@ -70,7 +69,6 @@ export function MetaFormSheet({
     data_inicio: metaToEdit?.data_inicio || todayYYYYMMDD(),
     tipo: (metaToEdit?.tipo as MetaTipo) || "vista",
     fixada: metaToEdit?.fixada || false,
-
     auto_deposito_ativo: metaToEdit?.auto_deposito_ativo || false,
     auto_valor: metaToEdit?.auto_valor || 0,
     auto_dia_cobranca: metaToEdit?.auto_dia_cobranca || 15,
@@ -82,7 +80,6 @@ export function MetaFormSheet({
       todayYYYYMMDD(),
   });
 
-  // Re-sincroniza formulário quando trocar a meta a ser editada
   useEffect(() => {
     setParcelamentoConfig({
       totalParcelas: metaToEdit?.auto_meses_duracao
@@ -100,7 +97,6 @@ export function MetaFormSheet({
       data_inicio: metaToEdit?.data_inicio || todayYYYYMMDD(),
       tipo: (metaToEdit?.tipo as MetaTipo) || "vista",
       fixada: metaToEdit?.fixada || false,
-
       auto_deposito_ativo: metaToEdit?.auto_deposito_ativo || false,
       auto_valor: metaToEdit?.auto_valor || 0,
       auto_dia_cobranca: metaToEdit?.auto_dia_cobranca || 15,
@@ -127,15 +123,6 @@ export function MetaFormSheet({
     return totalParcelas * valorParcela;
   }, [parcelamentoConfig.totalParcelas, parcelamentoConfig.valorParcela]);
 
-  /**
-   * Quando o modo for PARCELADO e os campos estiverem válidos:
-   * - valor_total vira o total calculado
-   * - automação liga
-   * - auto_valor / auto_meses_duracao seguem parcelas
-   *
-   * Importante: fazemos isso via efeito, mas só quando o total calculado mudar.
-   * (evita re-render infinito e evita sobrescrever inputs do modo "à vista")
-   */
   useEffect(() => {
     if (formData.tipo !== "parcelado") return;
     if (totalParceladoCalculado <= 0) return;
@@ -180,7 +167,6 @@ export function MetaFormSheet({
         return;
       }
 
-      // validações mínimas
       if (formData.tipo === "parcelado") {
         if (
           toNumberOrZero(parcelamentoConfig.totalParcelas) <= 0 ||
@@ -217,23 +203,18 @@ export function MetaFormSheet({
           data_conclusao: null,
           tipo: formData.tipo as MetaTipo,
           fixada: !!formData.fixada,
-
           auto_deposito_ativo: !!formData.auto_deposito_ativo,
-
           auto_valor:
             (formData.tipo as MetaTipo) === "parcelado"
               ? toNumberOrZero(parcelamentoConfig.valorParcela)
               : toNumberOrZero(formData.auto_valor),
-
           auto_dia_cobranca: toNumberOrZero(formData.auto_dia_cobranca) || 15,
           auto_horario: formData.auto_horario || "00:00",
           auto_data_inicio: formData.data_inicio || null,
-
           auto_meses_duracao:
             (formData.tipo as MetaTipo) === "parcelado"
               ? toNumberOrZero(parcelamentoConfig.totalParcelas)
               : toNumberOrZero(formData.auto_meses_duracao),
-
           parcelamentos: formData.parcelamentos,
         };
 
@@ -243,7 +224,6 @@ export function MetaFormSheet({
             .update(payload)
             .eq("id", editingId)
             .eq("user_id", userId);
-
           if (error) throw error;
           toast({ title: "Meta atualizada!" });
         } else {
@@ -286,7 +266,6 @@ export function MetaFormSheet({
           </SheetDescription>
         </SheetHeader>
         <form onSubmit={handleSubmit} className="space-y-6 py-6">
-          {/* Básico */}
           <div className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="nome">Nome da Meta</Label>
@@ -322,7 +301,6 @@ export function MetaFormSheet({
             </div>
           </div>
 
-          {/* Tipo */}
           <div className="space-y-2">
             <Label>Tipo de Planejamento</Label>
             <Tabs
@@ -336,7 +314,6 @@ export function MetaFormSheet({
             </Tabs>
           </div>
 
-          {/* Valores */}
           {formData.tipo === "parcelado" ? (
             <div className="rounded-2xl border p-4 bg-accent/20">
               <div className="grid gap-4 sm:grid-cols-2">
@@ -395,7 +372,6 @@ export function MetaFormSheet({
             </div>
           )}
 
-          {/* Datas e saldo */}
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="dataInicio">Data de Início</Label>
@@ -429,7 +405,6 @@ export function MetaFormSheet({
             </div>
           </div>
 
-          {/* Automação */}
           <div className="space-y-4 rounded-2xl border p-4 bg-muted/20">
             <div className="flex items-start justify-between gap-4">
               <div className="space-y-0.5">
@@ -446,7 +421,7 @@ export function MetaFormSheet({
                 onCheckedChange={(checked) =>
                   setField("auto_deposito_ativo", checked)
                 }
-                disabled={(formData.tipo as MetaTipo) === "parcelado"} // parcelado força ligado
+                disabled={(formData.tipo as MetaTipo) === "parcelado"}
               />
             </div>
 
@@ -524,7 +499,7 @@ export function MetaFormSheet({
             <Button type="submit" disabled={isSaving}>
               {isSaving ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                   Salvando...
                 </>
               ) : editingId ? (

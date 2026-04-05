@@ -10,7 +10,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Trash2, Filter, Loader2, Search } from "lucide-react";
+import {
+  PlusIcon,
+  TrashIcon,
+  FunnelIcon,
+  ArrowPathIcon,
+  MagnifyingGlassIcon,
+} from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
 
 // COMPONENTES
@@ -284,7 +290,7 @@ export default function Lancamentos() {
           <h1 className="text-2xl font-bold tracking-tight">
             Lançamentos{" "}
             {activeContext === "grupo" && (
-              <span className="text-primary">(Casa)</span>
+              <span className="text-primary">(Grupo)</span>
             )}
           </h1>
           <p className="text-muted-foreground text-sm">
@@ -298,7 +304,7 @@ export default function Lancamentos() {
             size="icon"
             className="shrink-0 h-10 w-10 rounded-xl"
           >
-            <Plus className="h-5 w-5" />
+            <PlusIcon className="h-5 w-5" />
           </Button>
         </div>
       </div>
@@ -318,7 +324,7 @@ export default function Lancamentos() {
 
       <div className="flex flex-col gap-4">
         <div className="relative group">
-          <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+          <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
           <Input
             placeholder="Buscar lançamentos..."
             value={searchQuery}
@@ -363,7 +369,7 @@ export default function Lancamentos() {
               onClick={handleBulkDelete}
               className="h-8 rounded-lg animate-in zoom-in-95"
             >
-              <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Excluir (
+              <TrashIcon className="h-3.5 w-3.5 mr-1.5" /> Excluir (
               {selectedIds.length})
             </Button>
           )}
@@ -373,11 +379,11 @@ export default function Lancamentos() {
       <div className="space-y-3">
         {loading ? (
           <div className="flex justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+            <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
           </div>
         ) : lancamentosFiltrados.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
-            <Filter className="h-10 w-10 text-muted-foreground/30 mb-3" />
+            <FunnelIcon className="h-10 w-10 text-muted-foreground/30 mb-3" />
             <p className="text-muted-foreground font-medium">
               Nenhum lançamento encontrado.
             </p>

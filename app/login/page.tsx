@@ -15,7 +15,11 @@ import {
   CardDescription,
   CardFooter,
 } from "@/components/ui/card";
-import { Loader2, Eye, EyeOff } from "lucide-react"; // <--- IMPORT DOS ÍCONES DE OLHO
+import {
+  ArrowPathIcon,
+  EyeIcon,
+  EyeSlashIcon,
+} from "@heroicons/react/24/solid";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/hooks/use-toast";
 import { AuroraText } from "@/components/ui/aurora-text";
@@ -125,7 +129,7 @@ export default function LoginPage() {
             disabled={isGoogleLoading || loading}
           >
             {isGoogleLoading ? (
-              <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+              <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
             ) : (
               <svg
                 className="mr-2 h-5 w-5 sm:h-4 sm:w-4"
@@ -209,9 +213,9 @@ export default function LoginPage() {
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? (
-                    <EyeOff className="h-5 w-5 sm:h-4 sm:w-4" />
+                    <EyeSlashIcon className="h-5 w-5 sm:h-4 sm:w-4" />
                   ) : (
-                    <Eye className="h-5 w-5 sm:h-4 sm:w-4" />
+                    <EyeIcon className="h-5 w-5 sm:h-4 sm:w-4" />
                   )}
                 </button>
               </div>
@@ -224,7 +228,7 @@ export default function LoginPage() {
               disabled={loading}
             >
               {loading ? (
-                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                <ArrowPathIcon className="mr-2 h-5 w-5 animate-spin" />
               ) : isLogin ? (
                 "Entrar"
               ) : (

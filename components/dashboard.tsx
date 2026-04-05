@@ -3,17 +3,17 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
-import { useWorkspace } from "@/contexts/WorkspaceContext"; // <-- Cérebro Global
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import {
-  TrendingDown,
-  TrendingUp,
-  Calendar,
-  Target,
-  Loader2,
-  AlertCircle,
-  Wallet,
-} from "lucide-react";
+  ArrowTrendingDownIcon,
+  ArrowTrendingUpIcon,
+  CalendarIcon,
+  FireIcon,
+  ArrowPathIcon,
+  WalletIcon,
+} from "@heroicons/react/24/solid";
+import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import {
   LineChart,
   Line,
@@ -333,7 +333,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/50" />
+        <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
       </div>
     );
   }
@@ -343,12 +343,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       {/* SEÇÃO 1: RESUMO FINANCEIRO - APENAS DESKTOP */}
       <section className="hidden md:block">
         <h2 className="text-lg font-semibold mb-4 text-foreground/80">
-          Visão Geral {activeContext === "grupo" && "(Casa)"}
+          Visão Geral {activeContext === "grupo" && "(Grupo)"}
         </h2>
         <div className="grid gap-6 grid-cols-3">
           <div className="pb-4 border-b border-border/50">
             <div className="flex items-center gap-2 text-sm font-medium text-green-600 mb-1">
-              <TrendingUp className="h-4 w-4" /> Entradas Confirmadas
+              <ArrowTrendingUpIcon className="h-4 w-4" /> Entradas Confirmadas
             </div>
             <div className="text-3xl font-bold tracking-tight text-foreground">
               {formatMoney(totalReceitas)}
@@ -356,7 +356,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </div>
           <div className="pb-4 border-b border-border/50">
             <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
-              <TrendingDown className="h-4 w-4" /> Gastos Variáveis
+              <ArrowTrendingDownIcon className="h-4 w-4" /> Gastos Variáveis
             </div>
             <div className="text-3xl font-bold tracking-tight text-foreground">
               {formatMoney(totalDespesas)}
@@ -368,7 +368,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               className="pb-4 border-b border-border/50 cursor-pointer hover:opacity-70 transition-opacity group"
             >
               <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1 group-hover:text-blue-600 transition-colors">
-                <Wallet className="h-4 w-4" /> Contas Fixas Mensais
+                <WalletIcon className="h-4 w-4" /> Contas Fixas Mensais
               </div>
               <div className="text-3xl font-bold tracking-tight text-foreground">
                 {formatMoney(totalDespesasFixas)}
@@ -389,24 +389,24 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               <button
                 key={periodo}
                 onClick={() => setPeriodoGrafico(periodo)}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${periodoGrafico === periodo ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
+                  periodoGrafico === periodo
+                    ? "bg-background shadow-sm text-foreground"
+                    : "text-muted-foreground hover:text-foreground"
+                }`}
               >
                 {periodo === "ALL" ? "Tudo" : periodo}
               </button>
             ))}
           </div>
         </div>
+
         <div className="h-[250px] w-full">
           {dadosGraficoEvolucao.length > 0 ? (
-            <ResponsiveContainer
-              width="100%"
-              height="100%"
-              minWidth={1}
-              minHeight={1}
-            >
+            <ResponsiveContainer width="100%" height="100%">
               <LineChart
                 data={dadosGraficoEvolucao}
-                margin={{ top: 5, right: 0, left: -20, bottom: 0 }}
+                margin={{ top: 5, right: 30, left: 10, bottom: 5 }}
               >
                 <CartesianGrid
                   strokeDasharray="3 3"
@@ -418,11 +418,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   axisLine={false}
                   tickLine={false}
                   tick={{ fontSize: 12, fill: "currentColor", opacity: 0.5 }}
+                  dy={10}
                 />
                 <YAxis
                   axisLine={false}
                   tickLine={false}
-                  tickFormatter={(val) => `R$${val}`}
+                  width={85}
+                  tickFormatter={(val) => `R$ ${val}`}
                   tick={{ fontSize: 12, fill: "currentColor", opacity: 0.5 }}
                 />
                 <Tooltip
@@ -431,21 +433,24 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                     "Despesas",
                   ]}
                   contentStyle={{
-                    borderRadius: "12px",
+                    borderRadius: "16px",
                     border: "1px solid hsl(var(--border))",
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1)",
                     backgroundColor: "hsl(var(--background))",
-                    color: "hsl(var(--foreground))",
                   }}
-                  itemStyle={{ color: "hsl(var(--foreground))" }}
                 />
                 <Line
                   type="monotone"
                   dataKey="valor"
-                  stroke="#f97316"
-                  strokeWidth={3}
-                  dot={{ r: 4, fill: "#f97316", strokeWidth: 0 }}
-                  activeDot={{ r: 6, strokeWidth: 0 }}
+                  stroke="oklch(0.65 0.15 230)"
+                  strokeWidth={4}
+                  dot={{ r: 4, fill: "oklch(0.65 0.15 230)", strokeWidth: 0 }}
+                  activeDot={{
+                    r: 6,
+                    strokeWidth: 0,
+                    fill: "oklch(0.65 0.15 230)",
+                  }}
+                  animationDuration={1500}
                 />
               </LineChart>
             </ResponsiveContainer>
@@ -461,8 +466,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       <div className="grid gap-12 md:grid-cols-2 pt-4">
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
-            <TrendingDown className="h-5 w-5 text-orange-500" /> Onde estou
-            gastando?
+            <ArrowTrendingDownIcon className="h-5 w-5 text-orange-500" /> Onde
+            estou gastando?
           </h2>
           <div className="space-y-5">
             {categoriasChart.length > 0 ? (
@@ -499,7 +504,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
-            <AlertCircle className="h-5 w-5 text-blue-500" /> Próximos
+            <ExclamationCircleIcon className="h-5 w-5 text-blue-500" /> Próximos
             Vencimentos
           </h2>
           <div className="space-y-1">
@@ -525,7 +530,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                         <span
                           className={`flex items-center gap-1 ${isAtrasado ? "text-destructive font-semibold" : ""}`}
                         >
-                          <Calendar className="h-3 w-3" />
+                          <CalendarIcon className="h-3 w-3" />
                           {dataVenc.toLocaleDateString("pt-BR")}
                         </span>
                       </div>
@@ -560,7 +565,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         >
           <div className="flex items-center justify-between mb-4">
             <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80 group-hover:text-primary transition-colors">
-              <Target className="h-4 w-4 text-primary" /> Meta:{" "}
+              <FireIcon className="h-4 w-4 text-primary" /> Meta:{" "}
               {metaFixada.nome}
             </h2>
             <span className="text-sm font-bold text-foreground">

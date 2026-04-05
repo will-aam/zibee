@@ -1,16 +1,14 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
 import {
-  Pencil,
-  Trash2,
+  PencilIcon,
+  TrashIcon,
   CalendarIcon,
-  CheckCircle2,
-  Circle,
-  ArrowUpRight,
-  ArrowDownRight,
-} from "lucide-react";
+  CheckCircleIcon,
+  ArrowUpRightIcon,
+  ArrowDownRightIcon,
+} from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 import type { Lancamento } from "@/types";
 
@@ -44,20 +42,20 @@ export function LancamentoItem({
     >
       {/* ESQUERDA: Checkbox, Status e Info */}
       <div className="flex items-start sm:items-center gap-3 sm:gap-4">
-        {/* 2. Botão de Status (Pago / Pendente) */}
+        {/* Botão de Status (Pago / Pendente) */}
         <button
           onClick={onTogglePago}
           title={lancamento.pago ? "Marcar como pendente" : "Marcar como pago"}
           className="pt-0.5 sm:pt-0 shrink-0 transition-transform active:scale-90"
         >
           {lancamento.pago ? (
-            <CheckCircle2 className="h-6 w-6 text-green-500" />
+            <CheckCircleIcon className="h-6 w-6 text-green-500" />
           ) : (
-            <Circle className="h-6 w-6 text-muted-foreground/30 hover:text-muted-foreground/60 transition-colors" />
+            <div className="h-6 w-6 rounded-full border-2 border-muted-foreground/30 hover:border-muted-foreground/60 transition-colors" />
           )}
         </button>
 
-        {/* 3. Textos e Detalhes */}
+        {/* Textos e Detalhes */}
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2">
             <h3
@@ -80,9 +78,9 @@ export function LancamentoItem({
               )}
             >
               {isReceita ? (
-                <ArrowUpRight className="h-3 w-3" />
+                <ArrowUpRightIcon className="h-3 w-3" />
               ) : (
-                <ArrowDownRight className="h-3 w-3" />
+                <ArrowDownRightIcon className="h-3 w-3" />
               )}
               {lancamento.categoria}
             </span>
@@ -127,7 +125,7 @@ export function LancamentoItem({
             className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
             onClick={onEdit}
           >
-            <Pencil className="h-3.5 w-3.5" />
+            <PencilIcon className="h-3.5 w-3.5" />
           </Button>
           <Button
             size="icon"
@@ -135,7 +133,7 @@ export function LancamentoItem({
             className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
             onClick={onDelete}
           >
-            <Trash2 className="h-3.5 w-3.5" />
+            <TrashIcon className="h-3.5 w-3.5" />
           </Button>
         </div>
       </div>

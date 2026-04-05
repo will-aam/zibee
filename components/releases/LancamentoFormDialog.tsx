@@ -1,4 +1,3 @@
-// components/releases/LancamentoFormDialog.tsx
 "use client";
 
 import type React from "react";
@@ -35,8 +34,6 @@ interface LancamentoFormDialogProps {
   userId: string | undefined;
   categoriasDB: { id: number; nome: string }[];
   formasPagamentoDB: { id: number; nome: string }[];
-
-  // NOVOS PROPS
   activeContext: string;
   groupId: string | null;
 }
@@ -200,7 +197,6 @@ export function LancamentoFormDialog({
     if (!validateRecurrence()) return;
 
     try {
-      // MAGIA ACONTECE AQUI: Adicionamos o grupo_id no payload base!
       const basePayload = {
         ...formData,
         user_id: userId,
@@ -208,7 +204,6 @@ export function LancamentoFormDialog({
       } as Omit<Lancamento, "id">;
 
       if (lancamentoToEdit) {
-        // --- MODO EDIÇÃO ---
         const updatePayload = {
           descricao: formData.descricao,
           categoria: formData.categoria,
@@ -236,18 +231,16 @@ export function LancamentoFormDialog({
             const diaDoVencimento = Number(
               formData.data_vencimento?.split("-")[2] || 1,
             );
-            await supabase
-              .from("despesas_fixas")
-              .insert([
-                {
-                  user_id: userId,
-                  nome: formData.descricao,
-                  valor: formData.valor,
-                  dia_vencimento: diaDoVencimento,
-                  categoria: formData.categoria,
-                  forma_pagamento: formData.forma_pagamento,
-                },
-              ]);
+            await supabase.from("despesas_fixas").insert([
+              {
+                user_id: userId,
+                nome: formData.descricao,
+                valor: formData.valor,
+                dia_vencimento: diaDoVencimento,
+                categoria: formData.categoria,
+                forma_pagamento: formData.forma_pagamento,
+              },
+            ]);
           } else {
             const recurrenceItems = createRecurrenceItems(basePayload, false);
             if (recurrenceItems.length > 0)
@@ -256,25 +249,22 @@ export function LancamentoFormDialog({
         }
         toast({ title: "Atualizado!" });
       } else {
-        // --- MODO CRIAÇÃO ---
         if (isRecorrente && formData.tipo === "Despesa") {
           if (recurrenceEndType === "infinito") {
             await supabase.from("lancamentos").insert([basePayload]);
             const diaDoVencimento = Number(
               formData.data_vencimento?.split("-")[2] || 1,
             );
-            await supabase
-              .from("despesas_fixas")
-              .insert([
-                {
-                  user_id: userId,
-                  nome: formData.descricao,
-                  valor: formData.valor,
-                  dia_vencimento: diaDoVencimento,
-                  categoria: formData.categoria,
-                  forma_pagamento: formData.forma_pagamento,
-                },
-              ]);
+            await supabase.from("despesas_fixas").insert([
+              {
+                user_id: userId,
+                nome: formData.descricao,
+                valor: formData.valor,
+                dia_vencimento: diaDoVencimento,
+                categoria: formData.categoria,
+                forma_pagamento: formData.forma_pagamento,
+              },
+            ]);
           } else {
             const recurrenceItems = createRecurrenceItems(basePayload, true);
             await supabase.from("lancamentos").insert(recurrenceItems);
@@ -298,8 +288,9 @@ export function LancamentoFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+      {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: h-[100dvh] no lugar de h-screen */}
       <DialogContent
-        className="w-screen h-screen max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0"
+        className="w-screen h-dvh max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader className="p-6 pb-2 border-b">
@@ -529,7 +520,8 @@ export function LancamentoFormDialog({
             <div className="h-4"></div>
           </form>
         </div>
-        <div className="p-4 border-t bg-background/95 backdrop-blur z-10 flex gap-3">
+        {/* AQUI ESTÁ A SEGUNDA CORREÇÃO: pb-[max(1rem,env(safe-area-inset-bottom))] para respeitar o bottom do iPhone/Android */}
+        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t bg-background/95 backdrop-blur z-10 flex gap-3">
           <Button
             variant="outline"
             className="flex-1"

@@ -11,8 +11,8 @@ import {
   LockClosedIcon,
   ArrowLeftOnRectangleIcon,
   PhotoIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/solid";
-import { Loader2 } from "lucide-react"; // Única exceção permitida para spinners padrão shadcn
 
 interface ProfileMenuProps {
   userName: string;
@@ -83,7 +83,7 @@ export function ProfileMenu({
                 ) : (
                   <LockClosedIcon className="w-5 h-5 text-amber-500" />
                 )}
-                <span className="font-semibold text-sm">Casa / Grupo</span>
+                <span className="font-semibold text-sm">Grupo</span>
               </div>
               {!hasPremiumAccess && (
                 <Badge className="bg-amber-500 text-[10px] h-4 px-1.5">
@@ -119,7 +119,7 @@ export function ProfileMenu({
         onClick={onLogout}
       >
         {isLoggingOut ? (
-          <Loader2 className="w-5 h-5 animate-spin" />
+          <ArrowPathIcon className="w-5 h-5 animate-spin" />
         ) : (
           <ArrowLeftOnRectangleIcon className="w-5 h-5" />
         )}

@@ -1,13 +1,13 @@
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  CheckCircle2,
-  Rocket,
-  Pencil,
-  Trash2,
-  Loader2,
-  CalendarDays,
-} from "lucide-react";
+  CheckCircleIcon,
+  RocketLaunchIcon,
+  PencilIcon,
+  TrashIcon,
+  ArrowPathIcon,
+  CalendarDaysIcon,
+} from "@heroicons/react/24/solid";
 
 export function ExpenseCard({
   despesa,
@@ -33,16 +33,16 @@ export function ExpenseCard({
               {despesa.nome}
             </h3>
             <div className="flex items-center text-xs text-muted-foreground font-medium">
-              <CalendarDays className="mr-1.5 h-3.5 w-3.5 opacity-70" />
+              <CalendarDaysIcon className="mr-1.5 h-3.5 w-3.5 opacity-70" />
               Vence dia {despesa.dia_vencimento}
             </div>
           </div>
 
-          {/* Botões de Ação (Sempre visíveis, amigáveis para mobile touch) */}
+          {/* Botões de Ação */}
           <div className="flex items-center gap-0.5 shrink-0">
             {jaLancadoNoMes ? (
               <div className="h-8 w-8 flex items-center justify-center text-emerald-500 bg-emerald-500/10 rounded-md">
-                <CheckCircle2 className="h-4 w-4" />
+                <CheckCircleIcon className="h-4 w-4" />
               </div>
             ) : (
               <Button
@@ -54,9 +54,9 @@ export function ExpenseCard({
                 title="Lançar agora"
               >
                 {loadingId === despesa.id ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
+                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
                 ) : (
-                  <Rocket className="h-4 w-4" />
+                  <RocketLaunchIcon className="h-4 w-4" />
                 )}
               </Button>
             )}
@@ -67,7 +67,7 @@ export function ExpenseCard({
               className="h-8 w-8 text-muted-foreground hover:text-foreground active:scale-90 transition-all rounded-md"
               onClick={() => onEdit(despesa)}
             >
-              <Pencil className="h-4 w-4" />
+              <PencilIcon className="h-4 w-4" />
             </Button>
 
             <Button
@@ -76,7 +76,7 @@ export function ExpenseCard({
               className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-90 transition-all rounded-md"
               onClick={() => onDelete(despesa)}
             >
-              <Trash2 className="h-4 w-4" />
+              <TrashIcon className="h-4 w-4" />
             </Button>
           </div>
         </div>

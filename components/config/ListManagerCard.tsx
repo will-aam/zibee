@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, X, Loader2 } from "lucide-react";
-import { LucideIcon } from "lucide-react";
+import { PlusIcon, XMarkIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,7 +14,7 @@ export interface ListItem {
 
 interface ListManagerCardProps {
   title: string;
-  icon: LucideIcon;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
   items?: ListItem[]; // Tornamos opcional (?) para evitar erro se vier undefined
   placeholderInput: string;
   onAdd: (nome: string) => Promise<void>;
@@ -77,7 +76,7 @@ export function ListManagerCard({
                 onClick={() => handleRemoveItem(item.id)}
                 className="opacity-0 group-hover:opacity-100 transition-opacity"
               >
-                <X className="h-3 w-3" />
+                <XMarkIcon className="h-3 w-3" />
               </button>
             </div>
           ))}
@@ -89,7 +88,7 @@ export function ListManagerCard({
               onClick={() => setIsAddingItem(true)}
               className="h-7 text-xs"
             >
-              <Plus className="h-3 w-3 mr-1" />
+              <PlusIcon className="h-3 w-3 mr-1" />
               Adicionar
             </Button>
           ) : (
@@ -112,7 +111,11 @@ export function ListManagerCard({
                 onClick={handleAddItem}
                 disabled={loading}
               >
-                {loading ? <Loader2 className="h-3 w-3 animate-spin" /> : "Ok"}
+                {loading ? (
+                  <ArrowPathIcon className="h-3 w-3 animate-spin" />
+                ) : (
+                  "Ok"
+                )}
               </Button>
             </div>
           )}

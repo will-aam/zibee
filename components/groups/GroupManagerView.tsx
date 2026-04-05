@@ -8,12 +8,11 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { ArrowPathIcon } from "@heroicons/react/24/solid";
 
 import {
   Dialog,
   DialogContent,
-  DialogDescription,
   DialogHeader,
   DialogTitle,
   DialogFooter,
@@ -72,7 +71,6 @@ export default function GroupManagerView() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
-  // NOVO ESTADO: Modal de Excluir a Casa Inteira
   const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
 
   const loadGroupData = React.useCallback(async () => {
@@ -162,7 +160,6 @@ export default function GroupManagerView() {
         }
         setMembers(formattedMembers);
       } else {
-        // Se não achou grupo (ex: foi apagado), zera tudo
         setGroupId(null);
       }
     } catch (error) {
@@ -203,7 +200,7 @@ export default function GroupManagerView() {
       const { error } = await supabase
         .from("grupos")
         .insert({
-          nome: "Minha Casa",
+          nome: "Meu grupo",
           criador_id: userId,
           regra_divisao: "igual",
         })
@@ -212,7 +209,7 @@ export default function GroupManagerView() {
       if (error) throw error;
       toast({
         title: "Grupo Criado!",
-        description: "Sua casa foi configurada com sucesso.",
+        description: "Seu grupo foi configurado com sucesso.",
       });
       loadGroupData();
     } catch (error) {
@@ -346,7 +343,6 @@ export default function GroupManagerView() {
     setMemberToDelete(null);
   };
 
-  // NOVA FUNÇÃO: EXCLUIR O GRUPO INTEIRO
   const executeDeleteGroup = async () => {
     if (!groupId) return;
     try {
@@ -357,12 +353,10 @@ export default function GroupManagerView() {
       if (error) throw error;
 
       toast({
-        title: "Casa Excluída",
+        title: "Grupo Excluído",
         description: "Todos os dados do grupo foram apagados permanentemente.",
       });
       setIsDeleteGroupDialogOpen(false);
-
-      // Recarrega a página para limpar todos os caches de contexto (Pessoal/Grupo) e zerar as telas
       window.location.reload();
     } catch (err: any) {
       toast({
@@ -376,8 +370,8 @@ export default function GroupManagerView() {
   if (isLoading)
     return (
       <div className="w-full flex flex-col items-center justify-center py-20 text-muted-foreground">
-        <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
-        <p>Carregando sua casa...</p>
+        <ArrowPathIcon className="w-10 h-10 animate-spin text-primary mb-4" />
+        <p>Carregando seu grupo...</p>
       </div>
     );
 
@@ -391,8 +385,8 @@ export default function GroupManagerView() {
           Bem-vindo aos Grupos!
         </h2>
         <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto">
-          Seu acesso Premium está ativo. Crie sua primeira casa para começar a
-          dividir as contas.
+          Seu acesso Premium está ativo. Crie seu grupo para começar a dividir
+          as contas.
         </p>
         <Button
           size="lg"
@@ -453,7 +447,7 @@ export default function GroupManagerView() {
               className="h-12 rounded-2xl px-8 font-semibold w-full sm:w-auto hover:scale-[1.02] active:scale-[0.98] transition-transform"
             >
               {isInviting ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
+                <ArrowPathIcon className="w-5 h-5 animate-spin" />
               ) : (
                 "Enviar Convite"
               )}
@@ -546,23 +540,22 @@ export default function GroupManagerView() {
         )}
       </div>
 
-      {/* NOVA ZONA DE PERIGO (Excluir Grupo Inteiro) */}
       {isUserAdmin && (
         <div className="bg-destructive/5 p-6 md:p-8 rounded-3xl border border-destructive/20 shadow-sm space-y-4 mt-12">
           <h3 className="text-xl font-bold flex items-center gap-2 text-destructive">
             <TrashIcon className="w-6 h-6" /> Zona de Perigo
           </h3>
           <p className="text-sm text-destructive/80 font-medium">
-            Ao excluir a casa, todos os lançamentos, rendas e membros associados
-            a este grupo serão apagados do banco de dados permanentemente. Esta
-            ação não pode ser desfeita.
+            Ao excluir o grupo, todos os lançamentos, rendas e membros
+            associados a este grupo serão apagados do banco de dados
+            permanentemente. Esta ação não pode ser desfeita.
           </p>
           <Button
             variant="destructive"
             onClick={() => setIsDeleteGroupDialogOpen(true)}
             className="rounded-2xl h-11 font-bold"
           >
-            Excluir Casa Permanentemente
+            Excluir Grupo Permanentemente
           </Button>
         </div>
       )}
@@ -596,6 +589,7 @@ export default function GroupManagerView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
       <Dialog open={isRuleDialogOpen} onOpenChange={setIsRuleDialogOpen}>
         <DialogContent className="rounded-3xl sm:rounded-3xl max-w-md">
           <DialogHeader>
@@ -636,7 +630,6 @@ export default function GroupManagerView() {
         </DialogContent>
       </Dialog>
 
-      {/* Modal de Excluir Membro */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
@@ -661,7 +654,6 @@ export default function GroupManagerView() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* NOVO Modal de Excluir Grupo Inteiro */}
       <AlertDialog
         open={isDeleteGroupDialogOpen}
         onOpenChange={setIsDeleteGroupDialogOpen}
@@ -669,12 +661,12 @@ export default function GroupManagerView() {
         <AlertDialogContent className="rounded-3xl sm:rounded-3xl border-destructive/20">
           <AlertDialogHeader>
             <AlertDialogTitle className="text-2xl text-destructive flex items-center gap-2">
-              Excluir Casa Inteira?
+              Excluir Grupo Inteiro?
             </AlertDialogTitle>
             <AlertDialogDescription className="text-base text-foreground/80 mt-2">
-              Você está prestes a apagar a sua casa.{" "}
+              Você está prestes a apagar o seu grupo.{" "}
               <strong className="text-destructive">Tudo será perdido:</strong>{" "}
-              histórico de despesas da casa, rendas e os acessos de todos os
+              histórico de despesas do grupo, rendas e os acessos de todos os
               membros. <br />
               <br />
               Você tem certeza absoluta?

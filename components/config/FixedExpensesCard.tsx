@@ -7,13 +7,12 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import {
-  Plus,
-  Trash2,
-  Calendar,
-  DollarSign,
-  ChevronDown,
-  ChevronUp,
-} from "lucide-react";
+  PlusIcon,
+  TrashIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  ChevronUpIcon,
+} from "@heroicons/react/24/solid";
 
 // Tipo para nossa despesa fixa
 interface FixedExpense {
@@ -58,14 +57,14 @@ export function FixedExpensesCard() {
   // Calcula o total comprometido
   const totalFixed = expenses.reduce(
     (acc, curr) => acc + Number(curr.amount),
-    0
+    0,
   );
 
   return (
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2">
-          <Calendar className="h-5 w-5" />
+          <CalendarIcon className="h-5 w-5" />
           Despesas Fixas Mensais
         </CardTitle>
       </CardHeader>
@@ -108,7 +107,7 @@ export function FixedExpensesCard() {
                 size="icon"
                 className="h-9 w-9 shrink-0"
               >
-                <Plus className="h-4 w-4" />
+                <PlusIcon className="h-4 w-4" />
               </Button>
             </div>
           </div>
@@ -135,11 +134,11 @@ export function FixedExpensesCard() {
             >
               {isExpanded ? (
                 <>
-                  <ChevronUp className="h-4 w-4" /> Ocultar
+                  <ChevronUpIcon className="h-4 w-4" /> Ocultar
                 </>
               ) : (
                 <>
-                  <ChevronDown className="h-4 w-4" /> Exibir
+                  <ChevronDownIcon className="h-4 w-4" /> Exibir
                 </>
               )}
             </Button>
@@ -174,7 +173,7 @@ export function FixedExpensesCard() {
                       className="h-6 w-6 text-muted-foreground hover:text-destructive"
                       onClick={() => removeExpense(expense.id)}
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <TrashIcon className="h-3 w-3" />
                     </Button>
                   </div>
                 </div>

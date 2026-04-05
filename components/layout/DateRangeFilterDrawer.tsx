@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { X, Calendar as CalendarIcon, Check } from "lucide-react";
+import { CalendarIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { Button } from "@/components/ui/button";
 import { Calendar } from "@/components/ui/calendar";
 import {
@@ -13,8 +13,8 @@ import {
 type PresetKey = "this_month" | "last_month" | "all_time" | "custom";
 
 export type DateRangeValue = {
-  from: string | null; // YYYY-MM-DD
-  to: string | null; // YYYY-MM-DD
+  from: string | null;
+  to: string | null;
   preset: PresetKey;
 };
 
@@ -40,7 +40,6 @@ function toYMD(d: Date) {
 
 function parseYMD(s: string | null | undefined): Date | undefined {
   if (!s) return undefined;
-  // importante: construir como local para evitar offset estranho
   const [y, m, d] = s.split("-").map(Number);
   if (!y || !m || !d) return undefined;
   const dt = new Date(y, m - 1, d);
@@ -65,26 +64,24 @@ function getThisMonthRange() {
 function getLastMonthRange() {
   const now = new Date();
   const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
-  const month = now.getMonth() === 0 ? 12 : now.getMonth(); // last month in 1..12
+  const month = now.getMonth() === 0 ? 12 : now.getMonth();
   return monthRange(year, month);
 }
 
+// CORREÇÃO: Garante que se não tiver nada, devolve as datas corretas deste mês
 function readStored(): DateRangeValue {
-  const preset =
-    (localStorage.getItem(STORAGE_PRESET_KEY) as PresetKey) || "this_month";
+  const preset = localStorage.getItem(STORAGE_PRESET_KEY) as PresetKey;
   const from = localStorage.getItem(STORAGE_FROM_KEY);
   const to = localStorage.getItem(STORAGE_TO_KEY);
 
-  if (!localStorage.getItem(STORAGE_PRESET_KEY) && !from && !to) {
+  // Se não tem preset definido (1º acesso ou cookies limpos), força o mês atual
+  if (!preset) {
     const r = getThisMonthRange();
     return { preset: "this_month", from: r.from, to: r.to };
   }
 
-  return {
-    preset,
-    from: from || null,
-    to: to || null,
-  };
+  // Se o preset existe, retorna o que tá no cache
+  return { preset, from: from || null, to: to || null };
 }
 
 function persist(value: DateRangeValue) {
@@ -192,7 +189,6 @@ export default function DateRangeFilterDrawer({
 
   React.useEffect(() => {
     if (!open) return;
-
     setError(null);
     const stored = readStored();
     setPreset(stored.preset);
@@ -200,6 +196,7 @@ export default function DateRangeFilterDrawer({
     setTo(stored.to);
   }, [open]);
 
+  // Se o usuário clicar nas pílulas de atalho, atualiza as datas
   React.useEffect(() => {
     if (!open) return;
 
@@ -232,11 +229,9 @@ export default function DateRangeFilterDrawer({
   const canApply = (() => {
     if (preset === "all_time") return true;
     if (!from || !to) return false;
-
     const df = parseYMD(from)?.getTime();
     const dt = parseYMD(to)?.getTime();
     if (!df || !dt) return false;
-
     return df <= dt;
   })();
 
@@ -267,7 +262,6 @@ export default function DateRangeFilterDrawer({
 
     persist(value);
     fireFilterChanged();
-
     onApplied?.(value);
     onClose();
   }
@@ -275,7 +269,7 @@ export default function DateRangeFilterDrawer({
   const disableDates = preset === "all_time";
 
   return (
-    <div className="fixed inset-0 z-50" aria-modal="true" role="dialog">
+    <div className="fixed inset-0 z-120" aria-modal="true" role="dialog">
       <button
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
@@ -310,7 +304,7 @@ export default function DateRangeFilterDrawer({
             onClick={onClose}
             aria-label="Fechar"
           >
-            <X className="h-5 w-5" />
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -375,11 +369,10 @@ export default function DateRangeFilterDrawer({
           ) : null}
         </div>
 
-        {/* footer (stacked) */}
+        {/* footer */}
         <div className="px-4 py-4 border-t">
           <div className="grid grid-cols-1 gap-2">
             <Button className="w-full" onClick={apply} disabled={!canApply}>
-              <Check className="h-4 w-4 mr-2" />
               Aplicar
             </Button>
 

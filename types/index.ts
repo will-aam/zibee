@@ -5,7 +5,7 @@ export type TipoLancamento = "Receita" | "Despesa";
 export interface Lancamento {
   id: number;
   user_id?: string;
-  grupo_id?: string; // NOVO: Relaciona o lançamento ao grupo (se for da casa)
+  grupo_id?: string; // NOVO: Relaciona o lançamento ao grupo (se for da Grupo)
   descricao: string;
   link?: string;
   categoria: string;

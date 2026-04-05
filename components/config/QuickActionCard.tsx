@@ -1,12 +1,11 @@
-// components/config/QuickActionCard.tsx
 "use client";
 
-import { LucideIcon } from "lucide-react";
+import * as React from "react";
 import { Card } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 
 interface QuickActionCardProps {
-  icon: LucideIcon;
+  icon: React.ElementType;
   label: string;
   onClick: () => void;
   isActive?: boolean;
@@ -23,7 +22,7 @@ export function QuickActionCard({
       onClick={onClick}
       className={cn(
         "flex flex-col items-center justify-center p-4 gap-2 cursor-pointer transition-all hover:shadow-md hover:scale-105 active:scale-95",
-        isActive && "border-primary bg-primary/10"
+        isActive && "border-primary bg-primary/10",
       )}
     >
       <Icon className="h-6 w-6 text-primary" />

@@ -22,7 +22,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useToast } from "@/hooks/use-toast";
-import { Loader2 } from "lucide-react";
+import { ArrowPathIcon } from "@heroicons/react/24/solid";
 
 interface ItemOpcao {
   id: number;
@@ -45,8 +45,6 @@ interface EditFixedExpenseDialogProps {
   onSaved: (updated: DespesaFixa) => void;
   categorias: ItemOpcao[];
   formasPagamento: ItemOpcao[];
-
-  // NOVAS PROPS DE CONTEXTO (Para garantir a segurança ao salvar)
   activeContext?: string;
   groupId?: string | null;
 }
@@ -127,7 +125,6 @@ export function EditFixedExpenseDialog({
         forma_pagamento: form.pagamento?.trim() ? form.pagamento.trim() : null,
       };
 
-      // MÁGICA AQUI: O UPDATE respeita o contexto (Pessoal ou Grupo)
       let query = supabase
         .from("despesas_fixas")
         .update(payload)
@@ -154,7 +151,6 @@ export function EditFixedExpenseDialog({
 
       toast({ title: "Despesa atualizada!" });
 
-      // Atualiza o pai (otimista + cache) e fecha
       onSaved(updated);
       onOpenChange(false);
     } catch (err: any) {
@@ -188,7 +184,7 @@ export function EditFixedExpenseDialog({
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
           <DialogTitle>
-            Editar Despesa Fixa {activeContext === "grupo" ? "(Casa)" : ""}
+            Editar Despesa Fixa {activeContext === "grupo" ? "(Grupo)" : ""}
           </DialogTitle>
         </DialogHeader>
 
@@ -283,7 +279,9 @@ export function EditFixedExpenseDialog({
               Cancelar
             </Button>
             <Button type="submit" disabled={!canSave}>
-              {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {loading && (
+                <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
+              )}
               Salvar
             </Button>
           </DialogFooter>

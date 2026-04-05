@@ -2,7 +2,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Download } from "lucide-react";
+import { ArrowDownTrayIcon } from "@heroicons/react/24/solid";
 
 export function InstallButton() {
   const [promptInstall, setPromptInstall] = useState<any>(null);
@@ -26,7 +26,7 @@ export function InstallButton() {
 
   return (
     <Button onClick={handleInstall} variant="outline" className="gap-2">
-      <Download size={16} />
+      <ArrowDownTrayIcon className="size={16}" />
       Instalar App
     </Button>
   );

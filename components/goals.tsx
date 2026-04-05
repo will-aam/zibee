@@ -8,18 +8,17 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { useToast } from "@/hooks/use-toast";
+import { Pin, PinOff } from "lucide-react";
 import {
-  Plus,
-  Pencil,
-  Trash2,
-  TrendingUp,
-  Pin,
-  PinOff,
-  Loader2,
-  Calendar as CalendarIcon,
-  ExternalLink,
-  RefreshCw,
-} from "lucide-react";
+  PlusIcon,
+  PencilIcon,
+  TrashIcon,
+  ArrowTrendingUpIcon,
+  ArrowPathIcon,
+  CalendarIcon,
+  ArrowTopRightOnSquareIcon,
+} from "@heroicons/react/24/solid";
+
 import { MetaFormSheet } from "@/components/target/MetaFormSheet";
 import {
   AlertDialog,
@@ -386,11 +385,11 @@ export default function Metas() {
               onClick={() => fetchMetas(true)}
               className="gap-2"
             >
-              <RefreshCw className="h-4 w-4" />
+              <ArrowPathIcon className="h-4 w-4" />
               Atualizar
             </Button>
             <Button onClick={handleOpenNewForm} className="gap-2">
-              <Plus className="h-4 w-4" /> Nova Meta
+              <PlusIcon className="h-4 w-4" /> Nova Meta
             </Button>
           </div>
         </div>
@@ -405,7 +404,7 @@ export default function Metas() {
 
         {loading ? (
           <div className="flex justify-center py-14">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
+            <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/70" />
           </div>
         ) : metasView.length === 0 ? (
           <div className="text-center text-muted-foreground py-14 border border-dashed rounded-2xl bg-accent/20">
@@ -435,7 +434,7 @@ export default function Metas() {
                           className="text-lg text-balance hover:underline inline-flex items-center gap-2 text-primary"
                         >
                           <span className="truncate">{meta.nome}</span>
-                          <ExternalLink className="h-4 w-4 shrink-0" />
+                          <ArrowTopRightOnSquareIcon className="h-4 w-4 shrink-0" />
                         </a>
                       ) : (
                         <span className="text-lg text-balance block truncate">
@@ -444,7 +443,7 @@ export default function Metas() {
                       )}
                     </div>
 
-                    <TrendingUp className="h-5 w-5 text-primary shrink-0" />
+                    <ArrowTrendingUpIcon className="h-5 w-5 text-primary shrink-0" />
                   </CardTitle>
                 </CardHeader>
 
@@ -471,7 +470,7 @@ export default function Metas() {
 
                   {meta.auto_deposito_ativo && (
                     <div className="mt-1 flex items-start gap-2 rounded-xl bg-muted/50 p-3 text-xs text-muted-foreground border border-border/50">
-                      <RefreshCw className="h-3.5 w-3.5 mt-0.5 text-green-600 animate-spin-slow" />
+                      <ArrowPathIcon className="h-3.5 w-3.5 mt-0.5 text-green-600 animate-spin-slow" />
                       <div className="min-w-0">
                         <p className="font-medium text-foreground">
                           Depósito Automático Ativo
@@ -497,7 +496,7 @@ export default function Metas() {
                     </div>
                   )}
 
-                  <div className="flex gap-2 pt-2">
+                  <div className="flex gap-4 items-center pt-2">
                     <Button
                       size="sm"
                       variant={meta.fixada ? "default" : "outline"}
@@ -512,21 +511,23 @@ export default function Metas() {
                       )}
                     </Button>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleOpenEditForm(meta)}
-                    >
-                      <Pencil className="h-4 w-4" />
-                    </Button>
+                    <div className="flex gap-1">
+                      <button
+                        onClick={() => handleOpenEditForm(meta)}
+                        className="p-2 text-muted-foreground active:scale-90 transition-transform bg-transparent hover:bg-transparent"
+                        title="Editar Meta"
+                      >
+                        <PencilIcon className="h-5 w-5" />
+                      </button>
 
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => openDeleteDialog(meta)}
-                    >
-                      <Trash2 className="h-4 w-4 text-destructive" />
-                    </Button>
+                      <button
+                        onClick={() => openDeleteDialog(meta)}
+                        className="p-2 text-destructive active:scale-90 transition-transform bg-transparent hover:bg-transparent"
+                        title="Excluir Meta"
+                      >
+                        <TrashIcon className="h-5 w-5" />
+                      </button>
+                    </div>
                   </div>
                 </CardContent>
               </Card>
@@ -563,7 +564,7 @@ export default function Metas() {
             >
               {deleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
                   Excluindo...
                 </>
               ) : (

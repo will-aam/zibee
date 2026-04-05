@@ -68,13 +68,36 @@ export default function Header({
     });
   };
 
+  // --- NOVA FUNÇÃO DE LEITURA DO RANGE DE DATAS ---
+  const readRange = React.useCallback(() => {
+    let from = localStorage.getItem(STORAGE_FROM_KEY);
+    let to = localStorage.getItem(STORAGE_TO_KEY);
+
+    // Se o localStorage estiver vazio, define o mês atual como padrão
+    if (!from || !to) {
+      const hoje = new Date();
+      const ano = hoje.getFullYear();
+      const mes = String(hoje.getMonth() + 1).padStart(2, "0");
+      const ultimoDia = new Date(ano, hoje.getMonth() + 1, 0).getDate();
+
+      from = `${ano}-${mes}-01`;
+      to = `${ano}-${mes}-${String(ultimoDia).padStart(2, "0")}`;
+
+      // Salva no localStorage para que os outros painéis leiam essa mesma configuração inicial
+      localStorage.setItem(STORAGE_FROM_KEY, from);
+      localStorage.setItem(STORAGE_TO_KEY, to);
+    }
+
+    return { from, to };
+  }, []);
+
   // BUSCA DE TOTAIS (Respeitando Pessoal/Grupo)
   const loadTotals = React.useCallback(async () => {
     if (!userId) return setLoadingTotals(false);
     setLoadingTotals(true);
 
-    const from = localStorage.getItem(STORAGE_FROM_KEY);
-    const to = localStorage.getItem(STORAGE_TO_KEY);
+    // Substitui a leitura direta pelo localStorage pela função que garante o valor padrão
+    const { from, to } = readRange();
 
     try {
       // 1. Achar Grupo se necessário
@@ -118,6 +141,7 @@ export default function Header({
         queryF = queryF.eq("user_id", userId).is("grupo_id", null);
       }
 
+      // 'from' e 'to' nunca serão undefined agora graças ao readRange, mas mantemos o if por segurança
       if (from) {
         queryR = queryR.gte("data_vencimento", from);
         queryD = queryD.gte("data_vencimento", from);
@@ -147,11 +171,12 @@ export default function Header({
     } finally {
       setLoadingTotals(false);
     }
-  }, [userId, activeContext]);
+  }, [userId, activeContext, readRange]);
 
   React.useEffect(() => {
     loadTotals();
   }, [loadTotals]);
+
   React.useEffect(() => {
     window.addEventListener(FILTER_EVENT, loadTotals);
     return () => window.removeEventListener(FILTER_EVENT, loadTotals);
@@ -258,7 +283,6 @@ export default function Header({
         pendingInvite={pendingInvite}
         setPendingInvite={setPendingInvite}
         userId={userId}
-        // ADICIONE ESTAS DUAS LINHAS:
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
       />

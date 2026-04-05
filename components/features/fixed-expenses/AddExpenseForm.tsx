@@ -3,7 +3,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
-import { Plus, X, Loader2 } from "lucide-react";
+import { PlusIcon, XMarkIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
 import {
   Select,
   SelectContent,
@@ -75,7 +75,7 @@ export function AddExpenseForm({
         variant="outline"
         className="w-full h-12 border-dashed border-border hover:bg-accent transition-all rounded-xl gap-2 text-muted-foreground"
       >
-        <Plus className="h-4 w-4" />
+        <PlusIcon className="h-4 w-4" />
         Adicionar Nova Despesa
       </Button>
     );
@@ -96,7 +96,7 @@ export function AddExpenseForm({
             className="h-8 w-8 p-0 rounded-full"
             disabled={adding}
           >
-            <X className="h-4 w-4" />
+            <XMarkIcon className="h-4 w-4" />
           </Button>
         </div>
 
@@ -186,9 +186,9 @@ export function AddExpenseForm({
               title="Adicionar"
             >
               {adding ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <ArrowPathIcon className="h-4 w-4 animate-spin" />
               ) : (
-                <Plus className="h-4 w-4" />
+                <PlusIcon className="h-4 w-4" />
               )}
             </Button>
           </div>

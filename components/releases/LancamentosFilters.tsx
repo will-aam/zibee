@@ -17,11 +17,10 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { ChevronDown } from "lucide-react";
+import { ChevronDownIcon } from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 import { useMediaQuery } from "@/hooks/use-media-query";
 
-// --- TIPAGENS ---
 interface LancamentosFiltersProps {
   filtrosTipo: string[];
   setFiltrosTipo: React.Dispatch<React.SetStateAction<string[]>>;
@@ -35,7 +34,6 @@ interface LancamentosFiltersProps {
   pagamentoOptions: { id: number; nome: string }[];
 }
 
-// --- BOTÃO DO FILTRO (PÍLULA) ---
 const FilterPill = ({ label, isActive, count, onClick }: any) => (
   <button
     onClick={onClick}
@@ -52,11 +50,10 @@ const FilterPill = ({ label, isActive, count, onClick }: any) => (
         {count}
       </span>
     )}
-    <ChevronDown className="ml-1 h-3 w-3 opacity-50" />
+    <ChevronDownIcon className="ml-1 h-3 w-3 opacity-50" />
   </button>
 );
 
-// --- CONTEÚDO DO FILTRO (LISTA DE OPÇÕES) ---
 const FilterContent = ({
   options,
   selectedValues,
@@ -96,7 +93,6 @@ const FilterContent = ({
   );
 };
 
-// --- COMPONENTE RESPONSIVO (Sheet no Mobile / Popover no Desktop) ---
 const ResponsiveFilter = ({
   title,
   label,
@@ -121,7 +117,6 @@ const ResponsiveFilter = ({
 
   const clearSelection = () => setSelectedValues([]);
 
-  // RENDERIZAÇÃO DESKTOP (POPOVER)
   if (isDesktop) {
     return (
       <Popover open={open} onOpenChange={setOpen}>
@@ -151,7 +146,6 @@ const ResponsiveFilter = ({
     );
   }
 
-  // RENDERIZAÇÃO MOBILE (SHEET)
   return (
     <Sheet open={open} onOpenChange={setOpen}>
       <SheetTrigger asChild>
@@ -163,7 +157,6 @@ const ResponsiveFilter = ({
           />
         </div>
       </SheetTrigger>
-      {/* Adicionado w-full e px-4 para proteger o conteúdo de colar nas bordas do aparelho */}
       <SheetContent
         side="bottom"
         className="rounded-t-2xl w-full px-5 py-6 h-auto max-h-[85vh] overflow-y-auto"
@@ -189,7 +182,6 @@ const ResponsiveFilter = ({
   );
 };
 
-// --- COMPONENTE PRINCIPAL ---
 export function LancamentosFilters({
   filtrosTipo,
   setFiltrosTipo,
@@ -203,10 +195,8 @@ export function LancamentosFilters({
   pagamentoOptions,
 }: LancamentosFiltersProps) {
   return (
-    // Removida a margem negativa problemática e aplicado max-w-full limpo
     <div className="max-w-full overflow-x-auto scrollbar-hide pb-3">
       <div className="flex items-center w-max gap-2 pr-4">
-        {/* TIPO */}
         <ResponsiveFilter
           label="Tipo"
           title="Filtrar por Tipo"
@@ -215,7 +205,6 @@ export function LancamentosFilters({
           setSelectedValues={setFiltrosTipo}
         />
 
-        {/* CATEGORIA */}
         <ResponsiveFilter
           label="Categoria"
           title="Categorias"
@@ -224,7 +213,6 @@ export function LancamentosFilters({
           setSelectedValues={setFiltrosCategoria}
         />
 
-        {/* PAGAMENTO */}
         <ResponsiveFilter
           label="Pagamento"
           title="Formas de Pagamento"
@@ -233,7 +221,6 @@ export function LancamentosFilters({
           setSelectedValues={setFiltrosPagamento}
         />
 
-        {/* STATUS */}
         <ResponsiveFilterStatus
           label="Status"
           currentStatus={filtroStatus}
@@ -244,7 +231,6 @@ export function LancamentosFilters({
   );
 }
 
-// COMPONENTE DO STATUS (Single Select)
 const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
   const isDesktop = useMediaQuery("(min-width: 768px)");
   const [open, setOpen] = React.useState(false);

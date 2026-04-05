@@ -3,9 +3,9 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
-import { useWorkspace } from "@/contexts/WorkspaceContext"; // <-- Cérebro Global
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Button } from "@/components/ui/button";
-import { RefreshCw, Loader2 } from "lucide-react";
+import { ArrowPathIcon } from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
 import {
   AlertDialog,
@@ -18,7 +18,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// Importando os componentes filhos
 import { SummaryCard } from "./fixed-expenses/SummaryCard";
 import { ExpenseCard } from "./fixed-expenses/ExpenseCard";
 import { AddExpenseForm } from "./fixed-expenses/AddExpenseForm";
@@ -34,7 +33,7 @@ export interface ItemOpcao {
 
 const fixasCache = {
   userId: null as string | null,
-  context: null as string | null, // <-- Agora o cache sabe de qual contexto são os dados
+  context: null as string | null,
   despesas: null as DespesaFixa[] | null,
   categorias: null as ItemOpcao[] | null,
   pagamentos: null as ItemOpcao[] | null,
@@ -69,10 +68,9 @@ export default function DespesasFixas() {
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
-  const { activeContext } = useWorkspace(); // <-- Puxando o contexto ativo
+  const { activeContext } = useWorkspace();
 
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
-
   const [modoQuinzenal, setModoQuinzenal] = useState(false);
 
   const isCacheValid =
@@ -129,7 +127,6 @@ export default function DespesasFixas() {
     async (force = false) => {
       if (!userId) return;
 
-      // Limpa o cache se mudar de usuário OU de contexto (Pessoal/Grupo)
       if (
         fixasCache.userId !== userId ||
         fixasCache.context !== activeContext
@@ -149,7 +146,6 @@ export default function DespesasFixas() {
       else setLoading(true);
 
       try {
-        // 1. BUSCAR GRUPO ID (SE FOR MODO GRUPO)
         let groupId = currentGroupId;
         if (activeContext === "grupo" && !groupId) {
           const { data: myGroup } = await supabase
@@ -184,7 +180,6 @@ export default function DespesasFixas() {
           !fixasCache.nomesLancadosEsteMes ||
           fixasCache.nomesLancadosMesKey !== thisKey;
 
-        // Ajusta as queries de acordo com o contexto
         let queryFixas = supabase
           .from("despesas_fixas")
           .select("*")
@@ -278,7 +273,6 @@ export default function DespesasFixas() {
   ) => {
     if (!userId) return;
     try {
-      // INJETA O GRUPO ID NA HORA DE SALVAR
       const payload = {
         ...data,
         user_id: userId,
@@ -314,7 +308,6 @@ export default function DespesasFixas() {
     try {
       let query = supabase.from("despesas_fixas").delete().eq("id", id);
 
-      // Validação de segurança extra baseada no contexto
       if (activeContext === "grupo" && currentGroupId) {
         query = query.eq("grupo_id", currentGroupId);
       } else {
@@ -359,7 +352,6 @@ export default function DespesasFixas() {
 
       const dataFormatada = dataVencimento.toISOString().split("T")[0];
 
-      // INJETA O GRUPO ID NA HORA DE LANÇAR NA TELA DE LANÇAMENTOS
       const { error } = await supabase.from("lancamentos").insert([
         {
           user_id: userId,
@@ -438,7 +430,7 @@ export default function DespesasFixas() {
             <h1 className="text-3xl font-semibold tracking-tight">
               Despesas Fixas{" "}
               {activeContext === "grupo" && (
-                <span className="text-primary">(Casa)</span>
+                <span className="text-primary">(Grupo)</span>
               )}
             </h1>
             <p className="text-muted-foreground mt-1">
@@ -452,7 +444,7 @@ export default function DespesasFixas() {
             onClick={() => fetchData(true)}
             className="gap-2 shrink-0"
           >
-            <RefreshCw className="h-4 w-4" /> Atualizar
+            <ArrowPathIcon className="h-4 w-4" /> Atualizar
           </Button>
         </div>
 
@@ -474,7 +466,7 @@ export default function DespesasFixas() {
         {/* LISTA */}
         {loading && despesas.length === 0 ? (
           <div className="flex justify-center py-10">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground/70" />
+            <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/70" />
           </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -497,7 +489,7 @@ export default function DespesasFixas() {
             {despesas.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground border border-dashed rounded-xl bg-card/30">
                 Nenhuma despesa fixa cadastrada{" "}
-                {activeContext === "grupo" ? "para esta casa" : ""}.
+                {activeContext === "grupo" ? "para esta " : ""}.
               </div>
             )}
           </div>
@@ -511,7 +503,6 @@ export default function DespesasFixas() {
         onSaved={handleExpenseSaved}
         categorias={categoriasDB}
         formasPagamento={formasPagamentoDB}
-        // SE PRECISARMOS PASSAR O CONTEXTO PARA DENTRO DA EDIÇÃO:
         activeContext={activeContext}
         groupId={currentGroupId}
       />
@@ -543,7 +534,8 @@ export default function DespesasFixas() {
             >
               {deleting ? (
                 <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" /> Removendo...
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />{" "}
+                  Removendo...
                 </>
               ) : (
                 "Remover"

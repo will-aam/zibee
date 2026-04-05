@@ -2,13 +2,13 @@
 
 import * as React from "react";
 import {
-  Eye,
-  EyeOff,
-  TrendingUp,
-  TrendingDown,
-  Wallet,
-  ArrowRight,
-} from "lucide-react";
+  EyeIcon,
+  EyeSlashIcon,
+  ArrowTrendingUpIcon,
+  ArrowTrendingDownIcon,
+  WalletIcon,
+  ArrowRightIcon,
+} from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 
 function formatMoneyBRL(value: number) {
@@ -106,22 +106,21 @@ export default function MobileDashboardSummary({
               aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
             >
               {hidden ? (
-                <EyeOff className="h-5 w-5" />
+                <EyeSlashIcon className="h-5 w-5" />
               ) : (
-                <Eye className="h-5 w-5" />
+                <EyeIcon className="h-5 w-5" />
               )}
             </button>
           </div>
         </div>
 
-        {/* Linha Divisória com sintaxe correta do Tailwind */}
         <div className="h-px bg-linear-to-r from-transparent via-border to-transparent mx-4" />
 
         <div className="px-2 py-2">
           {/* Entradas confirmadas */}
           <div className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3">
             <div className="h-10 w-10 shrink-0 rounded-full bg-green-500/10 text-green-600 dark:text-green-500 flex items-center justify-center">
-              <TrendingUp className="h-5 w-5" />
+              <ArrowTrendingUpIcon className="h-5 w-5" />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -141,7 +140,7 @@ export default function MobileDashboardSummary({
           {/* Gastos variáveis */}
           <div className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3">
             <div className="h-10 w-10 shrink-0 rounded-full bg-red-500/10 text-destructive flex items-center justify-center">
-              <TrendingDown className="h-5 w-5" />
+              <ArrowTrendingDownIcon className="h-5 w-5" />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -156,14 +155,14 @@ export default function MobileDashboardSummary({
             </p>
           </div>
 
-          {/* Contas fixas mensais - AGORA A LINHA INTEIRA É CLICÁVEL */}
+          {/* Contas fixas mensais */}
           <div
             role="button"
             onClick={() => onNavigate?.("despesas_fixas")}
             className="w-full text-left px-3 py-3 rounded-2xl hover:bg-muted/50 active:bg-muted/80 transition flex items-center gap-3 cursor-pointer group"
           >
             <div className="h-10 w-10 shrink-0 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors group-hover:bg-blue-500/20">
-              <Wallet className="h-5 w-5" />
+              <WalletIcon className="h-5 w-5" />
             </div>
 
             <div className="flex-1 min-w-0">
@@ -172,7 +171,7 @@ export default function MobileDashboardSummary({
               </p>
               <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
                 Recorrência mensal
-                <ArrowRight className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                <ArrowRightIcon className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
               </p>
             </div>
 

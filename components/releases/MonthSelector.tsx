@@ -1,4 +1,3 @@
-// app/components/releases/MonthSelector.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -9,10 +8,10 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover";
 import {
-  Calendar as CalendarLucide,
-  ChevronLeft,
-  ChevronRight,
-} from "lucide-react";
+  CalendarIcon,
+  ChevronLeftIcon,
+  ChevronRightIcon,
+} from "@heroicons/react/24/solid";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { cn } from "@/lib/utils";
@@ -42,7 +41,7 @@ export function MonthSelector({ date, setDate }: MonthSelectorProps) {
             !date && "text-muted-foreground",
           )}
         >
-          <CalendarLucide className="mr-2 h-4 w-4 shrink-0" />
+          <CalendarIcon className="mr-2 h-4 w-4 shrink-0" />
           <span className="truncate">
             {date ? format(date, "MMMM yyyy", { locale: ptBR }) : "Mês"}
           </span>
@@ -56,7 +55,7 @@ export function MonthSelector({ date, setDate }: MonthSelectorProps) {
             className="h-7 w-7"
             onClick={() => setYearView((y) => y - 1)}
           >
-            <ChevronLeft className="h-4 w-4" />
+            <ChevronLeftIcon className="h-4 w-4" />
           </Button>
           <div className="font-semibold text-sm">{yearView}</div>
           <Button
@@ -65,7 +64,7 @@ export function MonthSelector({ date, setDate }: MonthSelectorProps) {
             className="h-7 w-7"
             onClick={() => setYearView((y) => y + 1)}
           >
-            <ChevronRight className="h-4 w-4" />
+            <ChevronRightIcon className="h-4 w-4" />
           </Button>
         </div>
         <div className="grid grid-cols-3 gap-2">

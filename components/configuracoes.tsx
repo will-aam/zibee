@@ -1,7 +1,13 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Tag, CreditCard, Calendar, Target, Plus, Loader2 } from "lucide-react";
+import {
+  TagIcon,
+  CreditCardIcon,
+  CalendarIcon,
+  PlusIcon,
+  ArrowPathIcon,
+} from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabase";
 import { InstallButton } from "@/components/ui/install-button";
 import { QuickActionCard } from "@/components/config/QuickActionCard";
@@ -20,15 +26,12 @@ interface ListItem {
   nome: string;
 }
 
-// CACHE GLOBAL NA MEMÓRIA DA PÁGINA
-// Isso impede que o banco seja consultado toda vez que o usuário troca de aba
 let cachedCategorias: ListItem[] | null = null;
 let cachedPagamentos: ListItem[] | null = null;
 
 export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
   const { toast } = useToast();
 
-  // Inicia com os dados do cache se existirem
   const [categorias, setCategorias] = useState<ListItem[]>(
     cachedCategorias || [],
   );
@@ -39,17 +42,13 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
     !cachedCategorias || !cachedPagamentos,
   );
 
-  // Estados dos inputs de adição
   const [novaCategoria, setNovaCategoria] = useState("");
   const [novaForma, setNovaForma] = useState("");
 
-  // Estados de loading dos botões
   const [isAddingCategoria, setIsAddingCategoria] = useState(false);
   const [isAddingForma, setIsAddingForma] = useState(false);
 
-  // Função otimizada com o cache
   const fetchData = useCallback(async (forceUpdate = false) => {
-    // Se não for uma atualização forçada e já tiver cache, retorna instantâneo
     if (!forceUpdate && cachedCategorias && cachedPagamentos) {
       setIsLoadingData(false);
       return;
@@ -76,7 +75,6 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
     fetchData();
   }, [fetchData]);
 
-  // Adição Global
   const handleAdd = async (
     table: "categorias" | "formas_pagamento",
     nome: string,
@@ -100,7 +98,6 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
       throw error;
     }
 
-    // Força o refetch no banco e atualiza o cache da memória
     await fetchData(true);
     clearInput();
     setLoadingState(false);
@@ -116,15 +113,10 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
       </div>
 
       {/* CARDS DE AÇÕES RÁPIDAS */}
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-3">
         <ThemeToggleCard />
         <QuickActionCard
-          icon={Target}
-          label="Metas"
-          onClick={() => onNavigate && onNavigate("metas")}
-        />
-        <QuickActionCard
-          icon={Calendar}
+          icon={CalendarIcon}
           label="Despesas Fixas"
           onClick={() => onNavigate && onNavigate("despesas_fixas")}
         />
@@ -135,7 +127,7 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
         {/* SESSÃO: CATEGORIAS */}
         <section className="space-y-4">
           <div className="flex items-center gap-2 text-foreground">
-            <Tag className="h-5 w-5 text-primary" />
+            <TagIcon className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold tracking-tight">
               Categorias (Global)
             </h2>
@@ -143,7 +135,7 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
 
           <div className="flex flex-wrap gap-2">
             {isLoadingData && categorias.length === 0 ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <ArrowPathIcon className="h-5 w-5 animate-spin text-muted-foreground" />
             ) : (
               categorias.map((c) => (
                 <Badge
@@ -186,9 +178,9 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
               className="h-10 rounded-xl px-4"
             >
               {isAddingCategoria ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <ArrowPathIcon className="h-4 w-4 animate-spin" />
               ) : (
-                <Plus className="h-4 w-4" />
+                <PlusIcon className="h-4 w-4" />
               )}
             </Button>
           </div>
@@ -199,7 +191,7 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
         {/* SESSÃO: FORMAS DE PAGAMENTO */}
         <section className="space-y-4">
           <div className="flex items-center gap-2 text-foreground">
-            <CreditCard className="h-5 w-5 text-primary" />
+            <CreditCardIcon className="h-5 w-5 text-primary" />
             <h2 className="text-lg font-semibold tracking-tight">
               Formas de Pagamento (Global)
             </h2>
@@ -207,7 +199,7 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
 
           <div className="flex flex-wrap gap-2">
             {isLoadingData && formasPagamento.length === 0 ? (
-              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              <ArrowPathIcon className="h-5 w-5 animate-spin text-muted-foreground" />
             ) : (
               formasPagamento.map((p) => (
                 <Badge
@@ -244,9 +236,9 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
               className="h-10 rounded-xl px-4"
             >
               {isAddingForma ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
+                <ArrowPathIcon className="h-4 w-4 animate-spin" />
               ) : (
-                <Plus className="h-4 w-4" />
+                <PlusIcon className="h-4 w-4" />
               )}
             </Button>
           </div>

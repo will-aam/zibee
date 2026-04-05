@@ -55,6 +55,8 @@ export default function GroupManagerView() {
   const session = authClient.useSession();
   const userId = session.data?.user?.id;
   const userEmail = session.data?.user?.email || "usuario@zibee.com";
+  // PEGANDO O NOME DO USUÁRIO AQUI
+  const userName = session.data?.user?.name || "Você";
 
   // ESTADOS DO BANCO DE DADOS
   const [isLoading, setIsLoading] = useState(true);
@@ -128,17 +130,15 @@ export default function GroupManagerView() {
 
         const formattedMembers: Member[] = [];
 
-        // Adicionamos o Criador manualmente no topo da lista
         formattedMembers.push({
           dbId: null,
-          name: admin ? "Você (Criador)" : "Criador",
+          name: admin ? `${userName}` : "Criador",
           email: admin ? userEmail : "Admin",
           role: "Admin",
           status: "Aceito",
           seed: admin ? userEmail : "Criador",
         });
 
-        // Adicionamos os convidados
         if (membersData) {
           membersData.forEach((m) => {
             formattedMembers.push({
@@ -163,7 +163,7 @@ export default function GroupManagerView() {
     } finally {
       setIsLoading(false);
     }
-  }, [userId, userEmail, toast]);
+  }, [userId, userEmail, userName, toast]);
 
   useEffect(() => {
     loadGroupData();

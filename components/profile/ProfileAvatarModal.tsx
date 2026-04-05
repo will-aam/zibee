@@ -1,14 +1,24 @@
 "use client";
 
 import * as React from "react";
-import { X } from "lucide-react";
+import { X, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { handleWhatsAppContact } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/lib/supabase";
+import { useWorkspace } from "@/contexts/WorkspaceContext"; // Para atualizar o acesso premium
+
 import {
   UserIcon as UserSolid,
   UserGroupIcon as UserGroupSolid,
   LockClosedIcon as LockClosedSolid,
+  CheckIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/solid";
+
+// Importa o tipo do Header para o TypeScript não reclamar
+import { type PendingInvite } from "@/components/layout/Header";
+import { Button } from "../ui/button";
 
 export type AvatarStyle = "bottts-neutral";
 
@@ -43,6 +53,11 @@ interface ProfileAvatarModalProps {
   activeContext?: string;
   onContextChange?: (ctx: string) => void;
   hasPremiumAccess?: boolean;
+
+  // NOVAS PROPRIEDADES DE CONVITE (Isso resolve o erro do TypeScript!)
+  pendingInvite?: PendingInvite;
+  setPendingInvite?: (invite: PendingInvite) => void;
+  userId?: string;
 }
 
 export default function ProfileAvatarModal({
@@ -57,8 +72,15 @@ export default function ProfileAvatarModal({
   activeContext = "pessoal",
   onContextChange,
   hasPremiumAccess = false,
+  pendingInvite,
+  setPendingInvite,
+  userId,
 }: ProfileAvatarModalProps) {
   const isMobile = useIsMobile();
+  const { toast } = useToast();
+  const { setHasPremiumAccess } = useWorkspace(); // Atualiza o global quando aceitar o convite
+
+  const [isProcessingInvite, setIsProcessingInvite] = React.useState(false);
 
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
@@ -73,30 +95,76 @@ export default function ProfileAvatarModal({
     [baseSeed, optionsCount],
   );
 
+  // ==========================================================================
+  // FUNÇÕES DE ACEITAR / RECUSAR CONVITE NO BANCO DE DADOS
+  // ==========================================================================
+  const handleAcceptInvite = async () => {
+    if (!pendingInvite || !userId) return;
+    setIsProcessingInvite(true);
+
+    // Atualiza no banco: Status vira 'Aceito' e vincula o ID do usuário
+    const { error } = await supabase
+      .from("membros_grupo")
+      .update({ status: "Aceito", user_id: userId })
+      .eq("id", pendingInvite.id);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível aceitar o convite.",
+        variant: "destructive",
+      });
+    } else {
+      setHasPremiumAccess(true); // Libera o Premium global para ele ver a tela de grupos
+      onContextChange?.("grupo"); // Troca a tela para o Grupo
+      setPendingInvite?.(null); // Tira o convite da tela
+      toast({
+        title: "Bem-vindo!",
+        description: `Você entrou na ${pendingInvite.grupo_nome}.`,
+      });
+      onClose();
+    }
+    setIsProcessingInvite(false);
+  };
+
+  const handleRejectInvite = async () => {
+    if (!pendingInvite) return;
+    setIsProcessingInvite(true);
+
+    // Deleta o convite do banco
+    const { error } = await supabase
+      .from("membros_grupo")
+      .delete()
+      .eq("id", pendingInvite.id);
+
+    if (error) {
+      toast({
+        title: "Erro",
+        description: "Não foi possível recusar o convite.",
+        variant: "destructive",
+      });
+    } else {
+      setPendingInvite?.(null);
+      toast({ description: "Convite recusado." });
+    }
+    setIsProcessingInvite(false);
+  };
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-110" aria-modal="true" role="dialog">
-      {/* Overlay Escuro com Blur */}
       <button
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
         aria-label="Fechar"
       />
 
-      {/* Drawer (Mobile) ou Modal (Desktop) */}
       <aside
-        className={`
-          absolute bg-background shadow-2xl flex flex-col transition-all duration-300
-          ${
-            isMobile
-              ? "left-0 top-0 h-full w-full animate-in slide-in-from-left"
-              : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[640px] rounded-[40px] border border-border/50 animate-in zoom-in-95"
-          }
+        className={`absolute bg-background shadow-2xl flex flex-col transition-all duration-300
+          ${isMobile ? "left-0 top-0 h-full w-full animate-in slide-in-from-left" : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[640px] rounded-[40px] border border-border/50 animate-in zoom-in-95"}
         `}
-        aria-label="Configurações da Conta"
       >
-        {/* Header do Painel */}
         <div className="px-6 py-6 border-b flex items-center justify-between">
           <div>
             <h2 className="text-xl font-bold tracking-tight">
@@ -106,14 +174,12 @@ export default function ProfileAvatarModal({
           <button
             className="p-2.5 rounded-full hover:bg-muted transition-colors shrink-0"
             onClick={onClose}
-            aria-label="Fechar"
-            disabled={saving}
+            disabled={saving || isProcessingInvite}
           >
             <X className="h-6 w-6" />
           </button>
         </div>
 
-        {/* Alerta de Erro */}
         {errorMessage && (
           <div className="px-6 pt-4">
             <div className="rounded-2xl border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive font-medium">
@@ -123,74 +189,110 @@ export default function ProfileAvatarModal({
         )}
 
         <div className="overflow-y-auto flex-1 custom-scrollbar">
-          {/* SEÇÃO: WORKSPACES (EXCLUSIVA MOBILE) */}
+          {/* ======================= SEÇÃO DE ESPAÇOS ======================= */}
           {isMobile && (
             <div className="px-6 py-6 border-b border-border/50 bg-muted/10">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">
                 Seu Espaço de Trabalho
               </p>
-              <div className="grid grid-cols-2 gap-3">
-                {/* Espaço Pessoal */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    onContextChange?.("pessoal");
-                    onClose();
-                  }}
-                  className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
-                    activeContext === "pessoal"
-                      ? "border-primary bg-primary/10 text-primary shadow-sm"
-                      : "border-border bg-background hover:border-primary/50 text-muted-foreground"
-                  }`}
-                >
-                  <UserSolid className="w-7 h-7" />
-                  <span className="font-bold text-xs uppercase tracking-wide">
-                    Pessoal
-                  </span>
-                </button>
 
-                {/* Espaço de Grupo */}
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (hasPremiumAccess) {
-                      onContextChange?.("grupo");
-                      onClose();
-                    } else {
-                      handleWhatsAppContact(); // Lógica centralizada
-                    }
-                  }}
-                  className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${
-                    activeContext === "grupo"
-                      ? "border-primary bg-primary/10 text-primary shadow-sm"
-                      : "border-border bg-background hover:border-primary/50 text-muted-foreground"
-                  }`}
-                >
-                  {!hasPremiumAccess && (
-                    <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-bl-lg">
-                      PRO
+              {/* CARD DE CONVITE (Aparece no lugar dos botões se houver convite) */}
+              {pendingInvite ? (
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-3xl p-5 mb-4 animate-in zoom-in-95 duration-300">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                      <UserGroupSolid className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
-                  )}
-                  {hasPremiumAccess ? (
-                    <UserGroupSolid className="w-7 h-7" />
-                  ) : (
-                    <LockClosedSolid className="w-7 h-7 text-amber-500/80" />
-                  )}
-                  <span className="font-bold text-xs uppercase tracking-wide">
-                    Grupo
-                  </span>
-                </button>
-              </div>
-              {!hasPremiumAccess && (
-                <p className="text-[11px] text-muted-foreground mt-4 text-center font-medium leading-relaxed">
-                  Você ainda não possui um grupo ativo. <br />
-                  Clique no cadeado para solicitar o acesso.
-                </p>
+                    <div>
+                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                        Convite Recebido
+                      </p>
+                      <p className="font-semibold text-foreground text-sm">
+                        {pendingInvite.grupo_nome}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="flex gap-2 mt-4">
+                    <Button
+                      variant="outline"
+                      className="flex-1 rounded-xl h-10 bg-white dark:bg-background border-border/50 text-muted-foreground hover:bg-muted"
+                      onClick={handleRejectInvite}
+                      disabled={isProcessingInvite}
+                    >
+                      <XMarkIcon className="w-4 h-4 mr-1" /> Recusar
+                    </Button>
+                    <Button
+                      className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white border-transparent shadow-sm"
+                      onClick={handleAcceptInvite}
+                      disabled={isProcessingInvite}
+                    >
+                      {isProcessingInvite ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <CheckIcon className="w-4 h-4 mr-1" /> Aceitar
+                        </>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                // BOTÕES NORMAIS (Pessoal / Grupo)
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onContextChange?.("pessoal");
+                      onClose();
+                    }}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
+                      activeContext === "pessoal"
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border bg-background hover:border-primary/50 text-muted-foreground"
+                    }`}
+                  >
+                    <UserSolid className="w-7 h-7" />
+                    <span className="font-bold text-xs uppercase tracking-wide">
+                      Pessoal
+                    </span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (hasPremiumAccess) {
+                        onContextChange?.("grupo");
+                        onClose();
+                      } else {
+                        handleWhatsAppContact();
+                      }
+                    }}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${
+                      activeContext === "grupo"
+                        ? "border-primary bg-primary/10 text-primary shadow-sm"
+                        : "border-border bg-background hover:border-primary/50 text-muted-foreground"
+                    }`}
+                  >
+                    {!hasPremiumAccess && (
+                      <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-bl-lg">
+                        PRO
+                      </div>
+                    )}
+                    {hasPremiumAccess ? (
+                      <UserGroupSolid className="w-7 h-7" />
+                    ) : (
+                      <LockClosedSolid className="w-7 h-7 text-amber-500/80" />
+                    )}
+                    <span className="font-bold text-xs uppercase tracking-wide">
+                      Grupo
+                    </span>
+                  </button>
+                </div>
               )}
             </div>
           )}
 
-          {/* SEÇÃO: SELEÇÃO DE AVATAR (MOBILE E DESKTOP) */}
+          {/* SEÇÃO DE FOTOS */}
           <div className="px-6 py-8">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6">
               {isMobile ? "Escolha seu novo avatar" : "Selecione um robô"}
@@ -204,18 +306,11 @@ export default function ProfileAvatarModal({
                     key={`${ROBOT_STYLE}:${seed}`}
                     type="button"
                     onClick={() => onChange({ style: ROBOT_STYLE, seed })}
-                    disabled={saving}
-                    className={`
-                      relative group transition-all active:scale-90
-                      ${selected ? "scale-110" : "hover:scale-105"}
-                    `}
-                    aria-label="Selecionar avatar"
+                    disabled={saving || isProcessingInvite}
+                    className={`relative group transition-all active:scale-90 ${selected ? "scale-110" : "hover:scale-105"}`}
                   >
                     <div
-                      className={`
-                      rounded-full p-1 transition-all
-                      ${selected ? "bg-primary shadow-lg shadow-primary/30" : "bg-transparent"}
-                    `}
+                      className={`rounded-full p-1 transition-all ${selected ? "bg-primary shadow-lg shadow-primary/30" : "bg-transparent"}`}
                     >
                       <img
                         src={avatarUrl(ROBOT_STYLE, seed)}
@@ -228,27 +323,19 @@ export default function ProfileAvatarModal({
                 );
               })}
             </div>
-            <p className="text-[11px] text-muted-foreground mt-10 text-center bg-muted/40 py-2.5 rounded-full font-medium">
-              Role para ver todas as 120 variações
-            </p>
           </div>
         </div>
 
-        {/* Rodapé de Ação */}
         <div
           className={`px-6 py-6 border-t bg-background ${!isMobile ? "rounded-b-[40px]" : ""}`}
         >
           <button
             type="button"
-            className={`
-  w-full px-4 py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm
-  hover:opacity-90 transition-all active:scale-[0.98]
-  ${saving ? "opacity-70 cursor-not-allowed" : ""}
-`}
+            className={`w-full px-4 py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm hover:opacity-90 transition-all active:scale-[0.98] shadow-lg shadow-primary/20 ${saving || isProcessingInvite ? "opacity-70 cursor-not-allowed" : ""}`}
             onClick={onClose}
-            disabled={saving}
+            disabled={saving || isProcessingInvite}
           >
-            {saving ? "Salvando Alterações..." : "Concluir e Salvar"}
+            {saving ? "Salvando..." : "Concluir e Salvar"}
           </button>
         </div>
       </aside>

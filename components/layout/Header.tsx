@@ -103,6 +103,9 @@ function MobileDashboardSummarySkeleton() {
   );
 }
 
+// TIPAGEM DO CONVITE
+export type PendingInvite = { id: string; grupo_nome: string } | null;
+
 export default function Header({
   activeTab = "dashboard",
   onNavigate,
@@ -112,7 +115,7 @@ export default function Header({
   const { toast } = useToast();
 
   const userId = session.data?.user?.id;
-  // Fallback para o nome real se existir na sessão
+  const userEmail = session.data?.user?.email;
   const userName = session.data?.user?.name || "Zibee";
   const baseSeed = userName;
 
@@ -131,7 +134,14 @@ export default function Header({
     seed: `${baseSeed}-1`,
   });
 
-  const { activeContext, setActiveContext, hasPremiumAccess } = useWorkspace();
+  // CONTEXTO E CONVITE
+  const {
+    activeContext,
+    setActiveContext,
+    hasPremiumAccess,
+    setHasPremiumAccess,
+  } = useWorkspace();
+  const [pendingInvite, setPendingInvite] = React.useState<PendingInvite>(null);
 
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
@@ -156,6 +166,61 @@ export default function Header({
       setIsLoggingOut(false);
     }
   };
+
+  // ==========================================================================
+  // VERIFICAÇÃO DE ACESSO PREMIUM E CONVITES PENDENTES
+  // ==========================================================================
+  React.useEffect(() => {
+    async function checkAccessAndInvites() {
+      if (!userId || !userEmail) return;
+
+      // 1. Verifica se o usuário é CRIADOR
+      const { data: myGroup } = await supabase
+        .from("grupos")
+        .select("id")
+        .eq("criador_id", userId)
+        .maybeSingle();
+
+      // 2. Verifica se o usuário é MEMBRO ACEITO
+      const { data: memberGroup } = await supabase
+        .from("membros_grupo")
+        .select("id")
+        .eq("user_id", userId)
+        .eq("status", "Aceito")
+        .maybeSingle();
+
+      if (myGroup || memberGroup) {
+        setHasPremiumAccess(true);
+      } else {
+        setHasPremiumAccess(false);
+        if (activeContext === "grupo") setActiveContext("pessoal");
+      }
+
+      // 3. Verifica se tem algum CONVITE PENDENTE
+      const { data: inviteData } = await supabase
+        .from("membros_grupo")
+        .select("id, grupos(nome)")
+        .eq("email_convite", userEmail.toLowerCase())
+        .eq("status", "Pendente")
+        .maybeSingle();
+
+      if (inviteData && inviteData.grupos) {
+        // CORREÇÃO DO ERRO DO TYPESCRIPT (usando as any para acessar a propriedade dinamicamente)
+        const gruposInfo = inviteData.grupos as any;
+        const nomeGrupo = Array.isArray(gruposInfo)
+          ? gruposInfo[0]?.nome
+          : gruposInfo?.nome;
+        setPendingInvite({
+          id: inviteData.id,
+          grupo_nome: nomeGrupo || "Grupo",
+        });
+      } else {
+        setPendingInvite(null);
+      }
+    }
+
+    checkAccessAndInvites();
+  }, [userId, userEmail, setHasPremiumAccess, activeContext, setActiveContext]);
 
   // Sincronização de Tema PWA
   React.useEffect(() => {
@@ -338,7 +403,10 @@ export default function Header({
         </p>
         <div className="grid grid-cols-1 gap-2">
           <button
-            onClick={() => setActiveContext("pessoal")}
+            onClick={() => {
+              setActiveContext("pessoal");
+              setOpenProfileDrawer(false);
+            }}
             className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
               activeContext === "pessoal"
                 ? "bg-primary/10 border-primary text-primary"
@@ -349,29 +417,47 @@ export default function Header({
             <span className="font-semibold text-sm">Meu Pessoal</span>
           </button>
 
-          <button
-            onClick={() => {
-              if (hasPremiumAccess) setActiveContext("grupo");
-              else handleWhatsAppContact();
-            }}
-            className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-              activeContext === "grupo"
-                ? "bg-primary/10 border-primary text-primary"
-                : "hover:bg-muted border-transparent text-muted-foreground"
-            }`}
-          >
-            <div className="flex items-center gap-3">
-              {hasPremiumAccess ? (
-                <UserGroupSolid className="w-5 h-5" />
-              ) : (
-                <LockClosedSolid className="w-5 h-5 text-amber-500" />
+          {/* MOSTRA O CONVITE OU O BOTÃO DO GRUPO */}
+          {pendingInvite ? (
+            <button
+              onClick={() => setOpenProfileDrawer(true)}
+              className="flex items-center justify-between p-3 rounded-xl border transition-all bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100"
+            >
+              <div className="flex items-center gap-3">
+                <span className="relative flex h-3 w-3">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-3 w-3 bg-amber-500"></span>
+                </span>
+                <span className="font-semibold text-sm">Convite Pendente</span>
+              </div>
+            </button>
+          ) : (
+            <button
+              onClick={() => {
+                if (hasPremiumAccess) setActiveContext("grupo");
+                else handleWhatsAppContact();
+              }}
+              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                activeContext === "grupo"
+                  ? "bg-primary/10 border-primary text-primary"
+                  : "hover:bg-muted border-transparent text-muted-foreground"
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                {hasPremiumAccess ? (
+                  <UserGroupSolid className="w-5 h-5" />
+                ) : (
+                  <LockClosedSolid className="w-5 h-5 text-amber-500" />
+                )}
+                <span className="font-semibold text-sm">Casa / Grupo</span>
+              </div>
+              {!hasPremiumAccess && (
+                <Badge className="bg-amber-500 text-[10px] h-4 px-1.5">
+                  PRO
+                </Badge>
               )}
-              <span className="font-semibold text-sm">Grupo</span>
-            </div>
-            {!hasPremiumAccess && (
-              <Badge className="bg-amber-500 text-[10px] h-4 px-1.5">PRO</Badge>
-            )}
-          </button>
+            </button>
+          )}
         </div>
       </div>
 
@@ -541,15 +627,18 @@ export default function Header({
 
           <div className="h-8 w-px bg-border mx-1" />
 
-          {/* POPOVER DO PERFIL DESKTOP */}
+          {/* POPOVER DO PERFIL DESKTOP COM BOLINHA AZUL DE CONVITE */}
           <Popover>
             <PopoverTrigger asChild>
-              <button className="h-12 w-12 rounded-full overflow-hidden ring-2 ring-border hover:ring-primary transition-all shadow-sm outline-none active:scale-95">
+              <button className="relative h-12 w-12 rounded-full ring-2 ring-border hover:ring-primary transition-all shadow-sm outline-none active:scale-95">
                 <img
                   src={avatarUrl(avatar.style, avatar.seed)}
                   alt="Avatar"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full rounded-full object-cover"
                 />
+                {pendingInvite && (
+                  <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-blue-500 border-2 border-background rounded-full z-10"></span>
+                )}
               </button>
             </PopoverTrigger>
             <PopoverContent
@@ -570,16 +659,21 @@ export default function Header({
             className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
           >
             <div className="flex items-center gap-4 mb-2">
+              {/* AVATAR COM BOLINHA AZUL DE CONVITE NO MOBILE */}
               <button
                 onClick={() => setOpenProfileDrawer(true)}
-                className="shrink-0 h-16 w-16 rounded-full overflow-hidden flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
+                className="relative shrink-0 h-16 w-16 rounded-full flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
               >
                 <img
                   src={avatarUrl(avatar.style, avatar.seed)}
                   alt="Avatar"
-                  className="h-full w-full object-cover"
+                  className="h-full w-full rounded-full object-cover"
                 />
+                {pendingInvite && (
+                  <span className="absolute top-0 right-0 w-4 h-4 bg-blue-500 border-2 border-primary rounded-full z-10"></span>
+                )}
               </button>
+
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-white/85">{getGreeting()},</p>
                 <p className="font-semibold text-xl leading-tight truncate text-white">
@@ -640,7 +734,7 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "lancamentos" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Lançamentos
+              Lanç.
             </span>
           </button>
 
@@ -711,7 +805,12 @@ export default function Header({
         saving={savingAvatar}
         errorMessage={saveErrorMessage}
         activeContext={activeContext}
+        // CORREÇÃO DO ERRO DO TYPESCRIPT (convertendo string genérica para o ContextType exigido)
+        onContextChange={(ctx) => setActiveContext(ctx as "pessoal" | "grupo")}
         hasPremiumAccess={hasPremiumAccess}
+        pendingInvite={pendingInvite}
+        setPendingInvite={setPendingInvite}
+        userId={userId}
       />
     </>
   );

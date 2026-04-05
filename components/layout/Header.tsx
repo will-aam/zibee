@@ -166,17 +166,28 @@ export default function Header({
   };
 
   // ==========================================================================
-  // REALTIME: VERIFICAÇÃO DE ACESSO PREMIUM E CONVITES
+  // REALTIME: VERIFICAÇÃO DA REGRA DE OURO (SÓ O CRIADOR PAGA)
   // ==========================================================================
   React.useEffect(() => {
     async function checkAccessAndInvites() {
       if (!userId || !userEmail) return;
 
+      // 0. Verifica se o usuário PAGOU O PREMIUM na tabela de perfis
+      const { data: profile } = await supabase
+        .from("user_profiles")
+        .select("has_premium_access")
+        .eq("id", userId)
+        .maybeSingle();
+      const isPremium = profile?.has_premium_access || false;
+
+      // 1. Verifica se é CRIADOR de algum grupo
       const { data: myGroup } = await supabase
         .from("grupos")
         .select("id")
         .eq("criador_id", userId)
         .maybeSingle();
+
+      // 2. Verifica se é MEMBRO ACEITO de algum grupo (Convidado entra grátis!)
       const { data: memberGroup } = await supabase
         .from("membros_grupo")
         .select("id")
@@ -184,13 +195,15 @@ export default function Header({
         .eq("status", "Aceito")
         .maybeSingle();
 
-      if (myGroup || memberGroup) {
+      // REGRA DE OURO: Acesso liberado se Pagou OU se tem grupo criado OU se foi convidado
+      if (isPremium || myGroup || memberGroup) {
         setHasPremiumAccess(true);
       } else {
         setHasPremiumAccess(false);
         if (activeContext === "grupo") setActiveContext("pessoal");
       }
 
+      // 3. Verifica convites pendentes
       const { data: inviteData } = await supabase
         .from("membros_grupo")
         .select("id, grupos(nome)")
@@ -212,26 +225,21 @@ export default function Header({
       }
     }
 
-    // Roda a primeira vez ao carregar a tela
     checkAccessAndInvites();
 
     if (!userEmail) return;
 
-    // INICIA O OUVINTE EM TEMPO REAL
     const channel = supabase
       .channel("header_invites_listener")
       .on(
         "postgres_changes",
         {
-          event: "*", // Escuta INSERT, UPDATE e DELETE
+          event: "*",
           schema: "public",
           table: "membros_grupo",
-          filter: `email_convite=eq.${userEmail.toLowerCase()}`, // Só escuta convites para mim!
+          filter: `email_convite=eq.${userEmail.toLowerCase()}`,
         },
-        () => {
-          // Sempre que houver uma alteração no banco, recarrega a verificação silenciosamente!
-          checkAccessAndInvites();
-        },
+        () => checkAccessAndInvites(),
       )
       .subscribe();
 
@@ -314,11 +322,10 @@ export default function Header({
           description: "Sua foto de perfil foi atualizada.",
         });
       } catch {
-        const msg = "Falha de conexão. Tente novamente.";
-        setSaveErrorMessage(msg);
+        setSaveErrorMessage("Falha de conexão. Tente novamente.");
         toast({
           title: "Erro ao salvar",
-          description: msg,
+          description: "Falha de conexão",
           variant: "destructive",
         });
       } finally {
@@ -335,10 +342,7 @@ export default function Header({
   }, []);
 
   const loadTotals = React.useCallback(async () => {
-    if (!userId) {
-      setLoadingTotals(false);
-      return;
-    }
+    if (!userId) return setLoadingTotals(false);
     setLoadingTotals(true);
     const { from, to } = readRange();
 
@@ -395,18 +399,10 @@ export default function Header({
   }, [loadTotals]);
 
   const navButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${
-      isActive
-        ? "bg-primary/10 text-primary px-5 py-3"
-        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground px-4 py-3"
-    }`;
+    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${isActive ? "bg-primary/10 text-primary px-5 py-3" : "text-muted-foreground hover:bg-muted/50 hover:text-foreground px-4 py-3"}`;
 
   const mobileNavButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center rounded-full transition-all duration-300 ease-in-out active:scale-95 ${
-      isActive
-        ? "bg-primary/15 text-primary px-5 py-2.5"
-        : "text-muted-foreground px-4 py-2.5"
-    }`;
+    `flex items-center justify-center rounded-full transition-all duration-300 ease-in-out active:scale-95 ${isActive ? "bg-primary/15 text-primary px-5 py-2.5" : "text-muted-foreground px-4 py-2.5"}`;
 
   const ProfileMenuContent = () => (
     <div className="flex flex-col gap-6">
@@ -420,11 +416,7 @@ export default function Header({
               setActiveContext("pessoal");
               setOpenProfileDrawer(false);
             }}
-            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${
-              activeContext === "pessoal"
-                ? "bg-primary/10 border-primary text-primary"
-                : "hover:bg-muted border-transparent text-muted-foreground"
-            }`}
+            className={`flex items-center gap-3 p-3 rounded-xl border transition-all ${activeContext === "pessoal" ? "bg-primary/10 border-primary text-primary" : "hover:bg-muted border-transparent text-muted-foreground"}`}
           >
             <UserSolid className="w-5 h-5" />
             <span className="font-semibold text-sm">Meu Pessoal</span>
@@ -449,11 +441,7 @@ export default function Header({
                 if (hasPremiumAccess) setActiveContext("grupo");
                 else handleWhatsAppContact();
               }}
-              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
-                activeContext === "grupo"
-                  ? "bg-primary/10 border-primary text-primary"
-                  : "hover:bg-muted border-transparent text-muted-foreground"
-              }`}
+              className={`flex items-center justify-between p-3 rounded-xl border transition-all ${activeContext === "grupo" ? "bg-primary/10 border-primary text-primary" : "hover:bg-muted border-transparent text-muted-foreground"}`}
             >
               <div className="flex items-center gap-3">
                 {hasPremiumAccess ? (
@@ -461,7 +449,7 @@ export default function Header({
                 ) : (
                   <LockClosedSolid className="w-5 h-5 text-amber-500" />
                 )}
-                <span className="font-semibold text-sm">Casa / Grupo</span>
+                <span className="font-semibold text-sm">Grupo</span>
               </div>
               {!hasPremiumAccess && (
                 <Badge className="bg-amber-500 text-[10px] h-4 px-1.5">
@@ -573,7 +561,7 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Resumo
+              Planos
             </span>
           </button>
           <button
@@ -763,7 +751,7 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Resumo
+              Planos
             </span>
           </button>
           <button

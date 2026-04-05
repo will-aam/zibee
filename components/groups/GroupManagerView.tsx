@@ -72,9 +72,9 @@ export default function GroupManagerView() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
-  // ============================================================================
-  // CARREGAR DADOS DO BANCO (READ) E AVATARES REAIS
-  // ============================================================================
+  // NOVO ESTADO: Modal de Excluir a Casa Inteira
+  const [isDeleteGroupDialogOpen, setIsDeleteGroupDialogOpen] = useState(false);
+
   const loadGroupData = React.useCallback(async () => {
     if (!userId) return;
     setIsLoading(true);
@@ -85,7 +85,6 @@ export default function GroupManagerView() {
         .select("*")
         .eq("criador_id", userId)
         .maybeSingle();
-
       let admin = true;
 
       if (!myGroup) {
@@ -95,7 +94,6 @@ export default function GroupManagerView() {
           .eq("user_id", userId)
           .eq("status", "Aceito")
           .maybeSingle();
-
         if (membership) {
           const { data: memberGroup } = await supabase
             .from("grupos")
@@ -118,44 +116,35 @@ export default function GroupManagerView() {
           .select("*")
           .eq("grupo_id", myGroup.id);
 
-        // ----------------------------------------------------------------------
-        // NOVIDADE: BUSCAR OS AVATARES REAIS NA TABELA user_profile_settings_ba
-        // ----------------------------------------------------------------------
-        // Pega o ID do criador + IDs de todos os membros que já aceitaram
         const acceptedUserIds =
           membersData
             ?.filter((m) => m.status === "Aceito" && m.user_id)
             .map((m) => m.user_id) || [];
         const allIdsToFetch = [myGroup.criador_id, ...acceptedUserIds];
 
-        // Vai à tabela buscar os seeds
         const { data: avatarsData } = await supabase
           .from("user_profile_settings_ba")
           .select("user_id, avatar_seed")
           .in("user_id", allIdsToFetch);
 
-        // Cria um "dicionário" fácil de consultar: Map { 'ID_DO_USER' => 'William-105' }
         const avatarMap = new Map();
         if (avatarsData) {
           avatarsData.forEach((a) => avatarMap.set(a.user_id, a.avatar_seed));
         }
-        // ----------------------------------------------------------------------
 
         const formattedMembers: Member[] = [];
 
-        // Adiciona o Criador com o Avatar Real
         formattedMembers.push({
           dbId: null,
           name: admin ? `${userName} (Você)` : "Criador do Grupo",
           email: admin ? userEmail : "Admin",
           role: "Admin",
           status: "Aceito",
-          seed: avatarMap.get(myGroup.criador_id) || "Criador", // Avatar real do criador!
+          seed: avatarMap.get(myGroup.criador_id) || "Criador",
         });
 
         if (membersData) {
           membersData.forEach((m) => {
-            // Se o membro aceitou, usa a foto real dele. Se for pendente, usa o e-mail como fallback
             let memberSeed = m.email_convite;
             if (m.status === "Aceito" && m.user_id) {
               memberSeed = avatarMap.get(m.user_id) || m.email_convite;
@@ -167,51 +156,41 @@ export default function GroupManagerView() {
               email: m.email_convite,
               role: m.role as "Admin" | "Membro",
               status: m.status as "Aceito" | "Pendente",
-              seed: memberSeed, // Foto real dos convidados!
+              seed: memberSeed,
             });
           });
         }
         setMembers(formattedMembers);
+      } else {
+        // Se não achou grupo (ex: foi apagado), zera tudo
+        setGroupId(null);
       }
     } catch (error) {
       console.error("Erro ao carregar grupo:", error);
-      toast({
-        title: "Erro de conexão",
-        description: "Não foi possível carregar os dados do grupo.",
-        variant: "destructive",
-      });
     } finally {
       setIsLoading(false);
     }
-  }, [userId, userEmail, userName, toast]);
+  }, [userId, userEmail, userName]);
 
   useEffect(() => {
     loadGroupData();
   }, [loadGroupData]);
 
-  // ==========================================================================
-  // REALTIME: RECARREGA A LISTA QUANDO ALGUÉM ACEITAR O CONVITE
-  // ==========================================================================
   useEffect(() => {
     if (!groupId) return;
-
     const channel = supabase
       .channel("lista_membros_listener")
       .on(
         "postgres_changes",
         {
-          event: "*", // INSERT, UPDATE (Aceitar), DELETE (Excluir)
+          event: "*",
           schema: "public",
           table: "membros_grupo",
-          filter: `grupo_id=eq.${groupId}`, // Só escuta eventos do MEU grupo
+          filter: `grupo_id=eq.${groupId}`,
         },
-        () => {
-          // Atualiza a tela sozinho quando a esposa aceitar no celular dela!
-          loadGroupData();
-        },
+        () => loadGroupData(),
       )
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
@@ -333,7 +312,6 @@ export default function GroupManagerView() {
         title: "Convite Adicionado!",
         description: "O usuário receberá a notificação.",
       });
-      // Não precisamos mais fazer o PUSH manual na lista, porque o Supabase Realtime (useEffect acima) vai recarregar a lista sozinho!
     } catch (error) {
       toast({
         title: "Erro",
@@ -366,6 +344,33 @@ export default function GroupManagerView() {
     }
     setIsDeleteDialogOpen(false);
     setMemberToDelete(null);
+  };
+
+  // NOVA FUNÇÃO: EXCLUIR O GRUPO INTEIRO
+  const executeDeleteGroup = async () => {
+    if (!groupId) return;
+    try {
+      const { error } = await supabase
+        .from("grupos")
+        .delete()
+        .eq("id", groupId);
+      if (error) throw error;
+
+      toast({
+        title: "Casa Excluída",
+        description: "Todos os dados do grupo foram apagados permanentemente.",
+      });
+      setIsDeleteGroupDialogOpen(false);
+
+      // Recarrega a página para limpar todos os caches de contexto (Pessoal/Grupo) e zerar as telas
+      window.location.reload();
+    } catch (err: any) {
+      toast({
+        title: "Erro ao excluir",
+        description: err.message,
+        variant: "destructive",
+      });
+    }
   };
 
   if (isLoading)
@@ -469,7 +474,6 @@ export default function GroupManagerView() {
             >
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-full overflow-hidden bg-muted shrink-0 relative">
-                  {/* Para os avatares REAIS: Precisamos de uma Rota API ou Função SQL. Até lá, a base está pronta! */}
                   <img
                     src={`https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${member.seed}`}
                     alt={member.name}
@@ -542,7 +546,28 @@ export default function GroupManagerView() {
         )}
       </div>
 
-      {/* ... MODAIS IDÊNTICOS (Editar Nome, Regra e Lixeira) ... */}
+      {/* NOVA ZONA DE PERIGO (Excluir Grupo Inteiro) */}
+      {isUserAdmin && (
+        <div className="bg-destructive/5 p-6 md:p-8 rounded-3xl border border-destructive/20 shadow-sm space-y-4 mt-12">
+          <h3 className="text-xl font-bold flex items-center gap-2 text-destructive">
+            <TrashIcon className="w-6 h-6" /> Zona de Perigo
+          </h3>
+          <p className="text-sm text-destructive/80 font-medium">
+            Ao excluir a casa, todos os lançamentos, rendas e membros associados
+            a este grupo serão apagados do banco de dados permanentemente. Esta
+            ação não pode ser desfeita.
+          </p>
+          <Button
+            variant="destructive"
+            onClick={() => setIsDeleteGroupDialogOpen(true)}
+            className="rounded-2xl h-11 font-bold"
+          >
+            Excluir Casa Permanentemente
+          </Button>
+        </div>
+      )}
+
+      {/* MODAIS */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="rounded-3xl sm:rounded-3xl">
           <DialogHeader>
@@ -610,6 +635,8 @@ export default function GroupManagerView() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Modal de Excluir Membro */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
@@ -629,6 +656,39 @@ export default function GroupManagerView() {
               className="rounded-xl bg-red-500 text-white hover:bg-red-600 shadow-sm"
             >
               Sim, Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* NOVO Modal de Excluir Grupo Inteiro */}
+      <AlertDialog
+        open={isDeleteGroupDialogOpen}
+        onOpenChange={setIsDeleteGroupDialogOpen}
+      >
+        <AlertDialogContent className="rounded-3xl sm:rounded-3xl border-destructive/20">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-2xl text-destructive flex items-center gap-2">
+              Excluir Casa Inteira?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-base text-foreground/80 mt-2">
+              Você está prestes a apagar a sua casa.{" "}
+              <strong className="text-destructive">Tudo será perdido:</strong>{" "}
+              histórico de despesas da casa, rendas e os acessos de todos os
+              membros. <br />
+              <br />
+              Você tem certeza absoluta?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="mt-4">
+            <AlertDialogCancel className="rounded-xl border-border/50">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={executeDeleteGroup}
+              className="rounded-xl bg-destructive text-destructive-foreground hover:bg-destructive/90 shadow-sm"
+            >
+              Sim, Excluir Tudo
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

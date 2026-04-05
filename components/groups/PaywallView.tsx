@@ -27,7 +27,6 @@ export default function PaywallView() {
           Desbloqueie os Grupos
         </h1>
         <p className="text-muted-foreground text-base md:text-lg max-w-xl mx-auto leading-relaxed">
-          Chega de planilhas confusas e prints de Pix perdidos no WhatsApp.
           Divida as contas de forma inteligente e sem estresse.
         </p>
       </div>
@@ -216,7 +215,6 @@ export default function PaywallView() {
               className="w-full h-16 text-lg rounded-2xl font-bold hover:scale-[1.02] active:scale-[0.98] transition-transform"
               onClick={handleWhatsAppContact}
             >
-         
               Solicitar Acesso Premium
             </Button>
           </div>

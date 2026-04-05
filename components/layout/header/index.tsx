@@ -258,6 +258,9 @@ export default function Header({
         pendingInvite={pendingInvite}
         setPendingInvite={setPendingInvite}
         userId={userId}
+        // ADICIONE ESTAS DUAS LINHAS:
+        onLogout={handleLogout}
+        isLoggingOut={isLoggingOut}
       />
     </>
   );

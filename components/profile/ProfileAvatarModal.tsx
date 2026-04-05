@@ -1,25 +1,26 @@
 "use client";
 
 import * as React from "react";
-import { X, Loader2 } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { handleWhatsAppContact } from "@/lib/utils";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
-import { useWorkspace } from "@/contexts/WorkspaceContext"; // Para atualizar o acesso premium
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 
+// Apenas Heroicons
 import {
-  UserIcon as UserSolid,
-  UserGroupIcon as UserGroupSolid,
-  LockClosedIcon as LockClosedSolid,
-  CheckIcon,
   XMarkIcon,
+  UserIcon,
+  UserGroupIcon,
+  LockClosedIcon,
+  CheckIcon,
+  ArrowLeftOnRectangleIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/solid";
 
-// Importa o tipo do Header para o TypeScript não reclamar
-import { type PendingInvite } from "@/components/layout/Header";
 import { Button } from "../ui/button";
 
+export type PendingInvite = { id: string; grupo_nome: string } | null;
 export type AvatarStyle = "bottts-neutral";
 
 export interface AvatarSelection {
@@ -48,16 +49,14 @@ interface ProfileAvatarModalProps {
   saving?: boolean;
   errorMessage?: string | null;
   optionsCount?: number;
-
-  // Propriedades de contexto para o Switcher Mobile
   activeContext?: string;
   onContextChange?: (ctx: string) => void;
   hasPremiumAccess?: boolean;
-
-  // NOVAS PROPRIEDADES DE CONVITE (Isso resolve o erro do TypeScript!)
   pendingInvite?: PendingInvite;
   setPendingInvite?: (invite: PendingInvite) => void;
   userId?: string;
+  onLogout?: () => void;
+  isLoggingOut?: boolean;
 }
 
 export default function ProfileAvatarModal({
@@ -75,10 +74,12 @@ export default function ProfileAvatarModal({
   pendingInvite,
   setPendingInvite,
   userId,
+  onLogout,
+  isLoggingOut = false,
 }: ProfileAvatarModalProps) {
   const isMobile = useIsMobile();
   const { toast } = useToast();
-  const { setHasPremiumAccess } = useWorkspace(); // Atualiza o global quando aceitar o convite
+  const { setHasPremiumAccess } = useWorkspace();
 
   const [isProcessingInvite, setIsProcessingInvite] = React.useState(false);
 
@@ -95,14 +96,9 @@ export default function ProfileAvatarModal({
     [baseSeed, optionsCount],
   );
 
-  // ==========================================================================
-  // FUNÇÕES DE ACEITAR / RECUSAR CONVITE NO BANCO DE DADOS
-  // ==========================================================================
   const handleAcceptInvite = async () => {
     if (!pendingInvite || !userId) return;
     setIsProcessingInvite(true);
-
-    // Atualiza no banco: Status vira 'Aceito' e vincula o ID do usuário
     const { error } = await supabase
       .from("membros_grupo")
       .update({ status: "Aceito", user_id: userId })
@@ -111,13 +107,13 @@ export default function ProfileAvatarModal({
     if (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível aceitar o convite.",
+        description: "Não foi possível aceitar.",
         variant: "destructive",
       });
     } else {
-      setHasPremiumAccess(true); // Libera o Premium global para ele ver a tela de grupos
-      onContextChange?.("grupo"); // Troca a tela para o Grupo
-      setPendingInvite?.(null); // Tira o convite da tela
+      setHasPremiumAccess(true);
+      onContextChange?.("grupo");
+      setPendingInvite?.(null);
       toast({
         title: "Bem-vindo!",
         description: `Você entrou na ${pendingInvite.grupo_nome}.`,
@@ -130,17 +126,14 @@ export default function ProfileAvatarModal({
   const handleRejectInvite = async () => {
     if (!pendingInvite) return;
     setIsProcessingInvite(true);
-
-    // Deleta o convite do banco
     const { error } = await supabase
       .from("membros_grupo")
       .delete()
       .eq("id", pendingInvite.id);
-
     if (error) {
       toast({
         title: "Erro",
-        description: "Não foi possível recusar o convite.",
+        description: "Não foi possível recusar.",
         variant: "destructive",
       });
     } else {
@@ -157,7 +150,6 @@ export default function ProfileAvatarModal({
       <button
         className="absolute inset-0 bg-black/60 backdrop-blur-sm transition-opacity"
         onClick={onClose}
-        aria-label="Fechar"
       />
 
       <aside
@@ -165,18 +157,34 @@ export default function ProfileAvatarModal({
           ${isMobile ? "left-0 top-0 h-full w-full animate-in slide-in-from-left" : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[640px] rounded-[40px] border border-border/50 animate-in zoom-in-95"}
         `}
       >
-        <div className="px-6 py-6 border-b flex items-center justify-between">
-          <div>
+        {/* HEADER DO MODAL - AGORA COM O LOGOUT NO TOPO NO MOBILE */}
+        <div className="px-6 py-6 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            {isMobile && (
+              <button
+                onClick={onLogout}
+                disabled={isLoggingOut}
+                className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform"
+                title="Sair da Conta"
+              >
+                {isLoggingOut ? (
+                  <ArrowPathIcon className="h-6 w-6 animate-spin" />
+                ) : (
+                  <ArrowLeftOnRectangleIcon className="h-6 w-6" />
+                )}
+              </button>
+            )}
             <h2 className="text-xl font-bold tracking-tight">
-              {isMobile ? "Conta e Perfil" : "Mudar Foto do Perfil"}
+              {isMobile ? "Minha Conta" : "Perfil"}
             </h2>
           </div>
+
           <button
             className="p-2.5 rounded-full hover:bg-muted transition-colors shrink-0"
             onClick={onClose}
-            disabled={saving || isProcessingInvite}
+            disabled={saving || isProcessingInvite || isLoggingOut}
           >
-            <X className="h-6 w-6" />
+            <XMarkIcon className="h-6 w-6" />
           </button>
         </div>
 
@@ -189,19 +197,17 @@ export default function ProfileAvatarModal({
         )}
 
         <div className="overflow-y-auto flex-1 custom-scrollbar">
-          {/* ======================= SEÇÃO DE ESPAÇOS ======================= */}
+          {/* WORKSPACES (MOBILE) */}
           {isMobile && (
-            <div className="px-6 py-6 border-b border-border/50 bg-muted/10">
+            <div className="px-6 py-6 bg-muted/10">
               <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">
                 Seu Espaço de Trabalho
               </p>
-
-              {/* CARD DE CONVITE (Aparece no lugar dos botões se houver convite) */}
               {pendingInvite ? (
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-3xl p-5 mb-4 animate-in zoom-in-95 duration-300">
+                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-3xl p-5 mb-4 animate-in zoom-in-95">
                   <div className="flex items-center gap-3 mb-3">
                     <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-                      <UserGroupSolid className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+                      <UserGroupIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                     </div>
                     <div>
                       <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
@@ -215,29 +221,26 @@ export default function ProfileAvatarModal({
                   <div className="flex gap-2 mt-4">
                     <Button
                       variant="outline"
-                      className="flex-1 rounded-xl h-10 bg-white dark:bg-background border-border/50 text-muted-foreground hover:bg-muted"
+                      className="flex-1 rounded-xl h-10 bg-white dark:bg-background border-border/50"
                       onClick={handleRejectInvite}
                       disabled={isProcessingInvite}
                     >
-                      <XMarkIcon className="w-4 h-4 mr-1" /> Recusar
+                      Recusar
                     </Button>
                     <Button
-                      className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white border-transparent shadow-sm"
+                      className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white"
                       onClick={handleAcceptInvite}
                       disabled={isProcessingInvite}
                     >
                       {isProcessingInvite ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
                       ) : (
-                        <>
-                          <CheckIcon className="w-4 h-4 mr-1" /> Aceitar
-                        </>
+                        "Aceitar"
                       )}
                     </Button>
                   </div>
                 </div>
               ) : (
-                // BOTÕES NORMAIS (Pessoal / Grupo)
                 <div className="grid grid-cols-2 gap-3">
                   <button
                     type="button"
@@ -245,18 +248,13 @@ export default function ProfileAvatarModal({
                       onContextChange?.("pessoal");
                       onClose();
                     }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${
-                      activeContext === "pessoal"
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border bg-background hover:border-primary/50 text-muted-foreground"
-                    }`}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${activeContext === "pessoal" ? "border-primary bg-primary/10 text-primary shadow-sm" : "border-border bg-background text-muted-foreground"}`}
                   >
-                    <UserSolid className="w-7 h-7" />
+                    <UserIcon className="w-7 h-7" />
                     <span className="font-bold text-xs uppercase tracking-wide">
                       Pessoal
                     </span>
                   </button>
-
                   <button
                     type="button"
                     onClick={() => {
@@ -267,11 +265,7 @@ export default function ProfileAvatarModal({
                         handleWhatsAppContact();
                       }
                     }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${
-                      activeContext === "grupo"
-                        ? "border-primary bg-primary/10 text-primary shadow-sm"
-                        : "border-border bg-background hover:border-primary/50 text-muted-foreground"
-                    }`}
+                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${activeContext === "grupo" ? "border-primary bg-primary/10 text-primary shadow-sm" : "border-border bg-background text-muted-foreground"}`}
                   >
                     {!hasPremiumAccess && (
                       <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-bl-lg">
@@ -279,9 +273,9 @@ export default function ProfileAvatarModal({
                       </div>
                     )}
                     {hasPremiumAccess ? (
-                      <UserGroupSolid className="w-7 h-7" />
+                      <UserGroupIcon className="w-7 h-7" />
                     ) : (
-                      <LockClosedSolid className="w-7 h-7 text-amber-500/80" />
+                      <LockClosedIcon className="w-7 h-7 text-amber-500/80" />
                     )}
                     <span className="font-bold text-xs uppercase tracking-wide">
                       Grupo
@@ -292,7 +286,7 @@ export default function ProfileAvatarModal({
             </div>
           )}
 
-          {/* SEÇÃO DE FOTOS */}
+          {/* SELEÇÃO DE AVATAR */}
           <div className="px-6 py-8">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6">
               {isMobile ? "Escolha seu novo avatar" : "Selecione um robô"}
@@ -303,7 +297,7 @@ export default function ProfileAvatarModal({
                   value.style === ROBOT_STYLE && value.seed === seed;
                 return (
                   <button
-                    key={`${ROBOT_STYLE}:${seed}`}
+                    key={seed}
                     type="button"
                     onClick={() => onChange({ style: ROBOT_STYLE, seed })}
                     disabled={saving || isProcessingInvite}
@@ -316,7 +310,6 @@ export default function ProfileAvatarModal({
                         src={avatarUrl(ROBOT_STYLE, seed)}
                         alt="Avatar"
                         className="h-full w-full rounded-full bg-muted object-cover border-2 border-background"
-                        loading="lazy"
                       />
                     </div>
                   </button>
@@ -326,17 +319,25 @@ export default function ProfileAvatarModal({
           </div>
         </div>
 
+        {/* FOOTER */}
         <div
-          className={`px-6 py-6 border-t bg-background ${!isMobile ? "rounded-b-[40px]" : ""}`}
+          className={`px-6 py-6 bg-background ${!isMobile ? "rounded-b-[40px]" : ""}`}
         >
-          <button
-            type="button"
-            className={`w-full px-4 py-4 rounded-2xl bg-primary text-primary-foreground font-black uppercase tracking-widest text-sm hover:opacity-90 transition-all active:scale-[0.98] shadow-lg shadow-primary/20 ${saving || isProcessingInvite ? "opacity-70 cursor-not-allowed" : ""}`}
+          <Button
+            className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest"
             onClick={onClose}
             disabled={saving || isProcessingInvite}
           >
+            {saving ? (
+              <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
+            ) : null}
             {saving ? "Salvando..." : "Concluir e Salvar"}
-          </button>
+          </Button>
+          {/* {isMobile && (
+            <p className="text-[10px] text-center text-muted-foreground mt-4 font-medium uppercase tracking-tighter opacity-50">
+              Zibee v1.0.4
+            </p>
+          )} */}
         </div>
       </aside>
     </div>

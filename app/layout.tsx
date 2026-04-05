@@ -1,5 +1,6 @@
 // app/layout.tsx
 import type React from "react";
+import { WorkspaceProvider } from "@/contexts/WorkspaceContext";
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
@@ -44,7 +45,9 @@ export const metadata: Metadata = {
 
 export default function RootLayout({
   children,
-}: Readonly<{ children: React.ReactNode }>) {
+}: Readonly<{
+  children: React.ReactNode;
+}>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
       <body
@@ -56,7 +59,7 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          {children}
+          <WorkspaceProvider>{children}</WorkspaceProvider>
           <Toaster />
         </ThemeProvider>
         <Analytics />

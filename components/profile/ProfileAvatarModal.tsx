@@ -3,7 +3,7 @@
 import * as React from "react";
 import { X } from "lucide-react";
 import { useIsMobile } from "@/hooks/use-mobile";
-import { handleWhatsAppContact } from "@/lib/utils"; // Importando a função centralizada
+import { handleWhatsAppContact } from "@/lib/utils";
 import {
   UserIcon as UserSolid,
   UserGroupIcon as UserGroupSolid,

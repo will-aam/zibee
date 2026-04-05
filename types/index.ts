@@ -1,9 +1,11 @@
 // types/index.ts
+
 export type TipoLancamento = "Receita" | "Despesa";
 
 export interface Lancamento {
   id: number;
   user_id?: string;
+  grupo_id?: string; // NOVO: Relaciona o lançamento ao grupo (se for da casa)
   descricao: string;
   link?: string;
   categoria: string;
@@ -40,6 +42,7 @@ export interface Meta {
   auto_meses_duracao?: number;
   auto_ultimo_processamento?: string;
 }
+
 export interface DespesaFixa {
   id: number;
   user_id: string;
@@ -55,4 +58,32 @@ export interface Categoria {
   id: number;
   nome: string;
   user_id?: string;
+}
+
+// ============================================================================
+// NOVAS INTERFACES PARA A FEATURE DE GRUPOS (FASE 2)
+// ============================================================================
+
+export interface UserProfile {
+  id: string;
+  has_premium_access: boolean;
+  created_at?: string;
+}
+
+export interface Grupo {
+  id: string;
+  nome: string;
+  criador_id: string;
+  regra_divisao: "igual" | "proporcional";
+  created_at?: string;
+}
+
+export interface MembroGrupo {
+  id: string;
+  grupo_id: string;
+  user_id?: string; // Será preenchido quando o usuário aceitar o convite
+  email_convite: string;
+  role: "Admin" | "Membro";
+  status: "Pendente" | "Aceito";
+  created_at?: string;
 }

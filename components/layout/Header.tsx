@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
@@ -130,9 +131,7 @@ export default function Header({
     seed: `${baseSeed}-1`,
   });
 
-  // ESTADOS DE CONTEXTO (Workspaces)
-  const [activeContext, setActiveContext] = React.useState("pessoal");
-  const hasPremiumAccess = false; // Mude para true no banco para testar liberado
+  const { activeContext, setActiveContext, hasPremiumAccess } = useWorkspace();
 
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
@@ -712,7 +711,6 @@ export default function Header({
         saving={savingAvatar}
         errorMessage={saveErrorMessage}
         activeContext={activeContext}
-        onContextChange={setActiveContext}
         hasPremiumAccess={hasPremiumAccess}
       />
     </>

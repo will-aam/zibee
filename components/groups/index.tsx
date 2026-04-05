@@ -1,23 +1,34 @@
 "use client";
 
-import React, { useState } from "react";
+import React from "react";
 import PaywallView from "./PaywallView";
 import GroupManagerView from "./GroupManagerView";
 import { Button } from "@/components/ui/button";
+import { useWorkspace } from "@/contexts/WorkspaceContext"; // Importando o "cérebro"
 
 export default function GruposConfig() {
-  // ATENÇÃO: Estado Mockado.
-  // No futuro, isso vai ler do banco: user.can_create_groups
-  const [hasPremiumAccess, setHasPremiumAccess] = useState(false);
+  // Agora lemos e escrevemos no estado global!
+  const { hasPremiumAccess, setHasPremiumAccess, setActiveContext } =
+    useWorkspace();
+
+  const togglePremium = () => {
+    const novoStatus = !hasPremiumAccess;
+    setHasPremiumAccess(novoStatus);
+
+    // Se o utilizador perder o premium, forçamos o regresso ao contexto "pessoal"
+    if (!novoStatus) {
+      setActiveContext("pessoal");
+    }
+  };
 
   return (
     <div className="p-4 pt-8 pb-24 md:pb-8">
-      {/* BOTÃO DE TESTE MOCKADO (Apenas para você visualizar a troca enquanto desenvolve) */}
+      {/* BOTÃO DE TESTE GLOBAL */}
       <div className="flex justify-center mb-8">
         <Button
           variant="outline"
-          onClick={() => setHasPremiumAccess(!hasPremiumAccess)}
-          className="rounded-full border-dashed border-2 border-primary text-primary hover:bg-primary/10"
+          onClick={togglePremium}
+          className="rounded-full border-dashed border-2 border-primary text-primary hover:bg-primary/10 shadow-sm"
         >
           {hasPremiumAccess
             ? "Testar Visual: Mudar para 'Sem Acesso'"
@@ -25,10 +36,6 @@ export default function GruposConfig() {
         </Button>
       </div>
 
-      {/* RENDERIZAÇÃO CONDICIONAL: 
-          Se tem acesso (Premium ou Convidado), mostra o painel do grupo.
-          Se não tem acesso, mostra a barreira de pagamento (Paywall).
-      */}
       {hasPremiumAccess ? <GroupManagerView /> : <PaywallView />}
     </div>
   );

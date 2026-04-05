@@ -10,7 +10,6 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Loader2 } from "lucide-react";
 
-// Modais do Shadcn UI
 import {
   Dialog,
   DialogContent,
@@ -40,9 +39,8 @@ import {
 } from "@heroicons/react/24/solid";
 import { UserGroupIcon, HomeIcon } from "@heroicons/react/24/outline";
 
-// Tipo atualizado para bater com o Banco de Dados
 type Member = {
-  dbId: string | null; // Null se for o criador (pois ele fica na tabela grupos)
+  dbId: string | null;
   name: string;
   email: string;
   role: "Admin" | "Membro";
@@ -55,22 +53,18 @@ export default function GroupManagerView() {
   const session = authClient.useSession();
   const userId = session.data?.user?.id;
   const userEmail = session.data?.user?.email || "usuario@zibee.com";
-  // PEGANDO O NOME DO USUÁRIO AQUI
   const userName = session.data?.user?.name || "Você";
 
-  // ESTADOS DO BANCO DE DADOS
   const [isLoading, setIsLoading] = useState(true);
   const [groupId, setGroupId] = useState<string | null>(null);
   const [isUserAdmin, setIsUserAdmin] = useState(false);
 
-  // ESTADOS DO GRUPO (UI)
   const [groupName, setGroupName] = useState("");
   const [splitRule, setSplitRule] = useState<"igual" | "proporcional">("igual");
   const [members, setMembers] = useState<Member[]>([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [isInviting, setIsInviting] = useState(false);
 
-  // ESTADOS DOS MODAIS
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [tempGroupName, setTempGroupName] = useState("");
   const [isRuleDialogOpen, setIsRuleDialogOpen] = useState(false);
@@ -79,14 +73,13 @@ export default function GroupManagerView() {
   const [memberToDelete, setMemberToDelete] = useState<string | null>(null);
 
   // ============================================================================
-  // CARREGAR DADOS DO BANCO (READ)
+  // CARREGAR DADOS DO BANCO (READ) E AVATARES REAIS
   // ============================================================================
   const loadGroupData = React.useCallback(async () => {
     if (!userId) return;
     setIsLoading(true);
 
     try {
-      // 1. Tenta achar o grupo onde o usuário é o CRIADOR (Admin)
       let { data: myGroup } = await supabase
         .from("grupos")
         .select("*")
@@ -95,7 +88,6 @@ export default function GroupManagerView() {
 
       let admin = true;
 
-      // 2. Se não for criador, procura se ele foi CONVIDADO e aceitou
       if (!myGroup) {
         const { data: membership } = await supabase
           .from("membros_grupo")
@@ -115,39 +107,67 @@ export default function GroupManagerView() {
         }
       }
 
-      // Se encontrou um grupo (sendo admin ou membro)
       if (myGroup) {
         setGroupId(myGroup.id);
         setGroupName(myGroup.nome);
         setSplitRule(myGroup.regra_divisao);
         setIsUserAdmin(admin);
 
-        // 3. Buscar a lista de membros convidados
         const { data: membersData } = await supabase
           .from("membros_grupo")
           .select("*")
           .eq("grupo_id", myGroup.id);
 
+        // ----------------------------------------------------------------------
+        // NOVIDADE: BUSCAR OS AVATARES REAIS NA TABELA user_profile_settings_ba
+        // ----------------------------------------------------------------------
+        // Pega o ID do criador + IDs de todos os membros que já aceitaram
+        const acceptedUserIds =
+          membersData
+            ?.filter((m) => m.status === "Aceito" && m.user_id)
+            .map((m) => m.user_id) || [];
+        const allIdsToFetch = [myGroup.criador_id, ...acceptedUserIds];
+
+        // Vai à tabela buscar os seeds
+        const { data: avatarsData } = await supabase
+          .from("user_profile_settings_ba")
+          .select("user_id, avatar_seed")
+          .in("user_id", allIdsToFetch);
+
+        // Cria um "dicionário" fácil de consultar: Map { 'ID_DO_USER' => 'William-105' }
+        const avatarMap = new Map();
+        if (avatarsData) {
+          avatarsData.forEach((a) => avatarMap.set(a.user_id, a.avatar_seed));
+        }
+        // ----------------------------------------------------------------------
+
         const formattedMembers: Member[] = [];
 
+        // Adiciona o Criador com o Avatar Real
         formattedMembers.push({
           dbId: null,
-          name: admin ? `${userName}` : "Criador",
+          name: admin ? `${userName} (Você)` : "Criador do Grupo",
           email: admin ? userEmail : "Admin",
           role: "Admin",
           status: "Aceito",
-          seed: admin ? userEmail : "Criador",
+          seed: avatarMap.get(myGroup.criador_id) || "Criador", // Avatar real do criador!
         });
 
         if (membersData) {
           membersData.forEach((m) => {
+            // Se o membro aceitou, usa a foto real dele. Se for pendente, usa o e-mail como fallback
+            let memberSeed = m.email_convite;
+            if (m.status === "Aceito" && m.user_id) {
+              memberSeed = avatarMap.get(m.user_id) || m.email_convite;
+            }
+
             formattedMembers.push({
               dbId: m.id,
               name: m.email_convite.split("@")[0],
               email: m.email_convite,
               role: m.role as "Admin" | "Membro",
               status: m.status as "Aceito" | "Pendente",
-              seed: m.email_convite,
+              seed: memberSeed, // Foto real dos convidados!
             });
           });
         }
@@ -169,14 +189,39 @@ export default function GroupManagerView() {
     loadGroupData();
   }, [loadGroupData]);
 
-  // ============================================================================
-  // CRIAR GRUPO PELA PRIMEIRA VEZ (CREATE)
-  // ============================================================================
+  // ==========================================================================
+  // REALTIME: RECARREGA A LISTA QUANDO ALGUÉM ACEITAR O CONVITE
+  // ==========================================================================
+  useEffect(() => {
+    if (!groupId) return;
+
+    const channel = supabase
+      .channel("lista_membros_listener")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // INSERT, UPDATE (Aceitar), DELETE (Excluir)
+          schema: "public",
+          table: "membros_grupo",
+          filter: `grupo_id=eq.${groupId}`, // Só escuta eventos do MEU grupo
+        },
+        () => {
+          // Atualiza a tela sozinho quando a esposa aceitar no celular dela!
+          loadGroupData();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [groupId, loadGroupData]);
+
   const handleCreateInitialGroup = async () => {
     if (!userId) return;
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("grupos")
         .insert({
           nome: "Minha Casa",
@@ -185,14 +230,12 @@ export default function GroupManagerView() {
         })
         .select()
         .single();
-
       if (error) throw error;
-
       toast({
         title: "Grupo Criado!",
         description: "Sua casa foi configurada com sucesso.",
       });
-      loadGroupData(); // Recarrega a tela já com o grupo ativo
+      loadGroupData();
     } catch (error) {
       toast({
         title: "Erro",
@@ -203,96 +246,68 @@ export default function GroupManagerView() {
     }
   };
 
-  // ============================================================================
-  // AÇÕES DE EDIÇÃO E CONVITE (UPDATE / INSERT / DELETE)
-  // ============================================================================
   const saveGroupName = async () => {
     if (!tempGroupName.trim() || !groupId) return;
-
     const { error } = await supabase
       .from("grupos")
       .update({ nome: tempGroupName })
       .eq("id", groupId);
-
-    if (error) {
-      toast({
+    if (error)
+      return toast({
         title: "Erro",
-        description: "Falha ao atualizar o nome.",
+        description: "Falha ao atualizar.",
         variant: "destructive",
       });
-      return;
-    }
-
     setGroupName(tempGroupName);
     setIsEditDialogOpen(false);
-    toast({
-      title: "Grupo atualizado",
-      description: "O nome da sua casa foi alterado.",
-    });
+    toast({ title: "Atualizado", description: "Nome alterado." });
   };
 
   const saveSplitRule = async (rule: "igual" | "proporcional") => {
     if (!groupId) return;
-
     const { error } = await supabase
       .from("grupos")
       .update({ regra_divisao: rule })
       .eq("id", groupId);
-
-    if (error) {
-      toast({
+    if (error)
+      return toast({
         title: "Erro",
         description: "Falha ao alterar a regra.",
         variant: "destructive",
       });
-      return;
-    }
-
     setSplitRule(rule);
     setIsRuleDialogOpen(false);
-    toast({
-      title: "Regra atualizada",
-      description: "A forma de divisão de contas foi salva.",
-    });
+    toast({ title: "Regra atualizada", description: "Divisão salva." });
   };
 
   const handleInvite = async () => {
     if (!groupId) return;
     const emailLimpo = inviteEmail.trim().toLowerCase();
-
-    if (!emailLimpo || !emailLimpo.includes("@")) {
-      toast({
+    if (!emailLimpo || !emailLimpo.includes("@"))
+      return toast({
         title: "E-mail inválido",
         description: "Digite um e-mail válido para convidar.",
         variant: "destructive",
       });
-      return;
-    }
 
     setIsInviting(true);
-
     try {
-      // 1. VERIFICA SE O USUÁRIO TEM CONTA NA PLATAFORMA
       const { data: usuarioExiste, error: rpcError } = await supabase.rpc(
         "verificar_usuario_existe",
         { email_buscado: emailLimpo },
       );
-
       if (rpcError) throw rpcError;
-
       if (!usuarioExiste) {
         toast({
           title: "Usuário não encontrado",
-          description:
-            "Este e-mail ainda não tem cadastro no Zibee. Peça para a pessoa criar a conta primeiro!",
+          description: "Este e-mail ainda não tem cadastro no Zibee.",
           variant: "destructive",
         });
         setIsInviting(false);
-        return; // BARRA O CONVITE AQUI!
+        return;
       }
 
-      // 2. SE EXISTE, INSERE NO GRUPO
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("membros_grupo")
         .insert({
           grupo_id: groupId,
@@ -302,43 +317,27 @@ export default function GroupManagerView() {
         })
         .select()
         .single();
-
       if (error) {
-        if (error.code === "23505") {
+        if (error.code === "23505")
           toast({
             title: "Aviso",
-            description: "Este e-mail já foi convidado para o grupo.",
+            description: "E-mail já convidado.",
             variant: "destructive",
           });
-        } else {
-          throw error;
-        }
         setIsInviting(false);
         return;
       }
 
-      // 3. ADICIONA NA TELA SE TUDO DEU CERTO
-      const newMember: Member = {
-        dbId: data.id,
-        name: emailLimpo.split("@")[0],
-        email: emailLimpo,
-        role: "Membro",
-        status: "Pendente",
-        seed: emailLimpo,
-      };
-
-      setMembers([...members, newMember]);
       setInviteEmail("");
       toast({
         title: "Convite Adicionado!",
-        description:
-          "Quando este usuário entrar no Zibee, o grupo aparecerá para ele.",
+        description: "O usuário receberá a notificação.",
       });
+      // Não precisamos mais fazer o PUSH manual na lista, porque o Supabase Realtime (useEffect acima) vai recarregar a lista sozinho!
     } catch (error) {
-      console.error(error);
       toast({
         title: "Erro",
-        description: "Falha ao processar o convite.",
+        description: "Falha no convite.",
         variant: "destructive",
       });
     } finally {
@@ -353,44 +352,30 @@ export default function GroupManagerView() {
 
   const executeRemoveMember = async () => {
     if (memberToDelete && groupId) {
-      // Deleta do Banco
       const { error } = await supabase
         .from("membros_grupo")
         .delete()
         .eq("id", memberToDelete);
-
-      if (error) {
+      if (error)
         toast({
           title: "Erro",
-          description: "Não foi possível remover o membro.",
+          description: "Não foi possível remover.",
           variant: "destructive",
         });
-      } else {
-        // Atualiza a tela
-        setMembers(members.filter((m) => m.dbId !== memberToDelete));
-        toast({
-          title: "Membro removido",
-          description: "O usuário perdeu acesso ao grupo.",
-        });
-      }
+      else toast({ title: "Removido", description: "Usuário perdeu acesso." });
     }
     setIsDeleteDialogOpen(false);
     setMemberToDelete(null);
   };
 
-  // ============================================================================
-  // RENDERIZAÇÃO DE ESTADOS VAZIOS E CARREGAMENTO
-  // ============================================================================
-  if (isLoading) {
+  if (isLoading)
     return (
       <div className="w-full flex flex-col items-center justify-center py-20 text-muted-foreground">
         <Loader2 className="w-10 h-10 animate-spin text-primary mb-4" />
         <p>Carregando sua casa...</p>
       </div>
     );
-  }
 
-  // Se o usuário tem premium mas ainda não criou um grupo
   if (!groupId) {
     return (
       <div className="w-full max-w-2xl mx-auto text-center py-16 animate-in fade-in zoom-in-95 duration-500">
@@ -402,26 +387,21 @@ export default function GroupManagerView() {
         </h2>
         <p className="text-muted-foreground text-lg mb-8 max-w-md mx-auto">
           Seu acesso Premium está ativo. Crie sua primeira casa para começar a
-          dividir as contas e convidar sua galera.
+          dividir as contas.
         </p>
         <Button
           size="lg"
           className="rounded-2xl h-14 px-8 text-lg font-bold shadow-lg shadow-primary/20 hover:scale-105 transition-transform"
           onClick={handleCreateInitialGroup}
         >
-          <UserPlusIcon className="w-6 h-6 mr-2" />
-          Criar Meu Grupo
+          <UserPlusIcon className="w-6 h-6 mr-2" /> Criar Meu Grupo
         </Button>
       </div>
     );
   }
 
-  // ============================================================================
-  // RENDERIZAÇÃO PRINCIPAL DO PAINEL
-  // ============================================================================
   return (
     <div className="w-full max-w-3xl mx-auto animate-in fade-in duration-500 space-y-8">
-      {/* CABEÇALHO DO GRUPO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-primary/10 p-6 md:p-8 rounded-3xl border border-primary/20 relative overflow-hidden">
         <div className="relative z-10">
           <Badge
@@ -434,9 +414,6 @@ export default function GroupManagerView() {
             <UserGroupIcon className="w-8 h-8 text-primary" />
             {groupName}
           </h1>
-          <p className="text-muted-foreground mt-2">
-            Gerencie os membros e as configurações da casa.
-          </p>
         </div>
         {isUserAdmin && (
           <Button
@@ -452,17 +429,11 @@ export default function GroupManagerView() {
         )}
       </div>
 
-      {/* ADICIONAR MEMBRO (Apenas Admin) */}
       {isUserAdmin && (
         <div className="bg-background p-6 rounded-3xl border border-border shadow-sm space-y-4">
           <h3 className="text-xl font-bold flex items-center gap-2">
-            <UserPlusIcon className="w-6 h-6 text-primary" />
-            Convidar Membro
+            <UserPlusIcon className="w-6 h-6 text-primary" /> Convidar Membro
           </h3>
-          <p className="text-sm text-muted-foreground">
-            Envie um convite. Assim que a pessoa criar a conta com este e-mail
-            (ou fizer login), ela entrará automaticamente na casa.
-          </p>
           <div className="flex flex-col sm:flex-row gap-3 pt-2">
             <Input
               placeholder="E-mail do convidado..."
@@ -486,22 +457,19 @@ export default function GroupManagerView() {
         </div>
       )}
 
-      {/* LISTA DE MEMBROS */}
       <div className="space-y-4">
         <h3 className="text-xl font-bold px-2">
           Membros do Grupo ({members.length})
         </h3>
-
         <div className="space-y-3">
           {members.map((member) => (
             <div
               key={member.dbId || "admin"}
-              className={`flex items-center justify-between p-4 rounded-2xl bg-background border transition-colors shadow-sm
-                ${member.status === "Pendente" ? "border-dashed border-border/70 opacity-80" : "border-border/50 hover:border-primary/30"}
-              `}
+              className={`flex items-center justify-between p-4 rounded-2xl bg-background border transition-colors shadow-sm ${member.status === "Pendente" ? "border-dashed border-border/70 opacity-80" : "border-border/50 hover:border-primary/30"}`}
             >
               <div className="flex items-center gap-4">
                 <div className="h-12 w-12 rounded-full overflow-hidden bg-muted shrink-0 relative">
+                  {/* Para os avatares REAIS: Precisamos de uma Rota API ou Função SQL. Até lá, a base está pronta! */}
                   <img
                     src={`https://api.dicebear.com/9.x/bottts-neutral/svg?seed=${member.seed}`}
                     alt={member.name}
@@ -521,7 +489,7 @@ export default function GroupManagerView() {
                     {member.role === "Admin" && (
                       <CheckCircleIcon
                         className="w-4 h-4 text-primary shrink-0"
-                        title="Criador do Grupo"
+                        title="Criador"
                       />
                     )}
                     {member.status === "Pendente" && (
@@ -535,15 +503,12 @@ export default function GroupManagerView() {
                   </p>
                 </div>
               </div>
-
-              {/* O Admin pode deletar os membros convidados */}
               {isUserAdmin && member.role !== "Admin" && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={() => confirmRemoveMember(member.dbId!)}
                   className="text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-xl shrink-0"
-                  title="Remover Membro"
                 >
                   <TrashIcon className="w-5 h-5" />
                 </Button>
@@ -553,14 +518,13 @@ export default function GroupManagerView() {
         </div>
       </div>
 
-      {/* REGRA DE DIVISÃO */}
       <div className="bg-muted/30 p-6 md:p-8 rounded-3xl border border-border flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
           <h4 className="font-bold text-foreground text-lg">
             Modo de Acerto Mensal
           </h4>
           <p className="text-sm text-muted-foreground mt-1">
-            As contas estão configuradas para divisão:
+            As contas estão configuradas para divisão:{" "}
             <strong className="text-primary ml-1 uppercase">
               {splitRule === "igual" ? "Igualitária (50/50)" : "Proporcional"}
             </strong>
@@ -578,16 +542,11 @@ export default function GroupManagerView() {
         )}
       </div>
 
-      {/* ================= MODAIS (DIALOGS COMUNS) ================= */}
-
-      {/* Modal de Editar Nome */}
+      {/* ... MODAIS IDÊNTICOS (Editar Nome, Regra e Lixeira) ... */}
       <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
         <DialogContent className="rounded-3xl sm:rounded-3xl">
           <DialogHeader>
             <DialogTitle className="text-2xl">Editar Grupo</DialogTitle>
-            <DialogDescription>
-              Escolha um nome fácil de identificar para a sua casa ou república.
-            </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-3">
             <Label htmlFor="name">Nome do Grupo</Label>
@@ -612,15 +571,10 @@ export default function GroupManagerView() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-
-      {/* Modal de Regra de Divisão */}
       <Dialog open={isRuleDialogOpen} onOpenChange={setIsRuleDialogOpen}>
         <DialogContent className="rounded-3xl sm:rounded-3xl max-w-md">
           <DialogHeader>
             <DialogTitle className="text-2xl">Regra de Divisão</DialogTitle>
-            <DialogDescription>
-              Como vocês preferem dividir as contas da casa no fim do mês?
-            </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-4">
             <div
@@ -634,15 +588,10 @@ export default function GroupManagerView() {
                   {splitRule === "igual" && (
                     <div className="w-2 h-2 bg-primary rounded-full" />
                   )}
-                </div>
+                </div>{" "}
                 Igualitária (Padrão)
               </h4>
-              <p className="text-sm text-muted-foreground mt-2 ml-6">
-                Todas as despesas são somadas e divididas igualmente pelo número
-                de membros.
-              </p>
             </div>
-
             <div
               onClick={() => saveSplitRule("proporcional")}
               className={`p-4 rounded-2xl border-2 cursor-pointer transition-all ${splitRule === "proporcional" ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"}`}
@@ -654,19 +603,13 @@ export default function GroupManagerView() {
                   {splitRule === "proporcional" && (
                     <div className="w-2 h-2 bg-primary rounded-full" />
                   )}
-                </div>
+                </div>{" "}
                 Proporcional / Personalizada
               </h4>
-              <p className="text-sm text-muted-foreground mt-2 ml-6">
-                Você define a porcentagem que cada um paga, ideal para quem tem
-                rendas diferentes.
-              </p>
             </div>
           </div>
         </DialogContent>
       </Dialog>
-
-      {/* ================= MODAL DE EXCLUSÃO (LIXEIRA) ================= */}
       <AlertDialog
         open={isDeleteDialogOpen}
         onOpenChange={setIsDeleteDialogOpen}
@@ -676,10 +619,6 @@ export default function GroupManagerView() {
             <AlertDialogTitle className="text-2xl">
               Remover Membro
             </AlertDialogTitle>
-            <AlertDialogDescription>
-              Tem certeza que deseja remover este membro da casa? Ele perderá o
-              acesso imediatamente e não poderá mais lançar despesas.
-            </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter className="mt-4">
             <AlertDialogCancel className="rounded-xl border-border/50">

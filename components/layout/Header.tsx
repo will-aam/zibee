@@ -103,7 +103,6 @@ function MobileDashboardSummarySkeleton() {
   );
 }
 
-// TIPAGEM DO CONVITE
 export type PendingInvite = { id: string; grupo_nome: string } | null;
 
 export default function Header({
@@ -134,7 +133,6 @@ export default function Header({
     seed: `${baseSeed}-1`,
   });
 
-  // CONTEXTO E CONVITE
   const {
     activeContext,
     setActiveContext,
@@ -168,20 +166,17 @@ export default function Header({
   };
 
   // ==========================================================================
-  // VERIFICAÇÃO DE ACESSO PREMIUM E CONVITES PENDENTES
+  // REALTIME: VERIFICAÇÃO DE ACESSO PREMIUM E CONVITES
   // ==========================================================================
   React.useEffect(() => {
     async function checkAccessAndInvites() {
       if (!userId || !userEmail) return;
 
-      // 1. Verifica se o usuário é CRIADOR
       const { data: myGroup } = await supabase
         .from("grupos")
         .select("id")
         .eq("criador_id", userId)
         .maybeSingle();
-
-      // 2. Verifica se o usuário é MEMBRO ACEITO
       const { data: memberGroup } = await supabase
         .from("membros_grupo")
         .select("id")
@@ -196,7 +191,6 @@ export default function Header({
         if (activeContext === "grupo") setActiveContext("pessoal");
       }
 
-      // 3. Verifica se tem algum CONVITE PENDENTE
       const { data: inviteData } = await supabase
         .from("membros_grupo")
         .select("id, grupos(nome)")
@@ -205,7 +199,6 @@ export default function Header({
         .maybeSingle();
 
       if (inviteData && inviteData.grupos) {
-        // CORREÇÃO DO ERRO DO TYPESCRIPT (usando as any para acessar a propriedade dinamicamente)
         const gruposInfo = inviteData.grupos as any;
         const nomeGrupo = Array.isArray(gruposInfo)
           ? gruposInfo[0]?.nome
@@ -219,10 +212,34 @@ export default function Header({
       }
     }
 
+    // Roda a primeira vez ao carregar a tela
     checkAccessAndInvites();
+
+    if (!userEmail) return;
+
+    // INICIA O OUVINTE EM TEMPO REAL
+    const channel = supabase
+      .channel("header_invites_listener")
+      .on(
+        "postgres_changes",
+        {
+          event: "*", // Escuta INSERT, UPDATE e DELETE
+          schema: "public",
+          table: "membros_grupo",
+          filter: `email_convite=eq.${userEmail.toLowerCase()}`, // Só escuta convites para mim!
+        },
+        () => {
+          // Sempre que houver uma alteração no banco, recarrega a verificação silenciosamente!
+          checkAccessAndInvites();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [userId, userEmail, setHasPremiumAccess, activeContext, setActiveContext]);
 
-  // Sincronização de Tema PWA
   React.useEffect(() => {
     const updateThemeColor = () => {
       const metaThemes = document.querySelectorAll('meta[name="theme-color"]');
@@ -249,7 +266,6 @@ export default function Header({
     return () => window.removeEventListener("resize", updateThemeColor);
   }, [activeTab]);
 
-  // Carregar Avatar
   React.useEffect(() => {
     let cancelled = false;
     async function loadAvatar() {
@@ -392,9 +408,6 @@ export default function Header({
         : "text-muted-foreground px-4 py-2.5"
     }`;
 
-  // ==========================================================================
-  // CONTEÚDO DO MENU DO PERFIL (Reutilizado no Popover e no Modal)
-  // ==========================================================================
   const ProfileMenuContent = () => (
     <div className="flex flex-col gap-6">
       <div>
@@ -417,7 +430,6 @@ export default function Header({
             <span className="font-semibold text-sm">Meu Pessoal</span>
           </button>
 
-          {/* MOSTRA O CONVITE OU O BOTÃO DO GRUPO */}
           {pendingInvite ? (
             <button
               onClick={() => setOpenProfileDrawer(true)}
@@ -491,11 +503,9 @@ export default function Header({
 
   return (
     <>
-      {/* ======================= DESKTOP HEADER ======================= */}
       <header
         className={`hidden md:flex items-center justify-between px-8 py-5 bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
       >
-        {/* LOGO */}
         <div
           className="flex items-center gap-4 cursor-pointer mr-6 hover:opacity-80 transition-opacity"
           onClick={() => onNavigate?.("dashboard")}
@@ -520,7 +530,6 @@ export default function Header({
           </div>
         </div>
 
-        {/* NAVEGAÇÃO DESKTOP */}
         <nav className="flex flex-1 items-center gap-2 justify-center">
           <button
             onClick={() => onNavigate?.("dashboard")}
@@ -612,7 +621,6 @@ export default function Header({
           </button>
         </nav>
 
-        {/* CONTROLES DIREITA DESKTOP */}
         <div className="flex items-center gap-4 ml-4">
           {activeTab === "dashboard" && (
             <Button
@@ -624,10 +632,7 @@ export default function Header({
               <span className="text-base font-medium">Filtrar</span>
             </Button>
           )}
-
           <div className="h-8 w-px bg-border mx-1" />
-
-          {/* POPOVER DO PERFIL DESKTOP COM BOLINHA AZUL DE CONVITE */}
           <Popover>
             <PopoverTrigger asChild>
               <button className="relative h-12 w-12 rounded-full ring-2 ring-border hover:ring-primary transition-all shadow-sm outline-none active:scale-95">
@@ -651,7 +656,6 @@ export default function Header({
         </div>
       </header>
 
-      {/* ======================= MOBILE HEADER ======================= */}
       {activeTab === "dashboard" && (
         <section className={`md:hidden ${sora.className}`}>
           <header
@@ -659,7 +663,6 @@ export default function Header({
             className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
           >
             <div className="flex items-center gap-4 mb-2">
-              {/* AVATAR COM BOLINHA AZUL DE CONVITE NO MOBILE */}
               <button
                 onClick={() => setOpenProfileDrawer(true)}
                 className="relative shrink-0 h-16 w-16 rounded-full flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
@@ -673,7 +676,6 @@ export default function Header({
                   <span className="absolute top-0 right-0 w-4 h-4 bg-blue-500 border-2 border-primary rounded-full z-10"></span>
                 )}
               </button>
-
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-white/85">{getGreeting()},</p>
                 <p className="font-semibold text-xl leading-tight truncate text-white">
@@ -688,7 +690,6 @@ export default function Header({
               </button>
             </div>
           </header>
-
           {loadingTotals ? (
             <MobileDashboardSummarySkeleton />
           ) : (
@@ -703,7 +704,6 @@ export default function Header({
         </section>
       )}
 
-      {/* ======================= MOBILE BOTTOM NAV ======================= */}
       <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
         <div className="flex items-center justify-around px-2 h-20">
           <button
@@ -721,7 +721,6 @@ export default function Header({
               Home
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("lancamentos")}
             className={mobileNavButtonClass(activeTab === "lancamentos")}
@@ -737,7 +736,6 @@ export default function Header({
               Lanç.
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("grupos")}
             className={mobileNavButtonClass(activeTab === "grupos")}
@@ -753,7 +751,6 @@ export default function Header({
               Grupos
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("receitas")}
             className={mobileNavButtonClass(activeTab === "receitas")}
@@ -769,7 +766,6 @@ export default function Header({
               Planos
             </span>
           </button>
-
           <button
             onClick={() => onNavigate?.("configuracoes")}
             className={mobileNavButtonClass(
@@ -790,12 +786,10 @@ export default function Header({
         </div>
       </div>
 
-      {/* MODAIS E DRAWERS */}
       <DateRangeFilterDrawer
         open={openFilterDrawer}
         onClose={() => setOpenFilterDrawer(false)}
       />
-
       <ProfileAvatarModal
         open={openProfileDrawer}
         onClose={() => setOpenProfileDrawer(false)}
@@ -805,7 +799,6 @@ export default function Header({
         saving={savingAvatar}
         errorMessage={saveErrorMessage}
         activeContext={activeContext}
-        // CORREÇÃO DO ERRO DO TYPESCRIPT (convertendo string genérica para o ContextType exigido)
         onContextChange={(ctx) => setActiveContext(ctx as "pessoal" | "grupo")}
         hasPremiumAccess={hasPremiumAccess}
         pendingInvite={pendingInvite}

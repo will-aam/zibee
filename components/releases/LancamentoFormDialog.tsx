@@ -30,11 +30,15 @@ const MAX_RECURRENCE_MONTHS = 600;
 interface LancamentoFormDialogProps {
   isOpen: boolean;
   onClose: () => void;
-  onSuccess: () => void; // Para avisar a tela principal que precisa recarregar a lista
+  onSuccess: () => void;
   lancamentoToEdit: Lancamento | null;
   userId: string | undefined;
   categoriasDB: { id: number; nome: string }[];
   formasPagamentoDB: { id: number; nome: string }[];
+
+  // NOVOS PROPS
+  activeContext: string;
+  groupId: string | null;
 }
 
 export function LancamentoFormDialog({
@@ -45,19 +49,18 @@ export function LancamentoFormDialog({
   userId,
   categoriasDB,
   formasPagamentoDB,
+  activeContext,
+  groupId,
 }: LancamentoFormDialogProps) {
   const { toast } = useToast();
 
-  // Estado do Formulário
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
-  // Estado para controlar recorrência
   const [isRecorrente, setIsRecorrente] = useState(false);
   const [recurrenceEndType, setRecurrenceEndType] =
     useState<RecurrenceEndType>("infinito");
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState(2);
 
-  // Quando o modal abrir/fechar ou mudar o item sendo editado, resetamos os dados
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData(lancamentoToEdit);
@@ -154,26 +157,24 @@ export function LancamentoFormDialog({
     if (!formData.data_vencimento) {
       toast({
         title: "Recorrência inválida",
-        description: "Informe a data de vencimento para aplicar recorrência.",
+        description: "Informe a data.",
         variant: "destructive",
       });
       return false;
     }
-
     if (recurrenceEndType === "ocorrencias" && recurrenceOccurrences < 2) {
       toast({
         title: "Recorrência inválida",
-        description: "Quantidade de ocorrências deve ser pelo menos 2.",
+        description: "Ocorrências deve ser > 1.",
         variant: "destructive",
       });
       return false;
     }
-
     if (recurrenceEndType === "ate_data") {
       if (!recurrenceEndDate) {
         toast({
           title: "Recorrência inválida",
-          description: "Selecione a data final da recorrência.",
+          description: "Selecione a data final.",
           variant: "destructive",
         });
         return false;
@@ -184,14 +185,12 @@ export function LancamentoFormDialog({
       ) {
         toast({
           title: "Recorrência inválida",
-          description:
-            "A data final deve ser igual ou posterior à data do lançamento.",
+          description: "A data final deve ser posterior.",
           variant: "destructive",
         });
         return false;
       }
     }
-
     return true;
   };
 
@@ -201,9 +200,11 @@ export function LancamentoFormDialog({
     if (!validateRecurrence()) return;
 
     try {
+      // MAGIA ACONTECE AQUI: Adicionamos o grupo_id no payload base!
       const basePayload = {
         ...formData,
         user_id: userId,
+        grupo_id: activeContext === "grupo" ? groupId : null,
       } as Omit<Lancamento, "id">;
 
       if (lancamentoToEdit) {
@@ -219,18 +220,23 @@ export function LancamentoFormDialog({
           observacoes: formData.observacoes,
           link: formData.link,
         };
-        await supabase
+
+        let query = supabase
           .from("lancamentos")
           .update(updatePayload)
-          .eq("id", lancamentoToEdit.id)
-          .eq("user_id", userId);
+          .eq("id", lancamentoToEdit.id);
+        if (activeContext === "grupo" && groupId)
+          query = query.eq("grupo_id", groupId);
+        else query = query.eq("user_id", userId).is("grupo_id", null);
+
+        await query;
 
         if (isRecorrente && formData.tipo === "Despesa") {
           if (recurrenceEndType === "infinito") {
             const diaDoVencimento = Number(
               formData.data_vencimento?.split("-")[2] || 1,
             );
-            const { error: errorDespesaFixa } = await supabase
+            await supabase
               .from("despesas_fixas")
               .insert([
                 {
@@ -242,33 +248,22 @@ export function LancamentoFormDialog({
                   forma_pagamento: formData.forma_pagamento,
                 },
               ]);
-            if (errorDespesaFixa) throw errorDespesaFixa;
           } else {
             const recurrenceItems = createRecurrenceItems(basePayload, false);
-            if (recurrenceItems.length > 0) {
-              const { error: recurrenceError } = await supabase
-                .from("lancamentos")
-                .insert(recurrenceItems);
-              if (recurrenceError) throw recurrenceError;
-            }
+            if (recurrenceItems.length > 0)
+              await supabase.from("lancamentos").insert(recurrenceItems);
           }
         }
-
         toast({ title: "Atualizado!" });
       } else {
         // --- MODO CRIAÇÃO ---
         if (isRecorrente && formData.tipo === "Despesa") {
           if (recurrenceEndType === "infinito") {
-            const { error } = await supabase
-              .from("lancamentos")
-              .insert([basePayload]);
-            if (error) throw error;
-
+            await supabase.from("lancamentos").insert([basePayload]);
             const diaDoVencimento = Number(
               formData.data_vencimento?.split("-")[2] || 1,
             );
-
-            const { error: errorDespesaFixa } = await supabase
+            await supabase
               .from("despesas_fixas")
               .insert([
                 {
@@ -280,29 +275,18 @@ export function LancamentoFormDialog({
                   forma_pagamento: formData.forma_pagamento,
                 },
               ]);
-            if (errorDespesaFixa) throw errorDespesaFixa;
           } else {
             const recurrenceItems = createRecurrenceItems(basePayload, true);
-            const { error: recurrenceError } = await supabase
-              .from("lancamentos")
-              .insert(recurrenceItems);
-            if (recurrenceError) throw recurrenceError;
+            await supabase.from("lancamentos").insert(recurrenceItems);
           }
-
-          toast({
-            title: "Criado com Recorrência!",
-            description: "Recorrência aplicada ao lançamento com sucesso.",
-          });
+          toast({ title: "Criado com Recorrência!" });
         } else {
-          const { error } = await supabase
-            .from("lancamentos")
-            .insert([basePayload]);
-          if (error) throw error;
+          await supabase.from("lancamentos").insert([basePayload]);
           toast({ title: "Criado!" });
         }
       }
-      onSuccess(); // Recarrega a lista
-      onClose(); // Fecha o modal
+      onSuccess();
+      onClose();
     } catch (error: any) {
       toast({
         title: "Erro ao salvar",
@@ -320,7 +304,12 @@ export function LancamentoFormDialog({
       >
         <DialogHeader className="p-6 pb-2 border-b">
           <DialogTitle>
-            {lancamentoToEdit ? "Editar" : "Novo"} Lançamento
+            {lancamentoToEdit ? "Editar" : "Novo"} Lançamento{" "}
+            {activeContext === "grupo" ? (
+              <span className="text-primary">(Casa)</span>
+            ) : (
+              ""
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -342,7 +331,6 @@ export function LancamentoFormDialog({
                 className="text-lg py-6"
               />
             </div>
-
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Valor</Label>
@@ -385,7 +373,6 @@ export function LancamentoFormDialog({
                 </Select>
               </div>
             </div>
-
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select
@@ -406,7 +393,6 @@ export function LancamentoFormDialog({
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>
                 {formData.tipo === "Receita"
@@ -431,7 +417,6 @@ export function LancamentoFormDialog({
                 </SelectContent>
               </Select>
             </div>
-
             <div className="space-y-2">
               <Label>
                 {formData.tipo === "Receita"
@@ -481,15 +466,14 @@ export function LancamentoFormDialog({
                       className="cursor-pointer flex-1 font-medium text-primary"
                     >
                       {lancamentoToEdit
-                        ? "Aplicar recorrência a partir deste lançamento"
-                        : "Repetir todo mês (Tornar Recorrente)"}
+                        ? "Aplicar recorrência a partir deste"
+                        : "Repetir (Tornar Recorrente)"}
                     </Label>
                   </div>
-
                   {isRecorrente && (
                     <div className="grid gap-3">
                       <div className="space-y-2">
-                        <Label>Condição de término</Label>
+                        <Label>Condição</Label>
                         <Select
                           value={recurrenceEndType}
                           onValueChange={(v: RecurrenceEndType) =>
@@ -501,18 +485,17 @@ export function LancamentoFormDialog({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="infinito">
-                              Sem fim (despesa fixa)
+                              Sem fim (Fixa)
                             </SelectItem>
                             <SelectItem value="ate_data">
                               Até uma data
                             </SelectItem>
                             <SelectItem value="ocorrencias">
-                              Número de ocorrências
+                              Nº de ocorrências
                             </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
-
                       {recurrenceEndType === "ate_data" && (
                         <div className="space-y-2">
                           <Label>Data final</Label>
@@ -525,10 +508,9 @@ export function LancamentoFormDialog({
                           />
                         </div>
                       )}
-
                       {recurrenceEndType === "ocorrencias" && (
                         <div className="space-y-2">
-                          <Label>Quantidade de ocorrências</Label>
+                          <Label>Qtd. de ocorrências</Label>
                           <Input
                             type="number"
                             min="2"
@@ -547,7 +529,6 @@ export function LancamentoFormDialog({
             <div className="h-4"></div>
           </form>
         </div>
-
         <div className="p-4 border-t bg-background/95 backdrop-blur z-10 flex gap-3">
           <Button
             variant="outline"

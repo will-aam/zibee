@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
+import { useWorkspace } from "@/contexts/WorkspaceContext"; // <-- Cérebro Global
 import { Button } from "@/components/ui/button";
 import { RefreshCw, Loader2 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
@@ -33,6 +34,7 @@ export interface ItemOpcao {
 
 const fixasCache = {
   userId: null as string | null,
+  context: null as string | null, // <-- Agora o cache sabe de qual contexto são os dados
   despesas: null as DespesaFixa[] | null,
   categorias: null as ItemOpcao[] | null,
   pagamentos: null as ItemOpcao[] | null,
@@ -67,18 +69,22 @@ export default function DespesasFixas() {
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const { activeContext } = useWorkspace(); // <-- Puxando o contexto ativo
+
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
 
   const [modoQuinzenal, setModoQuinzenal] = useState(false);
 
+  const isCacheValid =
+    fixasCache.userId === userId && fixasCache.context === activeContext;
+
   const [despesas, setDespesas] = useState<DespesaFixa[]>(
-    fixasCache.userId === userId && fixasCache.despesas
-      ? fixasCache.despesas
-      : [],
+    isCacheValid && fixasCache.despesas ? fixasCache.despesas : [],
   );
 
   const hojeKey = useMemo(() => monthKey(new Date()), []);
   const [nomesLancadosEsteMes, setNomesLancadosEsteMes] = useState<string[]>(
-    fixasCache.userId === userId &&
+    isCacheValid &&
       fixasCache.nomesLancadosEsteMes &&
       fixasCache.nomesLancadosMesKey === hojeKey
       ? fixasCache.nomesLancadosEsteMes
@@ -86,18 +92,14 @@ export default function DespesasFixas() {
   );
 
   const [categoriasDB, setCategoriasDB] = useState<ItemOpcao[]>(
-    fixasCache.userId === userId && fixasCache.categorias
-      ? fixasCache.categorias
-      : [],
+    isCacheValid && fixasCache.categorias ? fixasCache.categorias : [],
   );
   const [formasPagamentoDB, setFormasPagamentoDB] = useState<ItemOpcao[]>(
-    fixasCache.userId === userId && fixasCache.pagamentos
-      ? fixasCache.pagamentos
-      : [],
+    isCacheValid && fixasCache.pagamentos ? fixasCache.pagamentos : [],
   );
 
   const [loading, setLoading] = useState(
-    !(fixasCache.userId === userId && fixasCache.despesas),
+    !(isCacheValid && fixasCache.despesas),
   );
   const [loadingId, setLoadingId] = useState<number | null>(null);
 
@@ -127,20 +129,51 @@ export default function DespesasFixas() {
     async (force = false) => {
       if (!userId) return;
 
-      if (fixasCache.userId && fixasCache.userId !== userId) {
+      // Limpa o cache se mudar de usuário OU de contexto (Pessoal/Grupo)
+      if (
+        fixasCache.userId !== userId ||
+        fixasCache.context !== activeContext
+      ) {
         fixasCache.userId = userId;
+        fixasCache.context = activeContext;
         fixasCache.despesas = null;
-        fixasCache.categorias = null;
-        fixasCache.pagamentos = null;
         fixasCache.nomesLancadosEsteMes = null;
         fixasCache.nomesLancadosMesKey = "";
+        if (!force) {
+          setDespesas([]);
+          setNomesLancadosEsteMes([]);
+        }
       }
-      fixasCache.userId = userId;
 
       if (!force && fixasCache.despesas) setLoading(false);
       else setLoading(true);
 
       try {
+        // 1. BUSCAR GRUPO ID (SE FOR MODO GRUPO)
+        let groupId = currentGroupId;
+        if (activeContext === "grupo" && !groupId) {
+          const { data: myGroup } = await supabase
+            .from("grupos")
+            .select("id")
+            .eq("criador_id", userId)
+            .maybeSingle();
+          if (myGroup) groupId = myGroup.id;
+          else {
+            const { data: membership } = await supabase
+              .from("membros_grupo")
+              .select("grupo_id")
+              .eq("user_id", userId)
+              .eq("status", "Aceito")
+              .maybeSingle();
+            if (membership) groupId = membership.grupo_id;
+          }
+          setCurrentGroupId(groupId);
+          if (!groupId) {
+            setLoading(false);
+            return;
+          }
+        }
+
         const { start, end } = monthRange(new Date());
         const thisKey = monthKey(new Date());
 
@@ -151,19 +184,31 @@ export default function DespesasFixas() {
           !fixasCache.nomesLancadosEsteMes ||
           fixasCache.nomesLancadosMesKey !== thisKey;
 
-        const queries: any[] = [
-          supabase
-            .from("despesas_fixas")
-            .select("*")
+        // Ajusta as queries de acordo com o contexto
+        let queryFixas = supabase
+          .from("despesas_fixas")
+          .select("*")
+          .order("dia_vencimento", { ascending: true });
+        let queryLancamentos = supabase
+          .from("lancamentos")
+          .select("descricao")
+          .gte("data_vencimento", start)
+          .lte("data_vencimento", end);
+
+        if (activeContext === "grupo" && groupId) {
+          queryFixas = queryFixas.eq("grupo_id", groupId);
+          queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
+        } else {
+          queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
+          queryLancamentos = queryLancamentos
             .eq("user_id", userId)
-            .order("dia_vencimento", { ascending: true }),
+            .is("grupo_id", null);
+        }
+
+        const queries: any[] = [
+          queryFixas,
           needLancados
-            ? supabase
-                .from("lancamentos")
-                .select("descricao")
-                .eq("user_id", userId)
-                .gte("data_vencimento", start)
-                .lte("data_vencimento", end)
+            ? queryLancamentos
             : Promise.resolve({ data: fixasCache.nomesLancadosEsteMes }),
           needOptions
             ? supabase.from("categorias").select("*").order("nome")
@@ -181,12 +226,10 @@ export default function DespesasFixas() {
           fixasCache.despesas = resFixas.data;
         }
 
-        // CORREÇÃO AQUI: À prova de falhas (aceita tanto objeto do Supabase quanto string do cache)
         if (resLancados?.data) {
           const nomes = (resLancados.data as any[])
             .map((l) => (typeof l === "string" ? l : l?.descricao))
-            .filter(Boolean); // Remove nulos caso existam
-
+            .filter(Boolean);
           setNomesLancadosEsteMes(nomes);
           fixasCache.nomesLancadosEsteMes = nomes;
           fixasCache.nomesLancadosMesKey = thisKey;
@@ -204,12 +247,12 @@ export default function DespesasFixas() {
         setLoading(false);
       }
     },
-    [userId],
+    [userId, activeContext, currentGroupId],
   );
 
   useEffect(() => {
     if (userId) fetchData(false);
-  }, [userId, fetchData]);
+  }, [userId, activeContext, fetchData]);
 
   const totalComprometido = useMemo(
     () => despesas.reduce((acc, curr) => acc + Number(curr.valor), 0),
@@ -235,9 +278,14 @@ export default function DespesasFixas() {
   ) => {
     if (!userId) return;
     try {
-      const payload = { ...data, user_id: userId };
-      const { error } = await supabase.from("despesas_fixas").insert([payload]);
+      // INJETA O GRUPO ID NA HORA DE SALVAR
+      const payload = {
+        ...data,
+        user_id: userId,
+        grupo_id: activeContext === "grupo" ? currentGroupId : null,
+      };
 
+      const { error } = await supabase.from("despesas_fixas").insert([payload]);
       if (error) throw error;
 
       toast({ title: "Despesa fixa adicionada!" });
@@ -264,11 +312,16 @@ export default function DespesasFixas() {
     fixasCache.despesas = next;
 
     try {
-      const { error } = await supabase
-        .from("despesas_fixas")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", userId);
+      let query = supabase.from("despesas_fixas").delete().eq("id", id);
+
+      // Validação de segurança extra baseada no contexto
+      if (activeContext === "grupo" && currentGroupId) {
+        query = query.eq("grupo_id", currentGroupId);
+      } else {
+        query = query.eq("user_id", userId).is("grupo_id", null);
+      }
+
+      const { error } = await query;
       if (error) throw error;
       toast({ title: "Removido com sucesso" });
       setDeleteOpen(false);
@@ -306,9 +359,11 @@ export default function DespesasFixas() {
 
       const dataFormatada = dataVencimento.toISOString().split("T")[0];
 
+      // INJETA O GRUPO ID NA HORA DE LANÇAR NA TELA DE LANÇAMENTOS
       const { error } = await supabase.from("lancamentos").insert([
         {
           user_id: userId,
+          grupo_id: activeContext === "grupo" ? currentGroupId : null,
           descricao: despesa.nome,
           valor: despesa.valor,
           tipo: "Despesa",
@@ -381,10 +436,14 @@ export default function DespesasFixas() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h1 className="text-3xl font-semibold tracking-tight">
-              Despesas Fixas
+              Despesas Fixas{" "}
+              {activeContext === "grupo" && (
+                <span className="text-primary">(Casa)</span>
+              )}
             </h1>
             <p className="text-muted-foreground mt-1">
-              Gerencie seus gastos recorrentes
+              Gerencie seus gastos recorrentes{" "}
+              {activeContext === "grupo" && "em conjunto"}
             </p>
           </div>
           <Button
@@ -393,12 +452,10 @@ export default function DespesasFixas() {
             onClick={() => fetchData(true)}
             className="gap-2 shrink-0"
           >
-            <RefreshCw className="h-4 w-4" />
-            Atualizar
+            <RefreshCw className="h-4 w-4" /> Atualizar
           </Button>
         </div>
 
-        {/* COMPONENTES EXTRAÍDOS */}
         <SummaryCard
           totalComprometido={totalComprometido}
           totalPagamentoDia05={totalPagamentoDia05}
@@ -439,7 +496,8 @@ export default function DespesasFixas() {
 
             {despesas.length === 0 && (
               <div className="col-span-full text-center py-12 text-muted-foreground border border-dashed rounded-xl bg-card/30">
-                Nenhuma despesa fixa cadastrada.
+                Nenhuma despesa fixa cadastrada{" "}
+                {activeContext === "grupo" ? "para esta casa" : ""}.
               </div>
             )}
           </div>
@@ -453,6 +511,9 @@ export default function DespesasFixas() {
         onSaved={handleExpenseSaved}
         categorias={categoriasDB}
         formasPagamento={formasPagamentoDB}
+        // SE PRECISARMOS PASSAR O CONTEXTO PARA DENTRO DA EDIÇÃO:
+        activeContext={activeContext}
+        groupId={currentGroupId}
       />
 
       <AlertDialog

@@ -4,6 +4,7 @@ import type React from "react";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
+import { useWorkspace } from "@/contexts/WorkspaceContext"; // <-- Cérebro Global
 import type { Lancamento } from "@/types";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,8 +19,7 @@ import { LancamentoItem } from "./releases/LancamentoItem";
 import { LancamentosFilters } from "./releases/LancamentosFilters";
 import { LancamentoFormDialog } from "./releases/LancamentoFormDialog";
 
-// CACHE EM MEMÓRIA (Stale-While-Revalidate)
-// Guarda os dados para evitar telas de loading ao trocar de abas
+// CACHE EM MEMÓRIA
 const memoryCache = {
   lancamentosPorMes: {} as Record<string, Lancamento[]>,
   categorias: null as { id: number; nome: string }[] | null,
@@ -30,16 +30,18 @@ export default function Lancamentos() {
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const { activeContext } = useWorkspace(); // <-- Puxando o contexto
 
-  // Data e Mês de Referência
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
+
   const [date, setDate] = useState<Date>(new Date());
   const [filtroMes, setFiltroMes] = useState(
     new Date().toISOString().slice(0, 7),
   );
 
-  // Estados inicializados pelo cache (para renderização instantânea)
+  const cacheKey = `${filtroMes}_${activeContext}`;
   const [lancamentos, setLancamentos] = useState<Lancamento[]>(
-    memoryCache.lancamentosPorMes[filtroMes] || [],
+    memoryCache.lancamentosPorMes[cacheKey] || [],
   );
   const [categoriasDB, setCategoriasDB] = useState(
     memoryCache.categorias || [],
@@ -47,18 +49,14 @@ export default function Lancamentos() {
   const [formasPagamentoDB, setFormasPagamentoDB] = useState(
     memoryCache.formasPagamento || [],
   );
-
-  // Só exibe loading se o mês selecionado não estiver no cache
   const [loading, setLoading] = useState(
-    !memoryCache.lancamentosPorMes[filtroMes],
+    !memoryCache.lancamentosPorMes[cacheKey],
   );
 
-  // Controle do Modal
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [lancamentoEditando, setLancamentoEditando] =
     useState<Lancamento | null>(null);
 
-  // Seleção e Filtros
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [filtrosTipo, setFiltrosTipo] = useState<string[]>([]);
@@ -66,42 +64,74 @@ export default function Lancamentos() {
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
 
-  // Quando a data muda, atualiza o mês e resgata do cache se possível
   useEffect(() => {
     if (date) {
       const ano = date.getFullYear();
       const mes = String(date.getMonth() + 1).padStart(2, "0");
       const novoMes = `${ano}-${mes}`;
-
       setFiltroMes(novoMes);
 
-      if (memoryCache.lancamentosPorMes[novoMes]) {
-        setLancamentos(memoryCache.lancamentosPorMes[novoMes]);
-        setLoading(false); // Já temos os dados
+      const novoCacheKey = `${novoMes}_${activeContext}`;
+      if (memoryCache.lancamentosPorMes[novoCacheKey]) {
+        setLancamentos(memoryCache.lancamentosPorMes[novoCacheKey]);
+        setLoading(false);
       } else {
-        setLoading(true); // Precisamos buscar
+        setLoading(true);
       }
     }
-  }, [date]);
+  }, [date, activeContext]);
 
-  // Busca Inteligente de Dados
   const fetchAllData = useCallback(async () => {
     if (!userId) return;
 
     try {
+      // 1. BUSCAR GRUPO ID (SE FOR MODO GRUPO)
+      let groupId = currentGroupId;
+      if (activeContext === "grupo" && !groupId) {
+        const { data: myGroup } = await supabase
+          .from("grupos")
+          .select("id")
+          .eq("criador_id", userId)
+          .maybeSingle();
+        if (myGroup) groupId = myGroup.id;
+        else {
+          const { data: membership } = await supabase
+            .from("membros_grupo")
+            .select("grupo_id")
+            .eq("user_id", userId)
+            .eq("status", "Aceito")
+            .maybeSingle();
+          if (membership) groupId = membership.grupo_id;
+        }
+        setCurrentGroupId(groupId);
+        if (!groupId) {
+          setLoading(false);
+          return;
+        }
+      }
+
       const [ano, mes] = filtroMes.split("-");
       const dataInicio = `${filtroMes}-01`;
       const dataFim = `${filtroMes}-${new Date(parseInt(ano), parseInt(mes), 0).getDate()}`;
 
-      // Promise.all executa as buscas em paralelo (muito mais rápido)
-      const [resLancamentos, resCat, resPay] = await Promise.all([
-        supabase
-          .from("lancamentos")
-          .select("*")
+      let queryLancamentos = supabase
+        .from("lancamentos")
+        .select("*")
+        .gte("data_vencimento", dataInicio)
+        .lte("data_vencimento", dataFim)
+        .order("data_vencimento", { ascending: true });
+
+      // FILTRO DO CONTEXTO
+      if (activeContext === "grupo" && groupId) {
+        queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
+      } else {
+        queryLancamentos = queryLancamentos
           .eq("user_id", userId)
-          .gte("data_vencimento", dataInicio)
-          .lte("data_vencimento", dataFim)
-          .order("data_vencimento", { ascending: true }),
+          .is("grupo_id", null);
+      }
+
+      const [resLancamentos, resCat, resPay] = await Promise.all([
+        queryLancamentos,
         !memoryCache.categorias
           ? supabase.from("categorias").select("*").order("nome")
           : Promise.resolve({ data: memoryCache.categorias }),
@@ -110,14 +140,11 @@ export default function Lancamentos() {
           : Promise.resolve({ data: memoryCache.formasPagamento }),
       ]);
 
-      // Atualiza Lançamentos
       if (resLancamentos.data) {
         const dados = resLancamentos.data as unknown as Lancamento[];
-        memoryCache.lancamentosPorMes[filtroMes] = dados;
+        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] = dados;
         setLancamentos(dados);
       }
-
-      // Atualiza Opções GLOBAIS
       if (resCat.data && !memoryCache.categorias) {
         memoryCache.categorias = resCat.data;
         setCategoriasDB(resCat.data);
@@ -135,14 +162,12 @@ export default function Lancamentos() {
     } finally {
       setLoading(false);
     }
-  }, [filtroMes, userId, toast]);
+  }, [filtroMes, userId, activeContext, currentGroupId, toast]);
 
-  // Dispara a busca sempre que o mês ou o usuário mudar
   useEffect(() => {
     fetchAllData();
   }, [fetchAllData]);
 
-  // --- LÓGICA DE FILTRO ---
   const lancamentosFiltrados = lancamentos.filter((l) => {
     const matchSearch = l.descricao
       .toLowerCase()
@@ -156,7 +181,6 @@ export default function Lancamentos() {
     let matchStatus = true;
     if (filtroStatus === "pago") matchStatus = l.pago === true;
     if (filtroStatus === "pendente") matchStatus = l.pago === false;
-
     return (
       matchSearch &&
       matchTipo &&
@@ -166,37 +190,34 @@ export default function Lancamentos() {
     );
   });
 
-  // --- AÇÕES OTIMISTAS (Atualizam a UI e o Cache antes mesmo do banco responder) ---
   const handleSelectAll = () => {
     if (
       selectedIds.length === lancamentosFiltrados.length &&
       lancamentosFiltrados.length > 0
-    ) {
+    )
       setSelectedIds([]);
-    } else {
-      setSelectedIds(lancamentosFiltrados.map((l) => l.id));
-    }
+    else setSelectedIds(lancamentosFiltrados.map((l) => l.id));
   };
 
   const handleBulkDelete = async () => {
     if (selectedIds.length === 0 || !confirm("Excluir itens selecionados?"))
       return;
     try {
-      // 1. Otimista: remove da tela e do cache imediatamente
       const remaining = lancamentos.filter((l) => !selectedIds.includes(l.id));
       setLancamentos(remaining);
-      memoryCache.lancamentosPorMes[filtroMes] = remaining;
+      memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+        remaining;
       setSelectedIds([]);
 
-      // 2. Banco
-      await supabase
-        .from("lancamentos")
-        .delete()
-        .in("id", selectedIds)
-        .eq("user_id", userId);
+      let query = supabase.from("lancamentos").delete().in("id", selectedIds);
+      if (activeContext === "grupo" && currentGroupId)
+        query = query.eq("grupo_id", currentGroupId);
+      else query = query.eq("user_id", userId).is("grupo_id", null);
+
+      await query;
       toast({ title: `${selectedIds.length} excluídos.` });
     } catch {
-      fetchAllData(); // Se der erro, restaura
+      fetchAllData();
       toast({ title: "Erro ao excluir", variant: "destructive" });
     }
   };
@@ -204,17 +225,17 @@ export default function Lancamentos() {
   const handleDelete = async (id: number) => {
     if (!confirm("Excluir este lançamento?")) return;
     try {
-      // 1. Otimista
       const remaining = lancamentos.filter((l) => l.id !== id);
       setLancamentos(remaining);
-      memoryCache.lancamentosPorMes[filtroMes] = remaining;
+      memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+        remaining;
 
-      // 2. Banco
-      await supabase
-        .from("lancamentos")
-        .delete()
-        .eq("id", id)
-        .eq("user_id", userId);
+      let query = supabase.from("lancamentos").delete().eq("id", id);
+      if (activeContext === "grupo" && currentGroupId)
+        query = query.eq("grupo_id", currentGroupId);
+      else query = query.eq("user_id", userId).is("grupo_id", null);
+
+      await query;
       toast({ title: "Excluído com sucesso" });
     } catch {
       fetchAllData();
@@ -225,27 +246,27 @@ export default function Lancamentos() {
   const togglePago = async (lancamento: Lancamento) => {
     try {
       const novoStatus = !lancamento.pago;
-
-      // 1. Otimista
       const updated = lancamentos.map((l) =>
         l.id === lancamento.id ? { ...l, pago: novoStatus } : l,
       );
       setLancamentos(updated);
-      memoryCache.lancamentosPorMes[filtroMes] = updated;
+      memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] = updated;
 
-      // 2. Banco
-      await supabase
+      let query = supabase
         .from("lancamentos")
         .update({ pago: novoStatus })
-        .eq("id", lancamento.id)
-        .eq("user_id", userId);
+        .eq("id", lancamento.id);
+      if (activeContext === "grupo" && currentGroupId)
+        query = query.eq("grupo_id", currentGroupId);
+      else query = query.eq("user_id", userId).is("grupo_id", null);
+
+      await query;
     } catch {
       fetchAllData();
-      toast({ title: "Erro ao atualizar status", variant: "destructive" });
+      toast({ title: "Erro ao atualizar", variant: "destructive" });
     }
   };
 
-  // --- MODAL ---
   const handleNovoLancamento = () => {
     setLancamentoEditando(null);
     setIsDialogOpen(true);
@@ -260,7 +281,12 @@ export default function Lancamentos() {
     <div className="space-y-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 overflow-x-hidden w-full animate-in fade-in slide-in-from-bottom-4">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Lançamentos</h1>
+          <h1 className="text-2xl font-bold tracking-tight">
+            Lançamentos{" "}
+            {activeContext === "grupo" && (
+              <span className="text-primary">(Casa)</span>
+            )}
+          </h1>
           <p className="text-muted-foreground text-sm">
             Controle de receitas e despesas
           </p>
@@ -280,16 +306,17 @@ export default function Lancamentos() {
       <LancamentoFormDialog
         isOpen={isDialogOpen}
         onClose={() => setIsDialogOpen(false)}
-        onSuccess={fetchAllData} // Atualiza a lista quando salvar
+        onSuccess={fetchAllData}
         lancamentoToEdit={lancamentoEditando}
         userId={userId}
         categoriasDB={categoriasDB}
         formasPagamentoDB={formasPagamentoDB}
+        // NOVOS PROPS PARA O FORMULÁRIO ENVIAR PRO GRUPO CORRETO
+        activeContext={activeContext}
+        groupId={currentGroupId}
       />
 
-      {/* CONTROLES: SEARCH + FILTROS + SELECT ALL */}
       <div className="flex flex-col gap-4">
-        {/* Barra de Busca Minimalista */}
         <div className="relative group">
           <Search className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
           <Input
@@ -299,7 +326,6 @@ export default function Lancamentos() {
             className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
           />
         </div>
-
         <LancamentosFilters
           filtrosTipo={filtrosTipo}
           setFiltrosTipo={setFiltrosTipo}
@@ -312,8 +338,6 @@ export default function Lancamentos() {
           categoriasOptions={categoriasDB}
           pagamentoOptions={formasPagamentoDB}
         />
-
-        {/* Ações em Massa (Só aparece se tiver algo filtrado/selecionado) */}
         <div className="flex items-center justify-between pt-1">
           <div className="flex items-center gap-2 px-1">
             <Checkbox
@@ -346,7 +370,6 @@ export default function Lancamentos() {
         </div>
       </div>
 
-      {/* LISTA DE LANÇAMENTOS */}
       <div className="space-y-3">
         {loading ? (
           <div className="flex justify-center py-12">
@@ -376,26 +399,23 @@ export default function Lancamentos() {
                   setFiltroStatus(null);
                 }}
               >
-                Limpar todos os filtros
+                Limpar filtros
               </Button>
             )}
           </div>
         ) : (
           <div className="flex flex-col gap-2">
-            {/* O LancamentoItem renderiza cada linha. Assumindo que ele já é clean. */}
             {lancamentosFiltrados.map((lancamento) => (
               <LancamentoItem
                 key={lancamento.id}
                 lancamento={lancamento}
                 isSelected={selectedIds.includes(lancamento.id)}
                 onSelect={() => {
-                  if (selectedIds.includes(lancamento.id)) {
+                  if (selectedIds.includes(lancamento.id))
                     setSelectedIds((prev) =>
                       prev.filter((id) => id !== lancamento.id),
                     );
-                  } else {
-                    setSelectedIds((prev) => [...prev, lancamento.id]);
-                  }
+                  else setSelectedIds((prev) => [...prev, lancamento.id]);
                 }}
                 onTogglePago={() => togglePago(lancamento)}
                 onEdit={() => handleEdit(lancamento)}

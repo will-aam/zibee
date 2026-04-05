@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
+import { useWorkspace } from "@/contexts/WorkspaceContext"; // <-- Cérebro Global
 import { Progress } from "@/components/ui/progress";
 import {
   TrendingDown,
@@ -45,53 +46,47 @@ function monthToRange(anoMes: string) {
   return { from: `${anoMes}-01`, to: `${anoMes}-${pad2(ultimoDia)}` };
 }
 
-// CACHE EM MEMÓRIA (SWR)
-// Memoriza os dados pesados do Dashboard por período selecionado
+// CACHE EM MEMÓRIA ATUALIZADO PARA SUPORTAR CONTEXTO (PESSOAL / GRUPO)
 const dashboardCache = {
-  dataByRange: {} as Record<
-    string,
-    {
-      totalDespesas: number;
-      totalReceitas: number;
-      categoriasChart: any[];
-      proximosVencimentos: any[];
-      despesasBrutas: any[];
-    }
-  >,
-  totalDespesasFixas: null as number | null,
-  metaFixada: null as any | null,
+  dataByRange: {} as Record<string, any>,
+  totalDespesasFixas: {} as Record<string, number>,
+  metaFixada: {} as Record<string, any | null>,
 };
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const session = authClient.useSession();
   const userId = session.data?.user.id;
+  const { activeContext } = useWorkspace(); // <-- Puxando o contexto
 
   const [mesSelecionado, setMesSelecionado] = useState("todos");
 
-  // Função auxiliar para determinar a chave do cache
   const readRange = useCallback(() => {
-    // Só podemos acessar o localStorage de forma segura do lado do cliente
     if (typeof window === "undefined")
-      return { from: null, to: null, key: "all" };
+      return { from: null, to: null, key: `all_${activeContext}` };
 
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
     if (from || to)
-      return { from: from || null, to: to || null, key: `${from}_${to}` };
+      return {
+        from: from || null,
+        to: to || null,
+        key: `${from}_${to}_${activeContext}`,
+      };
 
     const mes = localStorage.getItem(STORAGE_MONTH_KEY) || mesSelecionado;
-    if (!mes || mes === "todos") return { from: null, to: null, key: "all" };
+    if (!mes || mes === "todos")
+      return { from: null, to: null, key: `all_${activeContext}` };
 
     const range = monthToRange(mes);
-    return { ...range, key: `${range.from}_${range.to}` };
-  }, [mesSelecionado]);
+    return { ...range, key: `${range.from}_${range.to}_${activeContext}` };
+  }, [mesSelecionado, activeContext]);
 
-  // Recupera valores iniciais do Cache (se existirem) para o período atual
   const initialRange =
-    typeof window !== "undefined" ? readRange() : { key: "all" };
+    typeof window !== "undefined"
+      ? readRange()
+      : { key: `all_${activeContext}` };
   const cachedData = dashboardCache.dataByRange[initialRange.key];
 
-  // Estados inicializados instantaneamente pelo Cache
   const [totalDespesas, setTotalDespesas] = useState(
     cachedData?.totalDespesas || 0,
   );
@@ -109,15 +104,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   );
 
   const [totalDespesasFixas, setTotalDespesasFixas] = useState(
-    dashboardCache.totalDespesasFixas || 0,
+    dashboardCache.totalDespesasFixas[activeContext] || 0,
   );
   const [metaFixada, setMetaFixada] = useState<any>(
-    dashboardCache.metaFixada || null,
+    dashboardCache.metaFixada[activeContext] || null,
   );
 
-  // O loading só aparece se for a primeira vez que entra neste período
   const [loading, setLoading] = useState(!cachedData);
-
   const [periodoGrafico, setPeriodoGrafico] = useState<"7D" | "30D" | "ALL">(
     "30D",
   );
@@ -126,31 +119,65 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     if (!userId) return;
     try {
       const { from, to, key } = readRange();
+      if (!dashboardCache.dataByRange[key]) setLoading(true);
 
-      // Se não temos cache para essa aba, mostramos loading
-      if (!dashboardCache.dataByRange[key]) {
-        setLoading(true);
+      // BUSCAR GRUPO ID (SE FOR MODO GRUPO)
+      let currentGroupId = null;
+      if (activeContext === "grupo") {
+        const { data: myGroup } = await supabase
+          .from("grupos")
+          .select("id")
+          .eq("criador_id", userId)
+          .maybeSingle();
+        if (myGroup) currentGroupId = myGroup.id;
+        else {
+          const { data: membership } = await supabase
+            .from("membros_grupo")
+            .select("grupo_id")
+            .eq("user_id", userId)
+            .eq("status", "Aceito")
+            .maybeSingle();
+          if (membership) currentGroupId = membership.grupo_id;
+        }
+        if (!currentGroupId) {
+          setLoading(false);
+          return;
+        } // Se não achou grupo, para.
       }
 
       let queryDespesas = supabase
         .from("lancamentos")
         .select("*")
-        .eq("user_id", userId)
         .eq("tipo", "Despesa");
       let queryReceitas = supabase
         .from("lancamentos")
         .select("*")
-        .eq("user_id", userId)
         .eq("tipo", "Receita")
         .eq("pago", true);
       let queryVencimentos = supabase
         .from("lancamentos")
         .select("*")
-        .eq("user_id", userId)
         .eq("pago", false)
         .eq("tipo", "Despesa")
         .order("data_vencimento", { ascending: true })
         .limit(5);
+
+      // FILTROS MAGICOS DE CONTEXTO
+      if (activeContext === "grupo" && currentGroupId) {
+        queryDespesas = queryDespesas.eq("grupo_id", currentGroupId);
+        queryReceitas = queryReceitas.eq("grupo_id", currentGroupId);
+        queryVencimentos = queryVencimentos.eq("grupo_id", currentGroupId);
+      } else {
+        queryDespesas = queryDespesas
+          .eq("user_id", userId)
+          .is("grupo_id", null);
+        queryReceitas = queryReceitas
+          .eq("user_id", userId)
+          .is("grupo_id", null);
+        queryVencimentos = queryVencimentos
+          .eq("user_id", userId)
+          .is("grupo_id", null);
+      }
 
       if (from) {
         queryDespesas = queryDespesas.gte("data_vencimento", from);
@@ -163,7 +190,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         queryVencimentos = queryVencimentos.lte("data_vencimento", to);
       }
 
-      // Executa as queries em paralelo para máxima velocidade
       const [
         { data: lancamentosData },
         { data: receitasData },
@@ -174,13 +200,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         queryDespesas,
         queryReceitas,
         queryVencimentos,
-        dashboardCache.totalDespesasFixas === null
+        activeContext === "pessoal" &&
+        dashboardCache.totalDespesasFixas[activeContext] === undefined
           ? supabase
               .from("despesas_fixas")
               .select("valor")
               .eq("user_id", userId)
           : Promise.resolve({ data: null }),
-        dashboardCache.metaFixada === null
+        activeContext === "pessoal" &&
+        dashboardCache.metaFixada[activeContext] === undefined
           ? supabase
               .from("metas")
               .select("*")
@@ -190,7 +218,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           : Promise.resolve({ data: null }),
       ]);
 
-      // --- PROCESSAMENTO DE DADOS ---
       const fetchedDespesasBrutas = lancamentosData || [];
       const fetchedTotalDesp =
         lancamentosData?.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
@@ -211,7 +238,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       const fetchedVencimentos = vencimentosData || [];
 
-      // Atualiza Tela e Memória do Dashboard Dinâmico
       setDespesasBrutas(fetchedDespesasBrutas);
       setTotalDespesas(fetchedTotalDesp);
       setTotalReceitas(fetchedTotalRec);
@@ -226,25 +252,29 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         despesasBrutas: fetchedDespesasBrutas,
       };
 
-      // Atualiza Totais Estáticos (Meta e Fixas)
-      if (fixasData !== null) {
-        const totalFixas = fixasData.reduce(
-          (acc, curr) => acc + Number(curr.valor),
-          0,
-        );
-        setTotalDespesasFixas(totalFixas);
-        dashboardCache.totalDespesasFixas = totalFixas;
-      }
-      if (metaData !== null) {
-        setMetaFixada(metaData);
-        dashboardCache.metaFixada = metaData;
+      if (activeContext === "pessoal") {
+        if (fixasData !== null) {
+          const totalFixas = fixasData.reduce(
+            (acc, curr) => acc + Number(curr.valor),
+            0,
+          );
+          setTotalDespesasFixas(totalFixas);
+          dashboardCache.totalDespesasFixas[activeContext] = totalFixas;
+        }
+        if (metaData !== null) {
+          setMetaFixada(metaData);
+          dashboardCache.metaFixada[activeContext] = metaData;
+        }
+      } else {
+        setTotalDespesasFixas(0);
+        setMetaFixada(null);
       }
     } catch (error) {
       console.error("Erro ao carregar dashboard:", error);
     } finally {
       setLoading(false);
     }
-  }, [readRange, userId]);
+  }, [readRange, userId, activeContext]);
 
   useEffect(() => {
     if (userId) fetchDashboardData();
@@ -254,7 +284,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     const current =
       localStorage.getItem(STORAGE_MONTH_KEY) || getCurrentYearMonth();
     setMesSelecionado(current);
-
     function onFilterChanged() {
       fetchDashboardData();
     }
@@ -283,13 +312,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     const dataLimite = new Date(
       hoje.getTime() - diasFiltrar * 24 * 60 * 60 * 1000,
     );
-
     const filtrados = despesasBrutas.filter(
       (d) => new Date(d.data_vencimento) >= dataLimite,
     );
-
     const agrupado = filtrados.reduce((acc: any, curr) => {
-      // Ajuste de fuso para gráfico correto
       const d = new Date(curr.data_vencimento);
       d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
       const dataStr = d.toLocaleDateString("pt-BR", {
@@ -299,13 +325,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       acc[dataStr] = (acc[dataStr] || 0) + Number(curr.valor);
       return acc;
     }, {});
-
     return Object.keys(agrupado)
       .sort()
-      .map((data) => ({
-        data,
-        valor: agrupado[data],
-      }));
+      .map((data) => ({ data, valor: agrupado[data] }));
   }, [despesasBrutas, periodoGrafico]);
 
   if (loading) {
@@ -321,7 +343,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       {/* SEÇÃO 1: RESUMO FINANCEIRO - APENAS DESKTOP */}
       <section className="hidden md:block">
         <h2 className="text-lg font-semibold mb-4 text-foreground/80">
-          Visão Geral
+          Visão Geral {activeContext === "grupo" && "(Casa)"}
         </h2>
         <div className="grid gap-6 grid-cols-3">
           <div className="pb-4 border-b border-border/50">
@@ -332,7 +354,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               {formatMoney(totalReceitas)}
             </div>
           </div>
-
           <div className="pb-4 border-b border-border/50">
             <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
               <TrendingDown className="h-4 w-4" /> Gastos Variáveis
@@ -341,18 +362,19 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               {formatMoney(totalDespesas)}
             </div>
           </div>
-
-          <div
-            onClick={() => onNavigate && onNavigate("despesas_fixas")}
-            className="pb-4 border-b border-border/50 cursor-pointer hover:opacity-70 transition-opacity group"
-          >
-            <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1 group-hover:text-blue-600 transition-colors">
-              <Wallet className="h-4 w-4" /> Contas Fixas Mensais
+          {activeContext === "pessoal" && (
+            <div
+              onClick={() => onNavigate && onNavigate("despesas_fixas")}
+              className="pb-4 border-b border-border/50 cursor-pointer hover:opacity-70 transition-opacity group"
+            >
+              <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1 group-hover:text-blue-600 transition-colors">
+                <Wallet className="h-4 w-4" /> Contas Fixas Mensais
+              </div>
+              <div className="text-3xl font-bold tracking-tight text-foreground">
+                {formatMoney(totalDespesasFixas)}
+              </div>
             </div>
-            <div className="text-3xl font-bold tracking-tight text-foreground">
-              {formatMoney(totalDespesasFixas)}
-            </div>
-          </div>
+          )}
         </div>
       </section>
 
@@ -367,18 +389,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               <button
                 key={periodo}
                 onClick={() => setPeriodoGrafico(periodo)}
-                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                  periodoGrafico === periodo
-                    ? "bg-background shadow-sm text-foreground"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
+                className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${periodoGrafico === periodo ? "bg-background shadow-sm text-foreground" : "text-muted-foreground hover:text-foreground"}`}
               >
                 {periodo === "ALL" ? "Tudo" : periodo}
               </button>
             ))}
           </div>
         </div>
-
         <div className="h-[250px] w-full">
           {dadosGraficoEvolucao.length > 0 ? (
             <ResponsiveContainer
@@ -440,9 +457,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </section>
 
-      {/* SEÇÃO 3: CATEGORIAS E PRÓXIMOS VENCIMENTOS - MOBILE E DESKTOP */}
+      {/* SEÇÃO 3: CATEGORIAS E PRÓXIMOS VENCIMENTOS */}
       <div className="grid gap-12 md:grid-cols-2 pt-4">
-        {/* Onde estou gastando? */}
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
             <TrendingDown className="h-5 w-5 text-orange-500" /> Onde estou
@@ -481,7 +497,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         </section>
 
-        {/* Contas a Pagar */}
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
             <AlertCircle className="h-5 w-5 text-blue-500" /> Próximos
@@ -497,7 +512,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 const hoje = new Date();
                 hoje.setHours(0, 0, 0, 0);
                 const isAtrasado = dataVenc < hoje;
-
                 return (
                   <div
                     key={item.id}
@@ -538,8 +552,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         </section>
       </div>
 
-      {/* META FIXADA */}
-      {metaFixada && (
+      {/* META FIXADA (Só no modo pessoal) */}
+      {activeContext === "pessoal" && metaFixada && (
         <section
           onClick={() => onNavigate && onNavigate("metas")}
           className="mt-8 pt-6 border-t border-border/50 cursor-pointer group"

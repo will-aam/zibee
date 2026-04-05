@@ -1,4 +1,3 @@
-// components/features/fixed-expenses/EditFixedExpenseDialog.tsx
 "use client";
 
 import * as React from "react";
@@ -43,12 +42,13 @@ interface EditFixedExpenseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   expense: DespesaFixa | null;
-
-  // substitui onSuccess() por onSaved(updated)
   onSaved: (updated: DespesaFixa) => void;
-
   categorias: ItemOpcao[];
   formasPagamento: ItemOpcao[];
+
+  // NOVAS PROPS DE CONTEXTO (Para garantir a segurança ao salvar)
+  activeContext?: string;
+  groupId?: string | null;
 }
 
 type FormState = {
@@ -66,6 +66,8 @@ export function EditFixedExpenseDialog({
   onSaved,
   categorias,
   formasPagamento,
+  activeContext,
+  groupId,
 }: EditFixedExpenseDialogProps) {
   const { toast } = useToast();
   const session = authClient.useSession();
@@ -125,11 +127,19 @@ export function EditFixedExpenseDialog({
         forma_pagamento: form.pagamento?.trim() ? form.pagamento.trim() : null,
       };
 
-      const { error } = await supabase
+      // MÁGICA AQUI: O UPDATE respeita o contexto (Pessoal ou Grupo)
+      let query = supabase
         .from("despesas_fixas")
         .update(payload)
-        .eq("id", expense.id)
-        .eq("user_id", userId);
+        .eq("id", expense.id);
+
+      if (activeContext === "grupo" && groupId) {
+        query = query.eq("grupo_id", groupId);
+      } else {
+        query = query.eq("user_id", userId).is("grupo_id", null);
+      }
+
+      const { error } = await query;
 
       if (error) throw error;
 
@@ -156,7 +166,16 @@ export function EditFixedExpenseDialog({
     } finally {
       setLoading(false);
     }
-  }, [expense, form, onOpenChange, onSaved, toast, userId]);
+  }, [
+    expense,
+    form,
+    onOpenChange,
+    onSaved,
+    toast,
+    userId,
+    activeContext,
+    groupId,
+  ]);
 
   return (
     <Dialog
@@ -168,7 +187,9 @@ export function EditFixedExpenseDialog({
     >
       <DialogContent className="sm:max-w-[520px]">
         <DialogHeader>
-          <DialogTitle>Editar Despesa Fixa</DialogTitle>
+          <DialogTitle>
+            Editar Despesa Fixa {activeContext === "grupo" ? "(Casa)" : ""}
+          </DialogTitle>
         </DialogHeader>
 
         <form

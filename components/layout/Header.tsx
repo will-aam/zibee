@@ -573,7 +573,7 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[120px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Planos
+              Resumo
             </span>
           </button>
           <button
@@ -763,7 +763,7 @@ export default function Header({
             <span
               className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ease-in-out ${activeTab === "receitas" ? "max-w-[100px] ml-2.5 opacity-100" : "max-w-0 ml-0 opacity-0"}`}
             >
-              Planos
+              Resumo
             </span>
           </button>
           <button

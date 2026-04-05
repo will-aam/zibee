@@ -64,7 +64,7 @@ export function DesktopHeader(props: DesktopHeaderProps) {
   const navItems = [
     {
       id: "dashboard",
-      label: "Dashboard",
+      label: "Início",
       Icon: HomeIcon,
       IconActive: HomeSolid,
     },
@@ -173,7 +173,7 @@ export function DesktopHeader(props: DesktopHeaderProps) {
           </PopoverTrigger>
           <PopoverContent
             align="end"
-            className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-[100]"
+            className="w-72 p-5 rounded-3xl shadow-2xl border-border/50 bg-background/95 backdrop-blur-xl z-100"
           >
             <ProfileMenu {...props} />
           </PopoverContent>

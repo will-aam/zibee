@@ -5,15 +5,15 @@ import {
   HomeIcon,
   DocumentTextIcon,
   UserGroupIcon,
-  BanknotesIcon, // Trocado ChartPie por Banknotes
-  Cog6ToothIcon,
+  BanknotesIcon,
+  FireIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
   DocumentTextIcon as DocumentTextSolid,
   UserGroupIcon as UserGroupSolid,
   BanknotesIcon as BanknotesSolid,
-  Cog6ToothIcon as CogSolid,
+  FireIcon as FireSolid,
 } from "@heroicons/react/24/solid";
 
 interface MobileNavProps {
@@ -30,10 +30,10 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
     }`;
 
   const tabs = [
-    { id: "dashboard", label: "Home", Icon: HomeIcon, IconActive: HomeSolid },
+    { id: "dashboard", label: "Início", Icon: HomeIcon, IconActive: HomeSolid },
     {
       id: "lancamentos",
-      label: "Lanç.",
+      label: "Lançamentos",
       Icon: DocumentTextIcon,
       IconActive: DocumentTextSolid,
     },
@@ -48,22 +48,16 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
       label: "Resumo",
       Icon: BanknotesIcon,
       IconActive: BanknotesSolid,
-    }, // Nome e ícone novos
-    {
-      id: "configuracoes",
-      label: "Config",
-      Icon: Cog6ToothIcon,
-      IconActive: CogSolid,
     },
+    { id: "metas", label: "Metas", Icon: FireIcon, IconActive: FireSolid }, // Trocado Config por Metas
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] border-t">
+    <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] ">
       <div className="flex items-center justify-around px-2 h-20">
         {tabs.map(({ id, label, Icon, IconActive }) => {
-          const isActive =
-            activeTab === id ||
-            (id === "configuracoes" && activeTab === "despesas_fixas");
+          // Mantive a lógica para Metas ser ativa quando clicada
+          const isActive = activeTab === id;
           return (
             <button
               key={id}

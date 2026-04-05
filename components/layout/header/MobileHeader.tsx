@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import { Sora } from "next/font/google";
-import { FunnelIcon } from "@heroicons/react/24/solid";
+import { FunnelIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 
 const sora = Sora({ subsets: ["latin"] });
@@ -17,7 +17,7 @@ interface MobileHeaderProps {
   totalReceitas: number;
   totalDespesas: number;
   totalDespesasFixas: number;
-  onNavigate: (tab: string) => void;
+  onNavigate: (tab: string) => void; // Já estava aqui, vamos usar!
   onOpenProfile: () => void;
   onOpenFilter: () => void;
 }
@@ -105,12 +105,21 @@ export function MobileHeader({
             </p>
           </div>
 
-          <button
-            onClick={onOpenFilter}
-            className="shrink-0 p-3 rounded-2xl active:scale-95 transition bg-white/10"
-          >
-            <FunnelIcon className="h-6 w-6 text-white" />
-          </button>
+          {/* GRUPO DE BOTÕES DE AÇÃO NO TOPO */}
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => onNavigate("configuracoes")}
+              className="shrink-0 p-3 rounded-2xl active:scale-95 transition hover:bg-white/10"
+            >
+              <Cog6ToothIcon className="h-6 w-6 text-white" />
+            </button>
+            <button
+              onClick={onOpenFilter}
+              className="shrink-0 p-3 rounded-2xl active:scale-95 transition bg-white/10"
+            >
+              <FunnelIcon className="h-6 w-6 text-white" />
+            </button>
+          </div>
         </div>
       </header>
 

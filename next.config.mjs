@@ -6,8 +6,18 @@ const withPWA = withPWAInit({
   aggressiveFrontEndNavCaching: true,
   reloadOnOnline: true,
   swcMinify: true,
+
   // Desativa o PWA se estiver rodando localmente (dev) para parar o loop
   disable: process.env.NODE_ENV === "development",
+
+  // ========================================================
+  // ESTRATÉGIA ANTI-ZUMBI: ATUALIZAÇÃO AGRESSIVA DO CACHE
+  // ========================================================
+  register: true,
+  skipWaiting: true, // Força o novo Service Worker a assumir imediatamente
+  cleanupOutdatedCaches: true, // Apaga automaticamente o cache de versões antigas
+  // ========================================================
+
   workboxOptions: {
     disableDevLogs: true,
   },
@@ -23,7 +33,4 @@ const nextConfig = {
   },
 };
 
-// 👇 AQUI ESTAVA O ERRO!
-// Antes estava: export default nextConfig;
-// AGORA TEM QUE SER ASSIM:
 export default withPWA(nextConfig);

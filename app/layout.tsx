@@ -6,6 +6,7 @@ import { Geist, Geist_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
+import { PWAUpdater } from "@/components/PWAUpdater";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -26,15 +27,16 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Zibee",
   description: "Gerencie suas finanças pessoais",
-  manifest: "/manifest.json",
+  // ESTRATÉGIA DE CACHE BUSTING: Adicionado ?v=2
+  manifest: "/manifest.json?v=2",
   icons: {
     icon: [
-      { url: "/favicon.ico", sizes: "any" },
-      { url: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
-      { url: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { url: "/icon.png", type: "image/png", sizes: "192x192" },
+      { url: "/favicon.ico?v=2", sizes: "any" },
+      { url: "/favicon-16x16.png?v=2", type: "image/png", sizes: "16x16" },
+      { url: "/favicon-32x32.png?v=2", type: "image/png", sizes: "32x32" },
+      { url: "/icon.png?v=2", type: "image/png", sizes: "192x192" },
     ],
-    apple: [{ url: "/apple-icon.png", type: "image/png" }],
+    apple: [{ url: "/apple-icon.png?v=2", type: "image/png" }],
   },
   appleWebApp: {
     capable: true,
@@ -59,7 +61,11 @@ export default function RootLayout({
           enableSystem
           disableTransitionOnChange
         >
-          <WorkspaceProvider>{children}</WorkspaceProvider>
+          <WorkspaceProvider>
+            {/* INJETANDO O MONITOR DE ATUALIZAÇÃO DO PWA */}
+            <PWAUpdater />
+            {children}
+          </WorkspaceProvider>
           <Toaster />
         </ThemeProvider>
         <Analytics />

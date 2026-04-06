@@ -25,6 +25,18 @@ import { LancamentoItem } from "./releases/LancamentoItem";
 import { LancamentosFilters } from "./releases/LancamentosFilters";
 import { LancamentoFormDialog } from "./releases/LancamentoFormDialog";
 
+// IMPORTAÇÃO DO ALERT DIALOG DA NOSSA UI
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
 // CACHE EM MEMÓRIA
 const memoryCache = {
   lancamentosPorMes: {} as Record<string, Lancamento[]>,
@@ -69,6 +81,14 @@ export default function Lancamentos() {
   const [filtrosCategoria, setFiltrosCategoria] = useState<string[]>([]);
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
+
+  // --- ESTADOS DO MODAL DE EXCLUSÃO ---
+  const [deleteConfig, setDeleteConfig] = useState<{
+    isOpen: boolean;
+    type: "single" | "bulk" | null;
+    id?: number;
+  }>({ isOpen: false, type: null });
+  const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
     if (date) {
@@ -205,47 +225,70 @@ export default function Lancamentos() {
     else setSelectedIds(lancamentosFiltrados.map((l) => l.id));
   };
 
-  const handleBulkDelete = async () => {
-    if (selectedIds.length === 0 || !confirm("Excluir itens selecionados?"))
-      return;
-    try {
-      const remaining = lancamentos.filter((l) => !selectedIds.includes(l.id));
-      setLancamentos(remaining);
-      memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
-        remaining;
-      setSelectedIds([]);
-
-      let query = supabase.from("lancamentos").delete().in("id", selectedIds);
-      if (activeContext === "grupo" && currentGroupId)
-        query = query.eq("grupo_id", currentGroupId);
-      else query = query.eq("user_id", userId).is("grupo_id", null);
-
-      await query;
-      toast({ title: `${selectedIds.length} excluídos.` });
-    } catch {
-      fetchAllData();
-      toast({ title: "Erro ao excluir", variant: "destructive" });
-    }
+  // --- AÇÕES DE EXCLUSÃO (ABRIR MODAL) ---
+  const handleBulkDeleteClick = () => {
+    if (selectedIds.length === 0) return;
+    setDeleteConfig({ isOpen: true, type: "bulk" });
   };
 
-  const handleDelete = async (id: number) => {
-    if (!confirm("Excluir este lançamento?")) return;
+  const handleDeleteClick = (id: number) => {
+    setDeleteConfig({ isOpen: true, type: "single", id });
+  };
+
+  const closeDeleteDialog = () => {
+    if (isDeleting) return;
+    setDeleteConfig({ isOpen: false, type: null });
+  };
+
+  // --- EXECUÇÃO REAL DA EXCLUSÃO APÓS CONFIRMAÇÃO ---
+  const confirmDeletion = async () => {
+    setIsDeleting(true);
+
     try {
-      const remaining = lancamentos.filter((l) => l.id !== id);
-      setLancamentos(remaining);
-      memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
-        remaining;
+      if (deleteConfig.type === "bulk") {
+        const remaining = lancamentos.filter(
+          (l) => !selectedIds.includes(l.id),
+        );
+        setLancamentos(remaining);
+        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+          remaining;
+        const idsToDelete = [...selectedIds];
+        setSelectedIds([]);
 
-      let query = supabase.from("lancamentos").delete().eq("id", id);
-      if (activeContext === "grupo" && currentGroupId)
-        query = query.eq("grupo_id", currentGroupId);
-      else query = query.eq("user_id", userId).is("grupo_id", null);
+        let query = supabase.from("lancamentos").delete().in("id", idsToDelete);
+        if (activeContext === "grupo" && currentGroupId)
+          query = query.eq("grupo_id", currentGroupId);
+        else query = query.eq("user_id", userId).is("grupo_id", null);
 
-      await query;
-      toast({ title: "Excluído com sucesso" });
+        await query;
+        toast({ title: `${idsToDelete.length} excluídos.` });
+
+        // AVISA O CÉREBRO PARA ATUALIZAR O DASHBOARD
+        window.dispatchEvent(new Event("zibee:transaction-changed"));
+      } else if (deleteConfig.type === "single" && deleteConfig.id) {
+        const idToDelete = deleteConfig.id;
+        const remaining = lancamentos.filter((l) => l.id !== idToDelete);
+        setLancamentos(remaining);
+        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+          remaining;
+
+        let query = supabase.from("lancamentos").delete().eq("id", idToDelete);
+        if (activeContext === "grupo" && currentGroupId)
+          query = query.eq("grupo_id", currentGroupId);
+        else query = query.eq("user_id", userId).is("grupo_id", null);
+
+        await query;
+        toast({ title: "Excluído com sucesso" });
+
+        // AVISA O CÉREBRO PARA ATUALIZAR O DASHBOARD
+        window.dispatchEvent(new Event("zibee:transaction-changed"));
+      }
     } catch {
       fetchAllData();
       toast({ title: "Erro ao excluir", variant: "destructive" });
+    } finally {
+      setIsDeleting(false);
+      closeDeleteDialog();
     }
   };
 
@@ -267,6 +310,9 @@ export default function Lancamentos() {
       else query = query.eq("user_id", userId).is("grupo_id", null);
 
       await query;
+
+      // AVISA O CÉREBRO PARA ATUALIZAR O DASHBOARD
+      window.dispatchEvent(new Event("zibee:transaction-changed"));
     } catch {
       fetchAllData();
       toast({ title: "Erro ao atualizar", variant: "destructive" });
@@ -284,153 +330,201 @@ export default function Lancamentos() {
   };
 
   return (
-    <div className="space-y-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 overflow-x-hidden w-full animate-in fade-in slide-in-from-bottom-4">
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">
-            Lançamentos{" "}
-            {activeContext === "grupo" && (
-              <span className="text-primary">(Grupo)</span>
-            )}
-          </h1>
-          <p className="text-muted-foreground text-sm">
-            Controle de receitas e despesas
-          </p>
-        </div>
-        <div className="flex items-center gap-2 w-full sm:w-auto">
-          <MonthSelector date={date} setDate={setDate} />
-          <Button
-            onClick={handleNovoLancamento}
-            size="icon"
-            className="shrink-0 h-10 w-10 rounded-xl"
-          >
-            <PlusIcon className="h-5 w-5" />
-          </Button>
-        </div>
-      </div>
-
-      <LancamentoFormDialog
-        isOpen={isDialogOpen}
-        onClose={() => setIsDialogOpen(false)}
-        onSuccess={fetchAllData}
-        lancamentoToEdit={lancamentoEditando}
-        userId={userId}
-        categoriasDB={categoriasDB}
-        formasPagamentoDB={formasPagamentoDB}
-        // NOVOS PROPS PARA O FORMULÁRIO ENVIAR PRO GRUPO CORRETO
-        activeContext={activeContext}
-        groupId={currentGroupId}
-      />
-
-      <div className="flex flex-col gap-4">
-        <div className="relative group">
-          <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-          <Input
-            placeholder="Buscar lançamentos..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
-          />
-        </div>
-        <LancamentosFilters
-          filtrosTipo={filtrosTipo}
-          setFiltrosTipo={setFiltrosTipo}
-          filtrosCategoria={filtrosCategoria}
-          setFiltrosCategoria={setFiltrosCategoria}
-          filtrosPagamento={filtrosPagamento}
-          setFiltrosPagamento={setFiltrosPagamento}
-          filtroStatus={filtroStatus}
-          setFiltroStatus={setFiltroStatus}
-          categoriasOptions={categoriasDB}
-          pagamentoOptions={formasPagamentoDB}
-        />
-        <div className="flex items-center justify-between pt-1">
-          <div className="flex items-center gap-2 px-1">
-            <Checkbox
-              id="select-all"
-              checked={
-                lancamentosFiltrados.length > 0 &&
-                selectedIds.length === lancamentosFiltrados.length
-              }
-              onCheckedChange={handleSelectAll}
-              className="rounded-lg"
-            />
-            <Label
-              htmlFor="select-all"
-              className="cursor-pointer font-medium text-sm text-muted-foreground"
-            >
-              Selecionar Todos
-            </Label>
+    <>
+      <div className="space-y-6 p-4 md:p-6 max-w-5xl mx-auto pb-24 overflow-x-hidden w-full animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h1 className="text-2xl font-bold tracking-tight">
+              Lançamentos{" "}
+              {activeContext === "grupo" && (
+                <span className="text-primary">(Grupo)</span>
+              )}
+            </h1>
+            <p className="text-muted-foreground text-sm">
+              Controle de receitas e despesas
+            </p>
           </div>
-          {selectedIds.length > 0 && (
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <MonthSelector date={date} setDate={setDate} />
             <Button
-              variant="destructive"
-              size="sm"
-              onClick={handleBulkDelete}
-              className="h-8 rounded-lg animate-in zoom-in-95"
+              onClick={handleNovoLancamento}
+              size="icon"
+              className="shrink-0 h-10 w-10 rounded-xl"
             >
-              <TrashIcon className="h-3.5 w-3.5 mr-1.5" /> Excluir (
-              {selectedIds.length})
+              <PlusIcon className="h-5 w-5" />
             </Button>
+          </div>
+        </div>
+
+        <LancamentoFormDialog
+          isOpen={isDialogOpen}
+          onClose={() => setIsDialogOpen(false)}
+          onSuccess={fetchAllData}
+          lancamentoToEdit={lancamentoEditando}
+          userId={userId}
+          categoriasDB={categoriasDB}
+          formasPagamentoDB={formasPagamentoDB}
+          activeContext={activeContext}
+          groupId={currentGroupId}
+        />
+
+        <div className="flex flex-col gap-4">
+          <div className="relative group">
+            <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+            <Input
+              placeholder="Buscar lançamentos..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
+            />
+          </div>
+          <LancamentosFilters
+            filtrosTipo={filtrosTipo}
+            setFiltrosTipo={setFiltrosTipo}
+            filtrosCategoria={filtrosCategoria}
+            setFiltrosCategoria={setFiltrosCategoria}
+            filtrosPagamento={filtrosPagamento}
+            setFiltrosPagamento={setFiltrosPagamento}
+            filtroStatus={filtroStatus}
+            setFiltroStatus={setFiltroStatus}
+            categoriasOptions={categoriasDB}
+            pagamentoOptions={formasPagamentoDB}
+          />
+          <div className="flex items-center justify-between pt-1">
+            <div className="flex items-center gap-2 px-1">
+              <Checkbox
+                id="select-all"
+                checked={
+                  lancamentosFiltrados.length > 0 &&
+                  selectedIds.length === lancamentosFiltrados.length
+                }
+                onCheckedChange={handleSelectAll}
+                className="rounded-lg"
+              />
+              <Label
+                htmlFor="select-all"
+                className="cursor-pointer font-medium text-sm text-muted-foreground"
+              >
+                Selecionar Todos
+              </Label>
+            </div>
+            {selectedIds.length > 0 && (
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={handleBulkDeleteClick}
+                className="h-8 rounded-lg animate-in zoom-in-95"
+              >
+                <TrashIcon className="h-3.5 w-3.5 mr-1.5" /> Excluir (
+                {selectedIds.length})
+              </Button>
+            )}
+          </div>
+        </div>
+
+        <div className="space-y-3">
+          {loading ? (
+            <div className="flex justify-center py-12">
+              <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
+            </div>
+          ) : lancamentosFiltrados.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
+              <FunnelIcon className="h-10 w-10 text-muted-foreground/30 mb-3" />
+              <p className="text-muted-foreground font-medium">
+                Nenhum lançamento encontrado.
+              </p>
+              <p className="text-xs text-muted-foreground/70 mb-4">
+                Mude o mês ou ajuste os filtros.
+              </p>
+              {(filtrosTipo.length > 0 ||
+                filtrosCategoria.length > 0 ||
+                searchQuery ||
+                filtroStatus) && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setSearchQuery("");
+                    setFiltrosTipo([]);
+                    setFiltrosCategoria([]);
+                    setFiltrosPagamento([]);
+                    setFiltroStatus(null);
+                  }}
+                >
+                  Limpar filtros
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="flex flex-col gap-2">
+              {lancamentosFiltrados.map((lancamento) => (
+                <LancamentoItem
+                  key={lancamento.id}
+                  lancamento={lancamento}
+                  isSelected={selectedIds.includes(lancamento.id)}
+                  onSelect={() => {
+                    if (selectedIds.includes(lancamento.id))
+                      setSelectedIds((prev) =>
+                        prev.filter((id) => id !== lancamento.id),
+                      );
+                    else setSelectedIds((prev) => [...prev, lancamento.id]);
+                  }}
+                  onTogglePago={() => togglePago(lancamento)}
+                  onEdit={() => handleEdit(lancamento)}
+                  onDelete={() => handleDeleteClick(lancamento.id)}
+                />
+              ))}
+            </div>
           )}
         </div>
       </div>
 
-      <div className="space-y-3">
-        {loading ? (
-          <div className="flex justify-center py-12">
-            <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
-          </div>
-        ) : lancamentosFiltrados.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
-            <FunnelIcon className="h-10 w-10 text-muted-foreground/30 mb-3" />
-            <p className="text-muted-foreground font-medium">
-              Nenhum lançamento encontrado.
-            </p>
-            <p className="text-xs text-muted-foreground/70 mb-4">
-              Mude o mês ou ajuste os filtros.
-            </p>
-            {(filtrosTipo.length > 0 ||
-              filtrosCategoria.length > 0 ||
-              searchQuery ||
-              filtroStatus) && (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => {
-                  setSearchQuery("");
-                  setFiltrosTipo([]);
-                  setFiltrosCategoria([]);
-                  setFiltrosPagamento([]);
-                  setFiltroStatus(null);
-                }}
-              >
-                Limpar filtros
-              </Button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-2">
-            {lancamentosFiltrados.map((lancamento) => (
-              <LancamentoItem
-                key={lancamento.id}
-                lancamento={lancamento}
-                isSelected={selectedIds.includes(lancamento.id)}
-                onSelect={() => {
-                  if (selectedIds.includes(lancamento.id))
-                    setSelectedIds((prev) =>
-                      prev.filter((id) => id !== lancamento.id),
-                    );
-                  else setSelectedIds((prev) => [...prev, lancamento.id]);
-                }}
-                onTogglePago={() => togglePago(lancamento)}
-                onEdit={() => handleEdit(lancamento)}
-                onDelete={() => handleDelete(lancamento.id)}
-              />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+      {/* ALERT DIALOG: CONFIRMAÇÃO DE EXCLUSÃO */}
+      <AlertDialog
+        open={deleteConfig.isOpen}
+        onOpenChange={(open) =>
+          open
+            ? setDeleteConfig({ ...deleteConfig, isOpen: true })
+            : closeDeleteDialog()
+        }
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {deleteConfig.type === "bulk"
+                ? "Excluir lançamentos selecionados?"
+                : "Excluir lançamento?"}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {deleteConfig.type === "bulk"
+                ? `Você está prestes a excluir ${selectedIds.length} lançamentos. Esta ação não pode ser desfeita.`
+                : "Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita."}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isDeleting}>
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={(e) => {
+                e.preventDefault();
+                confirmDeletion();
+              }}
+              disabled={isDeleting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              {isDeleting ? (
+                <>
+                  <ArrowPathIcon className="h-4 w-4 mr-2 animate-spin" />
+                  Excluindo...
+                </>
+              ) : (
+                "Excluir"
+              )}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   );
 }

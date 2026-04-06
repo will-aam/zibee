@@ -22,8 +22,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
+import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
 
-type RecurrenceEndType = "infinito" | "ate_data" | "ocorrencias";
+// 1. REMOVIDA A OPÇÃO 'infinito'
+type RecurrenceEndType = "ate_data" | "ocorrencias";
 const MAX_RECURRENCE_MONTHS = 600;
 
 interface LancamentoFormDialogProps {
@@ -53,8 +55,9 @@ export function LancamentoFormDialog({
 
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
   const [isRecorrente, setIsRecorrente] = useState(false);
+  // O PADRÃO AGORA É 'ocorrencias'
   const [recurrenceEndType, setRecurrenceEndType] =
-    useState<RecurrenceEndType>("infinito");
+    useState<RecurrenceEndType>("ocorrencias");
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState(2);
 
@@ -62,7 +65,7 @@ export function LancamentoFormDialog({
     if (lancamentoToEdit) {
       setFormData(lancamentoToEdit);
       setIsRecorrente(false);
-      setRecurrenceEndType("infinito");
+      setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
       setRecurrenceOccurrences(2);
     } else {
@@ -77,7 +80,7 @@ export function LancamentoFormDialog({
         observacoes: "",
       });
       setIsRecorrente(false);
-      setRecurrenceEndType("infinito");
+      setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
       setRecurrenceOccurrences(2);
     }
@@ -154,7 +157,7 @@ export function LancamentoFormDialog({
     if (!formData.data_vencimento) {
       toast({
         title: "Recorrência inválida",
-        description: "Informe a data.",
+        description: "Informe a data do primeiro pagamento.",
         variant: "destructive",
       });
       return false;
@@ -162,7 +165,7 @@ export function LancamentoFormDialog({
     if (recurrenceEndType === "ocorrencias" && recurrenceOccurrences < 2) {
       toast({
         title: "Recorrência inválida",
-        description: "Ocorrências deve ser > 1.",
+        description: "O número de ocorrências deve ser pelo menos 2.",
         variant: "destructive",
       });
       return false;
@@ -182,7 +185,7 @@ export function LancamentoFormDialog({
       ) {
         toast({
           title: "Recorrência inválida",
-          description: "A data final deve ser posterior.",
+          description: "A data final deve ser depois do primeiro pagamento.",
           variant: "destructive",
         });
         return false;
@@ -227,54 +230,23 @@ export function LancamentoFormDialog({
         await query;
 
         if (isRecorrente && formData.tipo === "Despesa") {
-          if (recurrenceEndType === "infinito") {
-            const diaDoVencimento = Number(
-              formData.data_vencimento?.split("-")[2] || 1,
-            );
-            await supabase.from("despesas_fixas").insert([
-              {
-                user_id: userId,
-                nome: formData.descricao,
-                valor: formData.valor,
-                dia_vencimento: diaDoVencimento,
-                categoria: formData.categoria,
-                forma_pagamento: formData.forma_pagamento,
-              },
-            ]);
-          } else {
-            const recurrenceItems = createRecurrenceItems(basePayload, false);
-            if (recurrenceItems.length > 0)
-              await supabase.from("lancamentos").insert(recurrenceItems);
-          }
+          // Lógica de "infinito" foi removida. Só roda se for número ou data.
+          const recurrenceItems = createRecurrenceItems(basePayload, false);
+          if (recurrenceItems.length > 0)
+            await supabase.from("lancamentos").insert(recurrenceItems);
         }
-        toast({ title: "Atualizado!" });
+        toast({ title: "Lançamento Atualizado!" });
       } else {
         if (isRecorrente && formData.tipo === "Despesa") {
-          if (recurrenceEndType === "infinito") {
-            await supabase.from("lancamentos").insert([basePayload]);
-            const diaDoVencimento = Number(
-              formData.data_vencimento?.split("-")[2] || 1,
-            );
-            await supabase.from("despesas_fixas").insert([
-              {
-                user_id: userId,
-                nome: formData.descricao,
-                valor: formData.valor,
-                dia_vencimento: diaDoVencimento,
-                categoria: formData.categoria,
-                forma_pagamento: formData.forma_pagamento,
-              },
-            ]);
-          } else {
-            const recurrenceItems = createRecurrenceItems(basePayload, true);
-            await supabase.from("lancamentos").insert(recurrenceItems);
-          }
-          toast({ title: "Criado com Recorrência!" });
+          const recurrenceItems = createRecurrenceItems(basePayload, true);
+          await supabase.from("lancamentos").insert(recurrenceItems);
+          toast({ title: "Criados com Recorrência!" });
         } else {
           await supabase.from("lancamentos").insert([basePayload]);
-          toast({ title: "Criado!" });
+          toast({ title: "Lançamento Criado!" });
         }
       }
+      window.dispatchEvent(new Event("zibee:transaction-changed"));
       onSuccess();
       onClose();
     } catch (error: any) {
@@ -288,7 +260,6 @@ export function LancamentoFormDialog({
 
   return (
     <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      {/* AQUI ESTÁ A CORREÇÃO PRINCIPAL: h-[100dvh] no lugar de h-screen */}
       <DialogContent
         className="w-screen h-dvh max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0"
         onInteractOutside={(e) => e.preventDefault()}
@@ -318,7 +289,7 @@ export function LancamentoFormDialog({
                   setFormData({ ...formData, descricao: e.target.value })
                 }
                 required
-                placeholder="Ex: Mercado, Salário..."
+                placeholder="Ex: Conta de Luz, Aluguel..."
                 className="text-lg py-6"
               />
             </div>
@@ -458,13 +429,13 @@ export function LancamentoFormDialog({
                     >
                       {lancamentoToEdit
                         ? "Aplicar recorrência a partir deste"
-                        : "Repetir (Tornar Recorrente)"}
+                        : "Repetir (Parcelamento / Mensal)"}
                     </Label>
                   </div>
                   {isRecorrente && (
                     <div className="grid gap-3">
                       <div className="space-y-2">
-                        <Label>Condição</Label>
+                        <Label>Como repetir?</Label>
                         <Select
                           value={recurrenceEndType}
                           onValueChange={(v: RecurrenceEndType) =>
@@ -475,18 +446,16 @@ export function LancamentoFormDialog({
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="infinito">
-                              Sem fim (Fixa)
+                            <SelectItem value="ocorrencias">
+                              Quantidade de vezes
                             </SelectItem>
                             <SelectItem value="ate_data">
-                              Até uma data
-                            </SelectItem>
-                            <SelectItem value="ocorrencias">
-                              Nº de ocorrências
+                              Até uma data limite
                             </SelectItem>
                           </SelectContent>
                         </Select>
                       </div>
+
                       {recurrenceEndType === "ate_data" && (
                         <div className="space-y-2">
                           <Label>Data final</Label>
@@ -499,17 +468,45 @@ export function LancamentoFormDialog({
                           />
                         </div>
                       )}
+
+                      {/* O NOVO SELETOR DE OCORRÊNCIAS COM BOTÕES + E - */}
                       {recurrenceEndType === "ocorrencias" && (
                         <div className="space-y-2">
-                          <Label>Qtd. de ocorrências</Label>
-                          <Input
-                            type="number"
-                            min="2"
-                            value={recurrenceOccurrences}
-                            onChange={(e) =>
-                              setRecurrenceOccurrences(Number(e.target.value))
-                            }
-                          />
+                          <Label>
+                            Quantos meses no total? (Incluindo este)
+                          </Label>
+                          <div className="flex items-center justify-between bg-background border rounded-lg h-12 px-2 w-full max-w-[200px]">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() =>
+                                setRecurrenceOccurrences(
+                                  Math.max(2, recurrenceOccurrences - 1),
+                                )
+                              }
+                              disabled={recurrenceOccurrences <= 2}
+                            >
+                              <MinusIcon className="h-5 w-5" />
+                            </Button>
+                            <span className="text-lg font-bold w-12 text-center select-none">
+                              {recurrenceOccurrences}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
+                              onClick={() =>
+                                setRecurrenceOccurrences(
+                                  recurrenceOccurrences + 1,
+                                )
+                              }
+                            >
+                              <PlusIcon className="h-5 w-5" />
+                            </Button>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -520,7 +517,6 @@ export function LancamentoFormDialog({
             <div className="h-4"></div>
           </form>
         </div>
-        {/* AQUI ESTÁ A SEGUNDA CORREÇÃO: pb-[max(1rem,env(safe-area-inset-bottom))] para respeitar o bottom do iPhone/Android */}
         <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t bg-background/95 backdrop-blur z-10 flex gap-3">
           <Button
             variant="outline"

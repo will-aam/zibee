@@ -177,9 +177,17 @@ export default function Header({
     loadTotals();
   }, [loadTotals]);
 
+  // Procure este bloco no seu Header/index.tsx e deixe exatamente assim:
   React.useEffect(() => {
     window.addEventListener(FILTER_EVENT, loadTotals);
-    return () => window.removeEventListener(FILTER_EVENT, loadTotals);
+    // 1. ADICIONE ESTA LINHA: Escutar mudanças de lançamentos
+    window.addEventListener("zibee:transaction-changed", loadTotals);
+
+    return () => {
+      window.removeEventListener(FILTER_EVENT, loadTotals);
+      // 2. ADICIONE ESTA LINHA: Limpar o ouvinte
+      window.removeEventListener("zibee:transaction-changed", loadTotals);
+    };
   }, [loadTotals]);
 
   // Restante da lógica (Check Premium e Avatar) permanece igual...

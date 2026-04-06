@@ -172,12 +172,14 @@ export default function LoginPage() {
           <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-3">
             {!isLogin && (
               <div className="space-y-2 sm:space-y-1">
-                <Label className="text-base sm:text-sm">Nome</Label>
+                <Label className="text-base sm:text-sm">
+                  Como deseja ser chamado?
+                </Label>
                 <Input
                   className="py-6 sm:py-2 text-base sm:text-sm"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="Seu nome"
+                  placeholder="Seu primeiro nome ou apelido"
                 />
               </div>
             )}

@@ -13,9 +13,9 @@ import {
   UserIcon,
   UserGroupIcon,
   LockClosedIcon,
-  CheckIcon,
   ArrowLeftOnRectangleIcon,
   ArrowPathIcon,
+  ChevronDownIcon, // Novo ícone para o "Ver mais"
 } from "@heroicons/react/24/solid";
 
 import { Button } from "../ui/button";
@@ -65,7 +65,7 @@ export default function ProfileAvatarModal({
   baseSeed,
   value,
   onChange,
-  saving = false,
+  saving = false, // Mantido por compatibilidade, mas faremos o save interno
   errorMessage = null,
   optionsCount = 120,
   activeContext = "pessoal",
@@ -83,6 +83,19 @@ export default function ProfileAvatarModal({
 
   const [isProcessingInvite, setIsProcessingInvite] = React.useState(false);
 
+  // ESTADOS NOVOS PARA O AVATAR
+  const [localAvatar, setLocalAvatar] = React.useState<AvatarSelection>(value);
+  const [isSavingAvatar, setIsSavingAvatar] = React.useState(false);
+  const [visibleCount, setVisibleCount] = React.useState(20); // Começa mostrando apenas 20
+
+  // Sincroniza o valor externo com o interno quando o modal abre
+  React.useEffect(() => {
+    if (open) {
+      setLocalAvatar(value);
+      setVisibleCount(20); // Reseta a paginação ao abrir
+    }
+  }, [open, value]);
+
   React.useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape") onClose();
@@ -91,10 +104,49 @@ export default function ProfileAvatarModal({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [open, onClose]);
 
-  const seedOptions = React.useMemo(
+  const allSeedOptions = React.useMemo(
     () => buildSeedOptions(baseSeed, optionsCount),
     [baseSeed, optionsCount],
   );
+
+  const visibleOptions = allSeedOptions.slice(0, visibleCount);
+
+  // LOGICA PARA SALVAR O AVATAR DE FATO
+  const handleSaveAvatar = async () => {
+    if (localAvatar.seed === value.seed) {
+      onClose(); // Se não mudou nada, só fecha
+      return;
+    }
+
+    setIsSavingAvatar(true);
+    try {
+      const res = await fetch("/api/profile/avatar", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          avatar_style: localAvatar.style,
+          avatar_seed: localAvatar.seed,
+        }),
+      });
+
+      if (!res.ok) throw new Error();
+
+      onChange(localAvatar); // Atualiza a foto no Header (tela de fundo)
+      toast({
+        title: "Salvo com sucesso!",
+        description: "A sua foto de perfil foi atualizada.",
+      });
+      onClose();
+    } catch {
+      toast({
+        title: "Erro ao salvar",
+        description: "Verifique sua conexão e tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSavingAvatar(false);
+    }
+  };
 
   const handleAcceptInvite = async () => {
     if (!pendingInvite || !userId) return;
@@ -157,7 +209,6 @@ export default function ProfileAvatarModal({
           ${isMobile ? "left-0 top-0 h-full w-full animate-in slide-in-from-left" : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[640px] rounded-[40px] border border-border/50 animate-in zoom-in-95"}
         `}
       >
-        {/* HEADER DO MODAL - AGORA COM O LOGOUT NO TOPO NO MOBILE */}
         <div className="px-6 py-6 flex items-center justify-between">
           <div className="flex items-center gap-3">
             {isMobile && (
@@ -182,7 +233,9 @@ export default function ProfileAvatarModal({
           <button
             className="p-2.5 rounded-full hover:bg-muted transition-colors shrink-0"
             onClick={onClose}
-            disabled={saving || isProcessingInvite || isLoggingOut}
+            disabled={
+              saving || isSavingAvatar || isProcessingInvite || isLoggingOut
+            }
           >
             <XMarkIcon className="h-6 w-6" />
           </button>
@@ -292,15 +345,18 @@ export default function ProfileAvatarModal({
               {isMobile ? "Escolha seu novo avatar" : "Selecione um robô"}
             </p>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
-              {seedOptions.map((seed) => {
+              {visibleOptions.map((seed) => {
+                // Checa com a variável LOCAL, e não com a que veio salva no banco, para dar o feedback visual na hora do clique
                 const selected =
-                  value.style === ROBOT_STYLE && value.seed === seed;
+                  localAvatar.style === ROBOT_STYLE &&
+                  localAvatar.seed === seed;
                 return (
                   <button
                     key={seed}
                     type="button"
-                    onClick={() => onChange({ style: ROBOT_STYLE, seed })}
-                    disabled={saving || isProcessingInvite}
+                    // Atualiza apenas localmente ao clicar
+                    onClick={() => setLocalAvatar({ style: ROBOT_STYLE, seed })}
+                    disabled={saving || isSavingAvatar || isProcessingInvite}
                     className={`relative group transition-all active:scale-90 ${selected ? "scale-110" : "hover:scale-105"}`}
                   >
                     <div
@@ -310,34 +366,47 @@ export default function ProfileAvatarModal({
                         src={avatarUrl(ROBOT_STYLE, seed)}
                         alt="Avatar"
                         className="h-full w-full rounded-full bg-muted object-cover border-2 border-background"
+                        loading="lazy"
                       />
                     </div>
                   </button>
                 );
               })}
             </div>
+
+            {/* BOTÃO VER MAIS (PAGINAÇÃO) */}
+            {visibleCount < optionsCount && (
+              <div className="mt-8 flex justify-center">
+                <Button
+                  variant="outline"
+                  className="rounded-full px-6"
+                  onClick={() =>
+                    setVisibleCount((prev) => Math.min(prev + 20, optionsCount))
+                  }
+                >
+                  Carregar mais
+                  <ChevronDownIcon className="w-4 h-4 ml-2" />
+                </Button>
+              </div>
+            )}
           </div>
         </div>
 
         {/* FOOTER */}
         <div
-          className={`px-6 py-6 bg-background ${!isMobile ? "rounded-b-[40px]" : ""}`}
+          className={`px-6 py-6 bg-background border-t ${!isMobile ? "rounded-b-[40px]" : ""}`}
         >
+          {/* BOTÃO QUE EFETIVAMENTE SALVA */}
           <Button
             className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest"
-            onClick={onClose}
-            disabled={saving || isProcessingInvite}
+            onClick={handleSaveAvatar}
+            disabled={saving || isSavingAvatar || isProcessingInvite}
           >
-            {saving ? (
+            {isSavingAvatar ? (
               <ArrowPathIcon className="w-5 h-5 animate-spin mr-2" />
             ) : null}
-            {saving ? "Salvando..." : "Concluir e Salvar"}
+            {isSavingAvatar ? "Salvando..." : "Concluir e Salvar"}
           </Button>
-          {/* {isMobile && (
-            <p className="text-[10px] text-center text-muted-foreground mt-4 font-medium uppercase tracking-tighter opacity-50">
-              Zibee v1.0.4
-            </p>
-          )} */}
         </div>
       </aside>
     </div>

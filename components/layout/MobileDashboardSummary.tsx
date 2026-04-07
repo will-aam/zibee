@@ -45,25 +45,32 @@ export default function MobileDashboardSummary({
 
   const hasEntradas = entradasConfirmadas > 0;
 
-  React.useEffect(() => {
+  // Carrega o estado e escuta se o Desktop mandou ocultar também
+  const loadPrivacyState = React.useCallback(() => {
     try {
       const saved = localStorage.getItem(STORAGE_KEY);
-      if (saved === "true") setHidden(true);
+      setHidden(saved === "true");
+    } catch {}
+  }, []);
+
+  React.useEffect(() => {
+    loadPrivacyState();
+    window.addEventListener("zibee:privacy-toggled", loadPrivacyState);
+    return () => {
+      window.removeEventListener("zibee:privacy-toggled", loadPrivacyState);
+    };
+  }, [loadPrivacyState]);
+
+  const toggleHidden = () => {
+    const newVal = !hidden;
+    setHidden(newVal);
+    try {
+      localStorage.setItem(STORAGE_KEY, String(newVal));
+      // Avisa o resto do aplicativo (Categorias, Metas, etc) para ocultar na hora!
+      window.dispatchEvent(new Event("zibee:privacy-toggled"));
     } catch {
       // ignore
     }
-  }, []);
-
-  const toggleHidden = () => {
-    setHidden((prev) => {
-      const newVal = !prev;
-      try {
-        localStorage.setItem(STORAGE_KEY, String(newVal));
-      } catch {
-        // ignore
-      }
-      return newVal;
-    });
   };
 
   const displaySaldoGeral = !hasEntradas

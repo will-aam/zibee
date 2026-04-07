@@ -12,7 +12,7 @@ export function PWAUpdater() {
       navigator.serviceWorker.addEventListener("controllerchange", () => {
         // 1. Avisa o usuário para evitar o susto do reload
         toast({
-          title: "Atualização disponível ✨",
+          title: "Atualização disponível!",
           description: "A aplicar a nova versão do Zibee...",
           duration: 3000,
         });

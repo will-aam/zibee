@@ -12,6 +12,8 @@ import {
   FireIcon,
   ArrowPathIcon,
   WalletIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/solid";
 import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import {
@@ -32,6 +34,8 @@ const STORAGE_MONTH_KEY = "dashboardFiltroMes";
 const STORAGE_FROM_KEY = "dashboardFiltroDe";
 const STORAGE_TO_KEY = "dashboardFiltroAte";
 const FILTER_EVENT = "dashboard:filter-changed";
+// Chave compartilhada com o mobile para sincronizar o "Modo Privacidade"
+const PRIVACY_STORAGE_KEY = "mobile-dashboard-values-hidden";
 
 function pad2(n: number) {
   return String(n).padStart(2, "0");
@@ -60,6 +64,32 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   const [mesSelecionado, setMesSelecionado] = useState("todos");
 
+  // Estado global de privacidade (Olhinho)
+  const [hidden, setHidden] = useState(false);
+
+  // Escuta se o Mobile mandou ocultar
+  const loadPrivacyState = useCallback(() => {
+    try {
+      const saved = localStorage.getItem(PRIVACY_STORAGE_KEY);
+      setHidden(saved === "true");
+    } catch {}
+  }, []);
+
+  useEffect(() => {
+    loadPrivacyState();
+    window.addEventListener("zibee:privacy-toggled", loadPrivacyState);
+    return () =>
+      window.removeEventListener("zibee:privacy-toggled", loadPrivacyState);
+  }, [loadPrivacyState]);
+
+  const toggleHidden = () => {
+    const newVal = !hidden;
+    setHidden(newVal);
+    try {
+      localStorage.setItem(PRIVACY_STORAGE_KEY, String(newVal));
+      window.dispatchEvent(new Event("zibee:privacy-toggled"));
+    } catch {}
+  };
   const readRange = useCallback(() => {
     if (typeof window === "undefined")
       return { from: null, to: null, key: `all_${activeContext}` };
@@ -291,8 +321,22 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [fetchDashboardData]);
 
-  const formatMoney = (val: number) =>
-    val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  // FUNÇÃO MESTRA PARA FORMATAR O DINHEIRO (JÁ APLICANDO A MÁSCARA DE PRIVACIDADE)
+  const formatMoney = useCallback(
+    (val: number) => {
+      if (hidden) return "R$ ****";
+      return val.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+    },
+    [hidden],
+  );
+
+  const saldoGeral = useMemo(() => {
+    if (!totalReceitas || totalReceitas <= 0) return 0;
+    return totalReceitas - totalDespesas;
+  }, [totalReceitas, totalDespesas]);
 
   const progressoMeta = useMemo(() => {
     if (!metaFixada) return 0;
@@ -342,10 +386,46 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4">
       {/* SEÇÃO 1: RESUMO FINANCEIRO - APENAS DESKTOP */}
       <section className="hidden md:block">
-        <h2 className="text-lg font-semibold mb-4 text-foreground/80">
-          Visão Geral {activeContext === "grupo" && "(Grupo)"}
-        </h2>
-        <div className="grid gap-6 grid-cols-3">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-semibold text-foreground/80">
+            Visão Geral {activeContext === "grupo" && "(Grupo)"}
+          </h2>
+          <button
+            onClick={toggleHidden}
+            className="p-2 rounded-full hover:bg-muted/80 transition-colors text-muted-foreground active:scale-95"
+            title={hidden ? "Mostrar valores" : "Ocultar valores"}
+          >
+            {hidden ? (
+              <EyeSlashIcon className="h-5 w-5" />
+            ) : (
+              <EyeIcon className="h-5 w-5" />
+            )}
+          </button>
+        </div>
+
+        <div
+          className={`grid gap-6 ${activeContext === "pessoal" ? "grid-cols-4" : "grid-cols-3"}`}
+        >
+          {/* 1. NOVO CARD: SALDO GERAL */}
+          <div className="pb-4 border-b border-border/50">
+            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+              Saldo Geral
+            </div>
+            <div
+              className={`text-3xl font-bold tracking-tight ${
+                saldoGeral >= 0 ? "text-foreground" : "text-destructive"
+              }`}
+            >
+              {totalReceitas > 0 ? formatMoney(saldoGeral) : "****"}
+            </div>
+            {totalReceitas <= 0 && (
+              <p className="text-[11px] text-muted-foreground mt-1">
+                Sem entradas confirmadas
+              </p>
+            )}
+          </div>
+
+          {/* 2. ENTRADAS CONFIRMADAS */}
           <div className="pb-4 border-b border-border/50">
             <div className="flex items-center gap-2 text-sm font-medium text-green-600 mb-1">
               <ArrowTrendingUpIcon className="h-4 w-4" /> Entradas Confirmadas
@@ -354,6 +434,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               {formatMoney(totalReceitas)}
             </div>
           </div>
+
+          {/* 3. GASTOS VARIÁVEIS */}
           <div className="pb-4 border-b border-border/50">
             <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
               <ArrowTrendingDownIcon className="h-4 w-4" /> Gastos Variáveis
@@ -362,6 +444,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               {formatMoney(totalDespesas)}
             </div>
           </div>
+
+          {/* 4. CONTAS FIXAS MENSAIS (SOMENTE PESSOAL) */}
           {activeContext === "pessoal" && (
             <div
               onClick={() => onNavigate && onNavigate("despesas_fixas")}
@@ -424,7 +508,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                   axisLine={false}
                   tickLine={false}
                   width={85}
-                  tickFormatter={(val) => `R$ ${val}`}
+                  tickFormatter={(val) => (hidden ? "****" : `R$ ${val}`)}
                   tick={{ fontSize: 12, fill: "currentColor", opacity: 0.5 }}
                 />
                 <Tooltip

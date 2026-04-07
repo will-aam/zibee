@@ -3,6 +3,7 @@
 import * as React from "react";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { handleWhatsAppContact } from "@/lib/utils";
+import { useToast } from "@/hooks/use-toast";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -10,8 +11,9 @@ import {
   UserGroupIcon,
   LockClosedIcon,
   ArrowLeftOnRectangleIcon,
-  PhotoIcon,
   ArrowPathIcon,
+  HeartIcon,
+  ShareIcon,
 } from "@heroicons/react/24/solid";
 
 interface ProfileMenuProps {
@@ -32,9 +34,36 @@ export function ProfileMenu({
   pendingInvite,
 }: ProfileMenuProps) {
   const { activeContext, setActiveContext, hasPremiumAccess } = useWorkspace();
+  const { toast } = useToast();
+
+  // LÓGICA DE COMPARTILHAMENTO
+  const handleShareApp = async () => {
+    const shareText =
+      "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada: https://zibee.vercel.app/";
+    const shareData = {
+      title: "Zibee - Gestão Financeira",
+      text: "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada:",
+      url: "https://zibee.vercel.app/",
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Copiado para a área de transferência! 📋",
+          description: "Agora é só colar e enviar para seus amigos.",
+        });
+      }
+    } catch (err) {
+      console.log("Erro ao compartilhar:", err);
+    }
+  };
 
   return (
     <div className="flex flex-col gap-6">
+      {/* SEÇÃO 1: ESPAÇO DE TRABALHO */}
       <div>
         <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-3">
           Seu Espaço
@@ -95,10 +124,27 @@ export function ProfileMenu({
         </div>
       </div>
 
-      <div className="pt-4 border-t border-border/50">
+      {/* SEÇÃO 2: AÇÕES DA CONTA E COMPARTILHAR */}
+      <div className="pt-4 border-t border-border/50 flex flex-col gap-2">
+        {/* BOTÃO COMPARTILHAR MINIMALISTA */}
         <Button
           variant="outline"
-          className="w-full justify-start rounded-xl gap-3 h-12 border-border/60"
+          className="w-full justify-start rounded-xl gap-3 h-12 border-primary/20 bg-primary/5 hover:bg-primary/10 text-primary transition-colors"
+          onClick={handleShareApp}
+        >
+          <div className="relative flex items-center justify-center w-5 h-5 shrink-0">
+            <HeartIcon className="absolute w-5 h-5 animate-ping opacity-75 duration-1000" />
+            <HeartIcon className="relative w-5 h-5" />
+          </div>
+          <span className="text-sm font-bold flex-1 text-left">
+            Compartilhar Zibee
+          </span>
+          <ShareIcon className="w-4 h-4 opacity-70" />
+        </Button>
+
+        <Button
+          variant="outline"
+          className="w-full justify-start rounded-xl gap-3 h-12 border-border/60 mt-2"
           onClick={onOpenAvatarModal}
         >
           <div className="w-7 h-7 rounded-full overflow-hidden bg-muted shrink-0">
@@ -108,23 +154,25 @@ export function ProfileMenu({
               className="w-full h-full object-cover"
             />
           </div>
-          <span className="text-sm font-medium">Mudar Foto</span>
+          <span className="text-sm font-medium text-foreground">
+            Mudar Foto
+          </span>
+        </Button>
+
+        <Button
+          variant="ghost"
+          disabled={isLoggingOut}
+          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl gap-3 h-11"
+          onClick={onLogout}
+        >
+          {isLoggingOut ? (
+            <ArrowPathIcon className="w-5 h-5 animate-spin" />
+          ) : (
+            <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+          )}
+          <span className="text-sm font-bold">Sair da Conta</span>
         </Button>
       </div>
-
-      <Button
-        variant="ghost"
-        disabled={isLoggingOut}
-        className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl gap-3 h-11"
-        onClick={onLogout}
-      >
-        {isLoggingOut ? (
-          <ArrowPathIcon className="w-5 h-5 animate-spin" />
-        ) : (
-          <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-        )}
-        <span className="text-sm font-bold">Sair da Conta</span>
-      </Button>
     </div>
   );
 }

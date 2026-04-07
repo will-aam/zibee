@@ -15,7 +15,9 @@ import {
   LockClosedIcon,
   ArrowLeftOnRectangleIcon,
   ArrowPathIcon,
-  ChevronDownIcon, // Novo ícone para o "Ver mais"
+  ChevronDownIcon,
+  HeartIcon,
+  ShareIcon,
 } from "@heroicons/react/24/solid";
 
 import { Button } from "../ui/button";
@@ -65,7 +67,7 @@ export default function ProfileAvatarModal({
   baseSeed,
   value,
   onChange,
-  saving = false, // Mantido por compatibilidade, mas faremos o save interno
+  saving = false,
   errorMessage = null,
   optionsCount = 120,
   activeContext = "pessoal",
@@ -83,16 +85,14 @@ export default function ProfileAvatarModal({
 
   const [isProcessingInvite, setIsProcessingInvite] = React.useState(false);
 
-  // ESTADOS NOVOS PARA O AVATAR
   const [localAvatar, setLocalAvatar] = React.useState<AvatarSelection>(value);
   const [isSavingAvatar, setIsSavingAvatar] = React.useState(false);
-  const [visibleCount, setVisibleCount] = React.useState(20); // Começa mostrando apenas 20
+  const [visibleCount, setVisibleCount] = React.useState(20);
 
-  // Sincroniza o valor externo com o interno quando o modal abre
   React.useEffect(() => {
     if (open) {
       setLocalAvatar(value);
-      setVisibleCount(20); // Reseta a paginação ao abrir
+      setVisibleCount(20);
     }
   }, [open, value]);
 
@@ -111,10 +111,36 @@ export default function ProfileAvatarModal({
 
   const visibleOptions = allSeedOptions.slice(0, visibleCount);
 
-  // LOGICA PARA SALVAR O AVATAR DE FATO
+  // LÓGICA APRIMORADA DE COMPARTILHAMENTO
+  const handleShareApp = async () => {
+    const shareText =
+      "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada: https://zibee.vercel.app/";
+    const shareData = {
+      title: "Zibee - Gestão Financeira",
+      text: "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada:",
+      url: "https://zibee.vercel.app/",
+    };
+
+    try {
+      if (navigator.share) {
+        // Abre a gaveta nativa do celular (WhatsApp, Insta, etc)
+        await navigator.share(shareData);
+      } else {
+        // Fallback para quem não tem suporte nativo (PC)
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Copiado para a área de transferência! 📋",
+          description: "Agora é só colar e enviar para seus amigos.",
+        });
+      }
+    } catch (err) {
+      console.log("Erro ao compartilhar:", err);
+    }
+  };
+
   const handleSaveAvatar = async () => {
     if (localAvatar.seed === value.seed) {
-      onClose(); // Se não mudou nada, só fecha
+      onClose();
       return;
     }
 
@@ -131,7 +157,7 @@ export default function ProfileAvatarModal({
 
       if (!res.ok) throw new Error();
 
-      onChange(localAvatar); // Atualiza a foto no Header (tela de fundo)
+      onChange(localAvatar);
       toast({
         title: "Salvo com sucesso!",
         description: "A sua foto de perfil foi atualizada.",
@@ -339,14 +365,35 @@ export default function ProfileAvatarModal({
             </div>
           )}
 
+          {/* NOVO BANNER: COMPARTILHE O APP (Com o coração sonar e a planta) */}
+          <div className="mx-6 mt-6 bg-linear-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-5 flex flex-col items-center text-center relative overflow-hidden">
+            <div className="relative flex items-center justify-center w-8 h-8 mb-3">
+              <HeartIcon className="absolute w-8 h-8 text-primary animate-ping opacity-75 duration-1000" />
+              <HeartIcon className="relative w-8 h-8 text-primary" />
+            </div>
+            <h3 className="font-bold text-foreground mb-1 text-lg">
+              Ajude o projeto! 🌱
+            </h3>
+            <p className="text-xs text-muted-foreground mb-4 max-w-[250px] leading-relaxed">
+              Gostou do Zibee? Compartilhe o aplicativo com um amigo e apoie o
+              desenvolvedor.
+            </p>
+            <Button
+              onClick={handleShareApp}
+              className="w-full rounded-xl gap-2 shadow-sm hover:scale-[1.02] transition-transform font-bold h-11"
+            >
+              <ShareIcon className="w-4 h-4" />
+              Compartilhar Agora
+            </Button>
+          </div>
+
           {/* SELEÇÃO DE AVATAR */}
-          <div className="px-6 py-8">
+          <div className="px-6 pt-8 pb-4">
             <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6">
               {isMobile ? "Escolha seu novo avatar" : "Selecione um robô"}
             </p>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
               {visibleOptions.map((seed) => {
-                // Checa com a variável LOCAL, e não com a que veio salva no banco, para dar o feedback visual na hora do clique
                 const selected =
                   localAvatar.style === ROBOT_STYLE &&
                   localAvatar.seed === seed;
@@ -354,7 +401,6 @@ export default function ProfileAvatarModal({
                   <button
                     key={seed}
                     type="button"
-                    // Atualiza apenas localmente ao clicar
                     onClick={() => setLocalAvatar({ style: ROBOT_STYLE, seed })}
                     disabled={saving || isSavingAvatar || isProcessingInvite}
                     className={`relative group transition-all active:scale-90 ${selected ? "scale-110" : "hover:scale-105"}`}
@@ -376,7 +422,7 @@ export default function ProfileAvatarModal({
 
             {/* BOTÃO VER MAIS (PAGINAÇÃO) */}
             {visibleCount < optionsCount && (
-              <div className="mt-8 flex justify-center">
+              <div className="mt-8 flex justify-center mb-4">
                 <Button
                   variant="outline"
                   className="rounded-full px-6"

@@ -319,12 +319,8 @@ export default function Receitas() {
       <section className="bg-primary/5 rounded-2xl p-5 border border-primary/10">
         <div className="flex items-center justify-between mb-5">
           <h2 className="flex items-center gap-2 font-semibold text-primary">
-            {activeContext === "pessoal" ? (
-              <CalculatorSolid className="h-5 w-5" />
-            ) : (
-              <UserGroupSolid className="h-5 w-5" />
-            )}
-            Balanço Mensal {activeContext === "grupo"}
+            {activeContext === "pessoal" ? "Resumo Mensal" : "Balanço Mensal"}
+            {activeContext === "grupo" && " do Grupo"}
           </h2>
           <div className="w-auto scale-90 origin-right -mr-2">
             <MonthSelector date={date} setDate={setDate} />

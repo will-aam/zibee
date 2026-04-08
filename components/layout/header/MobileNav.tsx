@@ -5,14 +5,14 @@ import {
   HomeIcon,
   DocumentTextIcon,
   UserGroupIcon,
-  BanknotesIcon,
+  BriefcaseIcon, // Novo ícone para Investimentos
   FireIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
   DocumentTextIcon as DocumentTextSolid,
   UserGroupIcon as UserGroupSolid,
-  BanknotesIcon as BanknotesSolid,
+  BriefcaseIcon as BriefcaseSolid, // Novo ícone para Investimentos
   FireIcon as FireSolid,
 } from "@heroicons/react/24/solid";
 
@@ -43,20 +43,20 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
       Icon: UserGroupIcon,
       IconActive: UserGroupSolid,
     },
+    // SAIU O RESUMO, ENTROU INVESTIMENTOS AQUI
     {
-      id: "receitas",
-      label: "Resumo",
-      Icon: BanknotesIcon,
-      IconActive: BanknotesSolid,
+      id: "investimentos",
+      label: "Investimentos",
+      Icon: BriefcaseIcon,
+      IconActive: BriefcaseSolid,
     },
-    { id: "metas", label: "Metas", Icon: FireIcon, IconActive: FireSolid }, // Trocado Config por Metas
+    { id: "metas", label: "Metas", Icon: FireIcon, IconActive: FireSolid },
   ];
 
   return (
     <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] ">
       <div className="flex items-center justify-around px-2 h-20">
         {tabs.map(({ id, label, Icon, IconActive }) => {
-          // Mantive a lógica para Metas ser ativa quando clicada
           const isActive = activeTab === id;
           return (
             <button

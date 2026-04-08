@@ -66,7 +66,6 @@ export default function MobileDashboardSummary({
     setHidden(newVal);
     try {
       localStorage.setItem(STORAGE_KEY, String(newVal));
-      // Avisa o resto do aplicativo (Categorias, Metas, etc) para ocultar na hora!
       window.dispatchEvent(new Event("zibee:privacy-toggled"));
     } catch {
       // ignore
@@ -83,13 +82,15 @@ export default function MobileDashboardSummary({
   return (
     <section className="-mt-12 px-4 md:hidden relative z-10">
       <div className="rounded-3xl bg-card shadow-sm border border-border/50 overflow-hidden">
-        {/* Topo: Saldo geral + olho */}
+        {/* TOPO: SALDO GERAL + OLHO */}
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
+            {/* VOLTOU AO NORMAL: Limpo e direto ao ponto */}
+            <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground font-medium">
                 Saldo geral
               </p>
+
               <p
                 className={cn(
                   "text-3xl font-bold tracking-tight mt-0.5",

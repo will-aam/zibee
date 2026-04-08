@@ -9,7 +9,7 @@ export default function Investimentos() {
       {/* CONTAINER DA ANIMAÇÃO LOTTIE */}
       <div className="w-72 h-72 mb-2 relative">
         <DotLottieReact
-          src="https://lottie.host/67e42aa4-4540-41c3-ad46-f278d7a7b00f/8Ub5dumwL6.lottie"
+          src="https://lottie.host/3458de73-9317-42e3-a9ab-f0baad5f5d47/8bT6PpmW7O.lottie"
           loop
           autoplay
         />

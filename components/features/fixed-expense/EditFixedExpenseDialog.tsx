@@ -9,7 +9,6 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -31,7 +30,8 @@ interface ItemOpcao {
 
 export interface DespesaFixa {
   id: number;
-  nome: string;
+  descricao?: string; // Novo padrão
+  nome?: string; // Proteção para dados legados
   valor: number;
   dia_vencimento: number;
   categoria?: string;
@@ -50,7 +50,7 @@ interface EditFixedExpenseDialogProps {
 }
 
 type FormState = {
-  nome: string;
+  descricao: string;
   valor: string;
   dia: string;
   categoria: string;
@@ -75,7 +75,8 @@ export function EditFixedExpenseDialog({
 
   const initialForm: FormState = useMemo(
     () => ({
-      nome: expense?.nome ?? "",
+      // Lê de 'descricao' primeiro, se não achar tenta 'nome'
+      descricao: expense?.descricao || expense?.nome || "",
       valor: expense?.valor != null ? String(expense.valor) : "",
       dia:
         expense?.dia_vencimento != null ? String(expense.dia_vencimento) : "",
@@ -100,16 +101,16 @@ export function EditFixedExpenseDialog({
   );
 
   const canSave = useMemo(() => {
-    return !!form.nome.trim() && !!form.valor && !!form.dia && !loading;
-  }, [form.nome, form.valor, form.dia, loading]);
+    return !!form.descricao.trim() && !!form.valor && !!form.dia && !loading;
+  }, [form.descricao, form.valor, form.dia, loading]);
 
   const handleSave = useCallback(async () => {
     if (!userId || !expense) return;
 
-    if (!form.nome.trim() || !form.valor || !form.dia) {
+    if (!form.descricao.trim() || !form.valor || !form.dia) {
       toast({
         title: "Campos obrigatórios",
-        description: "Nome, Valor e Dia são obrigatórios.",
+        description: "Descrição, Valor e Dia são obrigatórios.",
         variant: "destructive",
       });
       return;
@@ -117,8 +118,9 @@ export function EditFixedExpenseDialog({
 
     setLoading(true);
     try {
+      // Salva corretamente na coluna 'descricao'
       const payload = {
-        nome: form.nome.trim(),
+        descricao: form.descricao.trim(),
         valor: Number(form.valor),
         dia_vencimento: Number(form.dia),
         categoria: form.categoria?.trim() ? form.categoria.trim() : null,
@@ -142,14 +144,14 @@ export function EditFixedExpenseDialog({
 
       const updated: DespesaFixa = {
         ...expense,
-        nome: payload.nome,
+        descricao: payload.descricao, // Mantém atualizado no state
         valor: payload.valor,
         dia_vencimento: payload.dia_vencimento,
         categoria: payload.categoria ?? undefined,
         forma_pagamento: payload.forma_pagamento ?? undefined,
       };
 
-      toast({ title: "Despesa atualizada!" });
+      toast({ title: "Conta Fixa atualizada!" });
 
       onSaved(updated);
       onOpenChange(false);
@@ -181,10 +183,13 @@ export function EditFixedExpenseDialog({
         onOpenChange(next);
       }}
     >
-      <DialogContent className="sm:max-w-[520px]">
-        <DialogHeader>
-          <DialogTitle>
-            Editar Despesa Fixa {activeContext === "grupo" ? "(Grupo)" : ""}
+      <DialogContent className="w-[90vw] sm:max-w-[425px] rounded-3xl p-0 gap-0 overflow-hidden">
+        <DialogHeader className="p-6 pb-2 border-b border-border/50">
+          <DialogTitle className="text-xl font-bold">
+            Editar Conta Fixa{" "}
+            {activeContext === "grupo" && (
+              <span className="text-primary">(Grupo)</span>
+            )}
           </DialogTitle>
         </DialogHeader>
 
@@ -193,31 +198,43 @@ export function EditFixedExpenseDialog({
             e.preventDefault();
             if (canSave) handleSave();
           }}
-          className="grid gap-4 py-4"
+          className="p-6 space-y-5"
         >
           <div className="space-y-2">
-            <Label>Nome</Label>
+            <Label className="text-muted-foreground font-medium">
+              Descrição
+            </Label>
             <Input
-              value={form.nome}
-              onChange={(e) => setField("nome", e.target.value)}
+              value={form.descricao}
+              onChange={(e) => setField("descricao", e.target.value)}
+              className="rounded-xl h-11 bg-muted/30"
+              placeholder="Ex: Aluguel, Internet..."
               autoFocus
             />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Valor (R$)</Label>
-              <Input
-                type="number"
-                step="0.01"
-                inputMode="decimal"
-                value={form.valor}
-                onChange={(e) => setField("valor", e.target.value)}
-              />
+              <Label className="text-muted-foreground font-medium">Valor</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  R$
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  inputMode="decimal"
+                  value={form.valor}
+                  onChange={(e) => setField("valor", e.target.value)}
+                  className="rounded-xl h-11 pl-9 bg-muted/30"
+                />
+              </div>
             </div>
 
             <div className="space-y-2">
-              <Label>Dia vencimento</Label>
+              <Label className="text-muted-foreground font-medium">
+                Dia do Vencimento
+              </Label>
               <Input
                 type="number"
                 min="1"
@@ -225,18 +242,21 @@ export function EditFixedExpenseDialog({
                 inputMode="numeric"
                 value={form.dia}
                 onChange={(e) => setField("dia", e.target.value)}
+                className="rounded-xl h-11 bg-muted/30"
               />
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Categoria (padrão)</Label>
+              <Label className="text-muted-foreground font-medium">
+                Categoria
+              </Label>
               <Select
                 value={form.categoria}
                 onValueChange={(v) => setField("categoria", v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl h-11 bg-muted/30">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -250,12 +270,14 @@ export function EditFixedExpenseDialog({
             </div>
 
             <div className="space-y-2">
-              <Label>Pagamento (padrão)</Label>
+              <Label className="text-muted-foreground font-medium">
+                Pagamento
+              </Label>
               <Select
                 value={form.pagamento}
                 onValueChange={(v) => setField("pagamento", v)}
               >
-                <SelectTrigger>
+                <SelectTrigger className="rounded-xl h-11 bg-muted/30">
                   <SelectValue placeholder="Selecione..." />
                 </SelectTrigger>
                 <SelectContent>
@@ -269,22 +291,27 @@ export function EditFixedExpenseDialog({
             </div>
           </div>
 
-          <DialogFooter className="pt-2">
+          <div className="pt-4 flex gap-3">
             <Button
               type="button"
               variant="outline"
               onClick={() => onOpenChange(false)}
               disabled={loading}
+              className="flex-1 rounded-xl h-11"
             >
               Cancelar
             </Button>
-            <Button type="submit" disabled={!canSave}>
+            <Button
+              type="submit"
+              disabled={!canSave}
+              className="flex-1 rounded-xl h-11"
+            >
               {loading && (
                 <ArrowPathIcon className="mr-2 h-4 w-4 animate-spin" />
               )}
-              Salvar
+              Salvar Alterações
             </Button>
-          </DialogFooter>
+          </div>
         </form>
       </DialogContent>
     </Dialog>

@@ -1,108 +1,101 @@
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import {
-  CheckCircleIcon,
-  RocketLaunchIcon,
   PencilIcon,
   TrashIcon,
-  ArrowPathIcon,
   CalendarDaysIcon,
+  ArrowDownRightIcon,
+  ArrowUpRightIcon,
 } from "@heroicons/react/24/solid";
+import { cn } from "@/lib/utils";
 
-export function ExpenseCard({
-  despesa,
-  jaLancadoNoMes,
-  loadingId,
-  onLancar,
-  onEdit,
-  onDelete,
-  formatMoney,
-}: any) {
+export function ExpenseCard({ despesa, onEdit, onDelete, formatMoney }: any) {
+  // Garante a compatibilidade independente se no banco a coluna chama "descricao" ou "nome"
+  const titulo = despesa.descricao || despesa.nome;
+  const isReceita = despesa.categoria === "Receita"; // Caso use receita fixa no futuro
+
   return (
-    <Card
-      className={`relative overflow-hidden transition-all duration-200 border-border/50 
-      ${jaLancadoNoMes ? "bg-muted/30 border-dashed opacity-80" : "bg-card shadow-sm"}`}
+    <div
+      className={cn(
+        "group flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-2xl border transition-all duration-200",
+        "bg-card border-border/50 hover:border-border hover:shadow-sm w-full",
+      )}
     >
-      <div className="p-4">
-        {/* Linha Superior: Nome e Ações */}
-        <div className="flex justify-between items-start gap-2 mb-3">
-          <div className="space-y-1 overflow-hidden">
-            <h3
-              className={`font-semibold text-base truncate ${jaLancadoNoMes ? "text-muted-foreground" : "text-foreground"}`}
-            >
-              {despesa.nome}
-            </h3>
-            <div className="flex items-center text-xs text-muted-foreground font-medium">
-              <CalendarDaysIcon className="mr-1.5 h-3.5 w-3.5 opacity-70" />
-              Vence dia {despesa.dia_vencimento}
-            </div>
-          </div>
-
-          {/* Botões de Ação */}
-          <div className="flex items-center gap-0.5 shrink-0">
-            {jaLancadoNoMes ? (
-              <div className="h-8 w-8 flex items-center justify-center text-emerald-500 bg-emerald-500/10 rounded-md">
-                <CheckCircleIcon className="h-4 w-4" />
-              </div>
-            ) : (
-              <Button
-                size="icon"
-                variant="ghost"
-                disabled={loadingId === despesa.id}
-                onClick={() => onLancar(despesa)}
-                className="h-8 w-8 text-emerald-600 bg-emerald-500/10 hover:bg-emerald-500/20 active:scale-90 transition-all rounded-md"
-                title="Lançar agora"
-              >
-                {loadingId === despesa.id ? (
-                  <ArrowPathIcon className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RocketLaunchIcon className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-muted-foreground hover:text-foreground active:scale-90 transition-all rounded-md"
-              onClick={() => onEdit(despesa)}
-            >
-              <PencilIcon className="h-4 w-4" />
-            </Button>
-
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 active:scale-90 transition-all rounded-md"
-              onClick={() => onDelete(despesa)}
-            >
-              <TrashIcon className="h-4 w-4" />
-            </Button>
+      {/* ESQUERDA: Ícone, Título e Info */}
+      <div className="flex items-start sm:items-center gap-3 sm:gap-4 w-full sm:w-auto">
+        {/* Ícone Estático (já que não tem botão de pago/pendente aqui) */}
+        <div className="pt-0.5 sm:pt-0 shrink-0">
+          <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
+            <CalendarDaysIcon className="h-5 w-5 text-primary" />
           </div>
         </div>
 
-        {/* Linha Inferior: Valor e Tags */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-3 mt-1">
-          <div
-            className={`text-2xl font-bold tracking-tight ${jaLancadoNoMes ? "text-muted-foreground" : "text-foreground"}`}
-          >
-            {formatMoney(despesa.valor)}
+        {/* Textos e Detalhes */}
+        <div className="flex flex-col min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="font-semibold text-sm sm:text-base truncate text-foreground">
+              {titulo}
+            </h3>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
-            {despesa.categoria && (
-              <span className="text-[10px] font-medium uppercase tracking-wider bg-primary/10 text-primary px-2 py-0.5 rounded-md">
-                {despesa.categoria}
-              </span>
-            )}
-            {despesa.forma_pagamento && (
-              <span className="text-[10px] font-medium uppercase tracking-wider bg-secondary text-secondary-foreground px-2 py-0.5 rounded-md">
-                {despesa.forma_pagamento}
-              </span>
-            )}
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:text-xs text-muted-foreground mt-0.5">
+            <span
+              className={cn(
+                "font-medium flex items-center gap-0.5",
+                isReceita
+                  ? "text-green-600 dark:text-green-500"
+                  : "text-destructive/80",
+              )}
+            >
+              {isReceita ? (
+                <ArrowUpRightIcon className="h-3 w-3" />
+              ) : (
+                <ArrowDownRightIcon className="h-3 w-3" />
+              )}
+              {despesa.categoria || "Sem Categoria"}
+            </span>
+            <span className="opacity-50">•</span>
+            <span>{despesa.forma_pagamento || "Sem Pagamento"}</span>
+            <span className="opacity-50">•</span>
+            <span className="flex items-center gap-1 font-bold">
+              Vence dia {despesa.dia_vencimento}
+            </span>
           </div>
         </div>
       </div>
-    </Card>
+
+      {/* DIREITA: Valor e Ações */}
+      <div className="flex items-center justify-between sm:justify-end gap-4 mt-3 sm:mt-0 pl-14 sm:pl-0 w-full sm:w-auto shrink-0">
+        {/* Valor */}
+        <div
+          className={cn(
+            "font-bold text-sm sm:text-base tracking-tight text-foreground",
+          )}
+        >
+          {formatMoney(despesa.valor)}
+        </div>
+
+        {/* Ações (Editar / Excluir) */}
+        <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-primary hover:bg-primary/10 rounded-full"
+            onClick={() => onEdit(despesa)}
+            title="Editar Conta Fixa"
+          >
+            <PencilIcon className="h-3.5 w-3.5" />
+          </Button>
+          <Button
+            size="icon"
+            variant="ghost"
+            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 rounded-full"
+            onClick={() => onDelete(despesa)}
+            title="Remover Conta Fixa"
+          >
+            <TrashIcon className="h-3.5 w-3.5" />
+          </Button>
+        </div>
+      </div>
+    </div>
   );
 }

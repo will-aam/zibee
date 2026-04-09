@@ -1,3 +1,5 @@
+// componentes/LancamentoItem.tsx
+// Componente para exibir um lançamento individual na lista de lançamentos
 "use client";
 
 import { Button } from "@/components/ui/button";

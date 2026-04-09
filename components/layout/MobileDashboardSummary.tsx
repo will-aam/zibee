@@ -25,7 +25,7 @@ function maskMoney(hidden: boolean, value: number) {
 type NavigateTarget = "recorrencia_mensal" | "despesas_fixas";
 
 interface MobileDashboardSummaryProps {
-  saldoGeral: number;
+  saldoGeral: number; // Mantido por compatibilidade da prop, mas recalculamos abaixo
   entradasConfirmadas: number;
   gastosVariaveis: number;
   contasFixasMensais: number;
@@ -44,6 +44,12 @@ export default function MobileDashboardSummary({
   const [hidden, setHidden] = React.useState(false);
 
   const hasEntradas = entradasConfirmadas > 0;
+
+  // MÁGICA AQUI: Recalculando o Saldo Geral com a nova lógica (igual ao Desktop)
+  const saldoGeralCalculado = React.useMemo(() => {
+    if (!hasEntradas) return 0;
+    return entradasConfirmadas - gastosVariaveis - contasFixasMensais;
+  }, [entradasConfirmadas, gastosVariaveis, contasFixasMensais, hasEntradas]);
 
   // Carrega o estado e escuta se o Desktop mandou ocultar também
   const loadPrivacyState = React.useCallback(() => {
@@ -74,7 +80,7 @@ export default function MobileDashboardSummary({
 
   const displaySaldoGeral = !hasEntradas
     ? "****"
-    : maskMoney(hidden, saldoGeral);
+    : maskMoney(hidden, saldoGeralCalculado);
   const displayEntradas = maskMoney(hidden, entradasConfirmadas);
   const displayGastos = maskMoney(hidden, gastosVariaveis);
   const displayFixas = maskMoney(hidden, contasFixasMensais);
@@ -85,7 +91,6 @@ export default function MobileDashboardSummary({
         {/* TOPO: SALDO GERAL + OLHO */}
         <div className="px-5 pt-5 pb-4">
           <div className="flex items-center justify-between gap-3">
-            {/* VOLTOU AO NORMAL: Limpo e direto ao ponto */}
             <div className="flex-1 min-w-0">
               <p className="text-sm text-muted-foreground font-medium">
                 Saldo geral
@@ -94,7 +99,9 @@ export default function MobileDashboardSummary({
               <p
                 className={cn(
                   "text-3xl font-bold tracking-tight mt-0.5",
-                  saldoGeral >= 0 ? "text-foreground" : "text-destructive",
+                  saldoGeralCalculado >= 0
+                    ? "text-foreground"
+                    : "text-destructive",
                 )}
               >
                 {displaySaldoGeral}

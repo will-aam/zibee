@@ -20,7 +20,6 @@ import {
 
 import { SummaryCard } from "./fixed-expense/SummaryCard";
 import { ExpenseCard } from "./fixed-expense/ExpenseCard";
-import { AddExpenseForm } from "./fixed-expense/AddExpenseForm";
 import {
   EditFixedExpenseDialog,
   type DespesaFixa,
@@ -37,8 +36,6 @@ const fixasCache = {
   despesas: null as DespesaFixa[] | null,
   categorias: null as ItemOpcao[] | null,
   pagamentos: null as ItemOpcao[] | null,
-  nomesLancadosMesKey: "" as string,
-  nomesLancadosEsteMes: null as string[] | null,
 };
 
 function formatMoney(val: number) {
@@ -46,22 +43,6 @@ function formatMoney(val: number) {
     style: "currency",
     currency: "BRL",
   });
-}
-
-function monthKey(d: Date) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  return `${y}-${m}`;
-}
-
-function monthRange(d: Date) {
-  const y = d.getFullYear();
-  const mIndex = d.getMonth();
-  const m = String(mIndex + 1).padStart(2, "0");
-  const start = `${y}-${m}-01`;
-  const lastDay = new Date(y, mIndex + 1, 0).getDate();
-  const end = `${y}-${m}-${String(lastDay).padStart(2, "0")}`;
-  return { start, end };
 }
 
 export default function DespesasFixas() {
@@ -80,15 +61,6 @@ export default function DespesasFixas() {
     isCacheValid && fixasCache.despesas ? fixasCache.despesas : [],
   );
 
-  const hojeKey = useMemo(() => monthKey(new Date()), []);
-  const [nomesLancadosEsteMes, setNomesLancadosEsteMes] = useState<string[]>(
-    isCacheValid &&
-      fixasCache.nomesLancadosEsteMes &&
-      fixasCache.nomesLancadosMesKey === hojeKey
-      ? fixasCache.nomesLancadosEsteMes
-      : [],
-  );
-
   const [categoriasDB, setCategoriasDB] = useState<ItemOpcao[]>(
     isCacheValid && fixasCache.categorias ? fixasCache.categorias : [],
   );
@@ -99,7 +71,6 @@ export default function DespesasFixas() {
   const [loading, setLoading] = useState(
     !(isCacheValid && fixasCache.despesas),
   );
-  const [loadingId, setLoadingId] = useState<number | null>(null);
 
   const [editingExpense, setEditingExpense] = useState<DespesaFixa | null>(
     null,
@@ -134,11 +105,8 @@ export default function DespesasFixas() {
         fixasCache.userId = userId;
         fixasCache.context = activeContext;
         fixasCache.despesas = null;
-        fixasCache.nomesLancadosEsteMes = null;
-        fixasCache.nomesLancadosMesKey = "";
         if (!force) {
           setDespesas([]);
-          setNomesLancadosEsteMes([]);
         }
       }
 
@@ -170,41 +138,22 @@ export default function DespesasFixas() {
           }
         }
 
-        const { start, end } = monthRange(new Date());
-        const thisKey = monthKey(new Date());
-
         const needOptions =
           force || !fixasCache.categorias || !fixasCache.pagamentos;
-        const needLancados =
-          force ||
-          !fixasCache.nomesLancadosEsteMes ||
-          fixasCache.nomesLancadosMesKey !== thisKey;
 
         let queryFixas = supabase
           .from("despesas_fixas")
           .select("*")
           .order("dia_vencimento", { ascending: true });
-        let queryLancamentos = supabase
-          .from("lancamentos")
-          .select("descricao")
-          .gte("data_vencimento", start)
-          .lte("data_vencimento", end);
 
         if (activeContext === "grupo" && groupId) {
           queryFixas = queryFixas.eq("grupo_id", groupId);
-          queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
         } else {
           queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
-          queryLancamentos = queryLancamentos
-            .eq("user_id", userId)
-            .is("grupo_id", null);
         }
 
         const queries: any[] = [
           queryFixas,
-          needLancados
-            ? queryLancamentos
-            : Promise.resolve({ data: fixasCache.nomesLancadosEsteMes }),
           needOptions
             ? supabase.from("categorias").select("*").order("nome")
             : Promise.resolve({ data: fixasCache.categorias }),
@@ -213,21 +162,11 @@ export default function DespesasFixas() {
             : Promise.resolve({ data: fixasCache.pagamentos }),
         ];
 
-        const [resFixas, resLancados, resCat, resPay] =
-          await Promise.all(queries);
+        const [resFixas, resCat, resPay] = await Promise.all(queries);
 
         if (resFixas?.data) {
           setDespesas(resFixas.data);
           fixasCache.despesas = resFixas.data;
-        }
-
-        if (resLancados?.data) {
-          const nomes = (resLancados.data as any[])
-            .map((l) => (typeof l === "string" ? l : l?.descricao))
-            .filter(Boolean);
-          setNomesLancadosEsteMes(nomes);
-          fixasCache.nomesLancadosEsteMes = nomes;
-          fixasCache.nomesLancadosMesKey = thisKey;
         }
 
         if (resCat?.data) {
@@ -253,46 +192,20 @@ export default function DespesasFixas() {
     () => despesas.reduce((acc, curr) => acc + Number(curr.valor), 0),
     [despesas],
   );
-  const totalPagamentoDia05 = useMemo(
+  const totalPrimeiraQuinzena = useMemo(
     () =>
       despesas
-        .filter((d) => d.dia_vencimento <= 10)
+        .filter((d) => d.dia_vencimento <= 14)
         .reduce((acc, curr) => acc + Number(curr.valor), 0),
     [despesas],
   );
-  const totalPagamentoDia15 = useMemo(
+  const totalSegundaQuinzena = useMemo(
     () =>
       despesas
-        .filter((d) => d.dia_vencimento > 10)
+        .filter((d) => d.dia_vencimento >= 15)
         .reduce((acc, curr) => acc + Number(curr.valor), 0),
     [despesas],
   );
-
-  const handleAdicionar = async (
-    data: Omit<DespesaFixa, "id" | "user_id" | "created_at">,
-  ) => {
-    if (!userId) return;
-    try {
-      const payload = {
-        ...data,
-        user_id: userId,
-        grupo_id: activeContext === "grupo" ? currentGroupId : null,
-      };
-
-      const { error } = await supabase.from("despesas_fixas").insert([payload]);
-      if (error) throw error;
-
-      toast({ title: "Despesa fixa adicionada!" });
-      await fetchData(true);
-    } catch (error: any) {
-      toast({
-        title: "Erro ao adicionar",
-        description: error.message,
-        variant: "destructive",
-      });
-      throw error;
-    }
-  };
 
   const confirmDelete = async () => {
     if (!userId || !expenseToDelete) return;
@@ -332,64 +245,6 @@ export default function DespesasFixas() {
     }
   };
 
-  const handleLancarAgora = async (despesa: DespesaFixa) => {
-    if (!userId || nomesLancadosEsteMes.includes(despesa.nome)) return;
-    setLoadingId(despesa.id);
-
-    try {
-      const hoje = new Date();
-      const anoAtual = hoje.getFullYear();
-      const mesAtual = hoje.getMonth();
-      const dataVencimento = new Date(
-        anoAtual,
-        mesAtual,
-        despesa.dia_vencimento,
-      );
-
-      if (dataVencimento.getMonth() !== mesAtual) {
-        dataVencimento.setDate(new Date(anoAtual, mesAtual + 1, 0).getDate());
-      }
-
-      const dataFormatada = dataVencimento.toISOString().split("T")[0];
-
-      const { error } = await supabase.from("lancamentos").insert([
-        {
-          user_id: userId,
-          grupo_id: activeContext === "grupo" ? currentGroupId : null,
-          descricao: despesa.nome,
-          valor: despesa.valor,
-          tipo: "Despesa",
-          categoria: despesa.categoria || "Contas Fixas",
-          forma_pagamento: despesa.forma_pagamento || "Pix",
-          data_vencimento: dataFormatada,
-          pago: true,
-        },
-      ]);
-
-      if (error) throw error;
-
-      setNomesLancadosEsteMes((prev) => {
-        const next = [...prev, despesa.nome];
-        fixasCache.nomesLancadosEsteMes = next;
-        fixasCache.nomesLancadosMesKey = monthKey(new Date());
-        return next;
-      });
-
-      toast({
-        title: "Lançamento realizado!",
-        description: `${despesa.nome} foi lançado para este mês.`,
-      });
-    } catch (error: any) {
-      toast({
-        title: "Erro ao lançar",
-        description: error.message,
-        variant: "destructive",
-      });
-    } finally {
-      setLoadingId(null);
-    }
-  };
-
   const handleExpenseSaved = (updated: DespesaFixa) => {
     setDespesas((prev) => {
       const next = prev
@@ -397,21 +252,6 @@ export default function DespesasFixas() {
         .slice()
         .sort((a, b) => a.dia_vencimento - b.dia_vencimento);
       fixasCache.despesas = next;
-      return next;
-    });
-
-    setNomesLancadosEsteMes((prev) => {
-      if (!editingExpense) return prev;
-      const oldName = editingExpense.nome;
-      const newName = updated.nome;
-      if (oldName === newName) return prev;
-
-      const hadOld = prev.includes(oldName);
-      const withoutOld = prev.filter((n) => n !== oldName);
-      const next = hadOld ? [...withoutOld, newName] : withoutOld;
-
-      fixasCache.nomesLancadosEsteMes = next;
-      fixasCache.nomesLancadosMesKey = monthKey(new Date());
       return next;
     });
 
@@ -423,26 +263,13 @@ export default function DespesasFixas() {
 
   return (
     <>
-      <div className="space-y-8 p-4 md:p-8 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4">
-        {/* HEADER */}
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-3xl font-semibold tracking-tight">
-              Despesas Fixas{" "}
-              {activeContext === "grupo" && (
-                <span className="text-primary">(Grupo)</span>
-              )}
-            </h1>
-            <p className="text-muted-foreground mt-1">
-              Gerencie seus gastos recorrentes{" "}
-              {activeContext === "grupo" && "em conjunto"}
-            </p>
-          </div>
+      <div className="space-y-6 animate-in fade-in p-4 sm:p-8">
+        <div className="flex justify-end">
           <Button
             variant="outline"
             size="sm"
             onClick={() => fetchData(true)}
-            className="gap-2 shrink-0"
+            className="gap-2 shrink-0 rounded-xl"
           >
             <ArrowPathIcon className="h-4 w-4" /> Atualizar
           </Button>
@@ -450,33 +277,23 @@ export default function DespesasFixas() {
 
         <SummaryCard
           totalComprometido={totalComprometido}
-          totalPagamentoDia05={totalPagamentoDia05}
-          totalPagamentoDia15={totalPagamentoDia15}
+          totalPrimeiraQuinzena={totalPrimeiraQuinzena}
+          totalSegundaQuinzena={totalSegundaQuinzena}
           modoQuinzenal={modoQuinzenal}
           setModoQuinzenal={setModoQuinzenal}
           formatMoney={formatMoney}
         />
 
-        <AddExpenseForm
-          categorias={categoriasDB}
-          pagamentos={formasPagamentoDB}
-          onAdd={handleAdicionar}
-        />
-
-        {/* LISTA */}
         {loading && despesas.length === 0 ? (
           <div className="flex justify-center py-10">
             <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/70" />
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="flex flex-col gap-2 pt-2 w-full">
             {despesas.map((despesa) => (
               <ExpenseCard
                 key={despesa.id}
                 despesa={despesa}
-                jaLancadoNoMes={nomesLancadosEsteMes.includes(despesa.nome)}
-                loadingId={loadingId}
-                onLancar={handleLancarAgora}
                 onEdit={(d: DespesaFixa) => {
                   setEditingExpense(d);
                   setIsEditDialogOpen(true);
@@ -487,9 +304,13 @@ export default function DespesasFixas() {
             ))}
 
             {despesas.length === 0 && (
-              <div className="col-span-full text-center py-12 text-muted-foreground border border-dashed rounded-xl bg-card/30">
-                Nenhuma despesa fixa cadastrada{" "}
-                {activeContext === "grupo" ? "para esta " : ""}.
+              <div className="col-span-full flex flex-col items-center justify-center py-16 text-center border border-dashed rounded-3xl bg-card/50">
+                <p className="text-muted-foreground font-medium mb-1">
+                  Nenhuma conta fixa cadastrada.
+                </p>
+                <p className="text-xs text-muted-foreground/70">
+                  Adicione contas fixas pelo botão "+" no topo da tela.
+                </p>
               </div>
             )}
           </div>
@@ -518,7 +339,7 @@ export default function DespesasFixas() {
             <AlertDialogTitle>Remover despesa fixa?</AlertDialogTitle>
             <AlertDialogDescription>
               {expenseToDelete
-                ? `Você tem certeza que deseja remover "${expenseToDelete.nome}"? Esta ação não pode ser desfeita.`
+                ? `Você tem certeza que deseja remover "${expenseToDelete.descricao || expenseToDelete.nome}" do seu planejamento? Lançamentos passados não serão alterados.`
                 : "Você tem certeza?"}
             </AlertDialogDescription>
           </AlertDialogHeader>

@@ -90,6 +90,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       window.dispatchEvent(new Event("zibee:privacy-toggled"));
     } catch {}
   };
+
   const readRange = useCallback(() => {
     if (typeof window === "undefined")
       return { from: null, to: null, key: `all_${activeContext}` };
@@ -179,11 +180,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .from("lancamentos")
         .select("*")
         .eq("tipo", "Despesa");
+
       let queryReceitas = supabase
         .from("lancamentos")
         .select("*")
         .eq("tipo", "Receita")
         .eq("pago", true);
+
       let queryVencimentos = supabase
         .from("lancamentos")
         .select("*")
@@ -192,11 +195,18 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .order("data_vencimento", { ascending: true })
         .limit(5);
 
+      // NOVA QUERY: Busca as Contas Fixas (sempre atualizadas)
+      let queryFixasDashboard = supabase.from("despesas_fixas").select("valor");
+
       // FILTROS MAGICOS DE CONTEXTO
       if (activeContext === "grupo" && currentGroupId) {
         queryDespesas = queryDespesas.eq("grupo_id", currentGroupId);
         queryReceitas = queryReceitas.eq("grupo_id", currentGroupId);
         queryVencimentos = queryVencimentos.eq("grupo_id", currentGroupId);
+        queryFixasDashboard = queryFixasDashboard.eq(
+          "grupo_id",
+          currentGroupId,
+        );
       } else {
         queryDespesas = queryDespesas
           .eq("user_id", userId)
@@ -205,6 +215,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryVencimentos = queryVencimentos
+          .eq("user_id", userId)
+          .is("grupo_id", null);
+        queryFixasDashboard = queryFixasDashboard
           .eq("user_id", userId)
           .is("grupo_id", null);
       }
@@ -224,19 +237,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         { data: lancamentosData },
         { data: receitasData },
         { data: vencimentosData },
-        { data: fixasData },
+        { data: fixasData }, // Trazemos sempre a versão fresca das Contas Fixas
         { data: metaData },
       ] = await Promise.all([
         queryDespesas,
         queryReceitas,
         queryVencimentos,
-        activeContext === "pessoal" &&
-        dashboardCache.totalDespesasFixas[activeContext] === undefined
-          ? supabase
-              .from("despesas_fixas")
-              .select("valor")
-              .eq("user_id", userId)
-          : Promise.resolve({ data: null }),
+        queryFixasDashboard,
         activeContext === "pessoal" &&
         dashboardCache.metaFixada[activeContext] === undefined
           ? supabase
@@ -254,6 +261,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         0;
       const fetchedTotalRec =
         receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+
+      // ATUALIZA O TOTAL DAS CONTAS FIXAS DINAMICAMENTE
+      const fetchedTotalFixas =
+        fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
 
       const categoriasMap = lancamentosData?.reduce((acc: any, curr) => {
         const k = curr.categoria || "Sem categoria";
@@ -273,6 +284,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       setTotalReceitas(fetchedTotalRec);
       setCategoriasChart(fetchedCategoriasChart);
       setProximosVencimentos(fetchedVencimentos);
+      setTotalDespesasFixas(fetchedTotalFixas); // Define o valor fresquinho
 
       dashboardCache.dataByRange[key] = {
         totalDespesas: fetchedTotalDesp,
@@ -283,20 +295,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       };
 
       if (activeContext === "pessoal") {
-        if (fixasData !== null) {
-          const totalFixas = fixasData.reduce(
-            (acc, curr) => acc + Number(curr.valor),
-            0,
-          );
-          setTotalDespesasFixas(totalFixas);
-          dashboardCache.totalDespesasFixas[activeContext] = totalFixas;
-        }
         if (metaData !== null) {
           setMetaFixada(metaData);
           dashboardCache.metaFixada[activeContext] = metaData;
         }
       } else {
-        setTotalDespesasFixas(0);
         setMetaFixada(null);
       }
     } catch (error) {
@@ -321,7 +324,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [fetchDashboardData]);
 
-  // FUNÇÃO MESTRA PARA FORMATAR O DINHEIRO (JÁ APLICANDO A MÁSCARA DE PRIVACIDADE)
   const formatMoney = useCallback(
     (val: number) => {
       if (hidden) return "R$ ****";
@@ -333,10 +335,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     [hidden],
   );
 
+  // MÁGICA ACONTECE AQUI: Nova lógica do Saldo Geral
   const saldoGeral = useMemo(() => {
+    // Se não tem entrada, não exibe saldo
     if (!totalReceitas || totalReceitas <= 0) return 0;
-    return totalReceitas - totalDespesas;
-  }, [totalReceitas, totalDespesas]);
+
+    // Entradas Confirmadas - Gastos Variáveis - Contas Fixas Mensais = Saldo Geral
+    return totalReceitas - totalDespesas - totalDespesasFixas;
+  }, [totalReceitas, totalDespesas, totalDespesasFixas]);
 
   const progressoMeta = useMemo(() => {
     if (!metaFixada) return 0;

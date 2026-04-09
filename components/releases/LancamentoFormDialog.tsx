@@ -23,8 +23,8 @@ import {
 } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { cn } from "@/lib/utils";
 
-// 1. REMOVIDA A OPÇÃO 'infinito'
 type RecurrenceEndType = "ate_data" | "ocorrencias";
 const MAX_RECURRENCE_MONTHS = 600;
 
@@ -54,8 +54,11 @@ export function LancamentoFormDialog({
   const { toast } = useToast();
 
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
+
+  // --- NOVOS ESTADOS DE REPETIÇÃO ---
+  const [isContaFixa, setIsContaFixa] = useState(false);
   const [isRecorrente, setIsRecorrente] = useState(false);
-  // O PADRÃO AGORA É 'ocorrencias'
+
   const [recurrenceEndType, setRecurrenceEndType] =
     useState<RecurrenceEndType>("ocorrencias");
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
@@ -64,6 +67,7 @@ export function LancamentoFormDialog({
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData(lancamentoToEdit);
+      setIsContaFixa(false);
       setIsRecorrente(false);
       setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
@@ -79,6 +83,7 @@ export function LancamentoFormDialog({
         pago: false,
         observacoes: "",
       });
+      setIsContaFixa(false);
       setIsRecorrente(false);
       setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
@@ -153,7 +158,10 @@ export function LancamentoFormDialog({
   };
 
   const validateRecurrence = () => {
+    if (isContaFixa) return true; // Conta fixa só precisa do dia, que já vem da data
+
     if (!isRecorrente || formData.tipo !== "Despesa") return true;
+
     if (!formData.data_vencimento) {
       toast({
         title: "Recorrência inválida",
@@ -207,6 +215,7 @@ export function LancamentoFormDialog({
       } as Omit<Lancamento, "id">;
 
       if (lancamentoToEdit) {
+        // --- MODO EDIÇÃO ---
         const updatePayload = {
           descricao: formData.descricao,
           categoria: formData.categoria,
@@ -229,23 +238,46 @@ export function LancamentoFormDialog({
 
         await query;
 
+        // Se marcou como parcelado durante a edição a partir deste mês
         if (isRecorrente && formData.tipo === "Despesa") {
-          // Lógica de "infinito" foi removida. Só roda se for número ou data.
           const recurrenceItems = createRecurrenceItems(basePayload, false);
           if (recurrenceItems.length > 0)
             await supabase.from("lancamentos").insert(recurrenceItems);
         }
         toast({ title: "Lançamento Atualizado!" });
       } else {
-        if (isRecorrente && formData.tipo === "Despesa") {
+        // --- MODO CRIAÇÃO NOVO ---
+        if (isContaFixa && formData.tipo === "Despesa") {
+          // 1. SALVA APENAS NA TABELA DE CONTAS FIXAS (MASTER)
+          const dia = parseInt(formData.data_vencimento!.split("-")[2]);
+          const payloadFixa = {
+            descricao: formData.descricao,
+            valor: formData.valor,
+            dia_vencimento: dia,
+            categoria: formData.categoria,
+            forma_pagamento: formData.forma_pagamento,
+            user_id: userId,
+            grupo_id: activeContext === "grupo" ? groupId : null,
+          };
+
+          const { error: errFixa } = await supabase
+            .from("despesas_fixas")
+            .insert([payloadFixa]);
+          if (errFixa) throw errFixa;
+
+          toast({ title: "Conta Fixa Cadastrada com Sucesso!" });
+        } else if (isRecorrente && formData.tipo === "Despesa") {
+          // SALVA LANÇAMENTOS PARCELADOS (VÁRIOS MESES NA TABELA NORMAL)
           const recurrenceItems = createRecurrenceItems(basePayload, true);
           await supabase.from("lancamentos").insert(recurrenceItems);
-          toast({ title: "Criados com Recorrência!" });
+          toast({ title: "Parcelas Criadas com Sucesso!" });
         } else {
+          // SALVA LANÇAMENTO ÚNICO NORMAL (TABELA NORMAL)
           await supabase.from("lancamentos").insert([basePayload]);
           toast({ title: "Lançamento Criado!" });
         }
       }
+
       window.dispatchEvent(new Event("zibee:transaction-changed"));
       onSuccess();
       onClose();
@@ -267,15 +299,13 @@ export function LancamentoFormDialog({
         <DialogHeader className="p-6 pb-2 border-b">
           <DialogTitle>
             {lancamentoToEdit ? "Editar" : "Novo"} Lançamento{" "}
-            {activeContext === "grupo" ? (
-              <span className="text-primary">(Casa)</span>
-            ) : (
-              ""
+            {activeContext === "grupo" && (
+              <span className="text-primary">(Grupo)</span>
             )}
           </DialogTitle>
         </DialogHeader>
 
-        <div className="flex-1 overflow-y-auto p-6">
+        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
           <form
             id="lancamento-form"
             onSubmit={handleSubmit}
@@ -293,6 +323,7 @@ export function LancamentoFormDialog({
                 className="text-lg py-6"
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Valor</Label>
@@ -317,7 +348,7 @@ export function LancamentoFormDialog({
               </div>
               <div className="space-y-2">
                 <Label>
-                  {formData.tipo === "Receita" ? "Fonte de Renda" : "Categoria"}
+                  {formData.tipo === "Receita" ? "Fonte de Renda" : "Tipo"}
                 </Label>
                 <Select
                   value={formData.tipo}
@@ -335,6 +366,7 @@ export function LancamentoFormDialog({
                 </Select>
               </div>
             </div>
+
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select
@@ -355,6 +387,7 @@ export function LancamentoFormDialog({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label>
                 {formData.tipo === "Receita"
@@ -379,6 +412,7 @@ export function LancamentoFormDialog({
                 </SelectContent>
               </Select>
             </div>
+
             <div className="space-y-2">
               <Label>
                 {formData.tipo === "Receita"
@@ -395,45 +429,101 @@ export function LancamentoFormDialog({
             </div>
 
             <div className="flex flex-col gap-2 mt-2">
-              <div className="flex items-center gap-2 border p-3 rounded-md">
-                <Checkbox
-                  id="pago"
-                  checked={formData.pago}
-                  onCheckedChange={(checked) =>
-                    setFormData({ ...formData, pago: checked === true })
-                  }
-                />
-                <Label
-                  htmlFor="pago"
-                  className="cursor-pointer flex-1 font-medium"
-                >
-                  {formData.tipo === "Receita"
-                    ? "Já foi recebido?"
-                    : "Já foi pago?"}
-                </Label>
-              </div>
+              {/* CHECKBOX DE PAGO (SÓ APARECE SE NÃO FOR CONTA FIXA) */}
+              {!isContaFixa && (
+                <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Checkbox
+                    id="pago"
+                    checked={formData.pago}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, pago: checked === true })
+                    }
+                  />
+                  <Label
+                    htmlFor="pago"
+                    className="cursor-pointer flex-1 font-medium"
+                  >
+                    {formData.tipo === "Receita"
+                      ? "Já foi recebido?"
+                      : "Já foi pago?"}
+                  </Label>
+                </div>
+              )}
 
-              {formData.tipo === "Despesa" && (
-                <div className="space-y-3 border p-3 rounded-md bg-muted/20">
-                  <div className="flex items-center gap-2">
+              {/* OPÇÕES DE REPETIÇÃO (SÓ APARECE PARA DESPESAS NOVAS) */}
+              {formData.tipo === "Despesa" && !lancamentoToEdit && (
+                <div className="space-y-3 mt-4 pt-4 border-t border-border/50">
+                  <Label className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">
+                    Opções de Repetição
+                  </Label>
+
+                  {/* CARD 1: TORNAR CONTA FIXA */}
+                  <label
+                    className={cn(
+                      "flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
+                      isContaFixa
+                        ? "bg-primary/10 border-primary shadow-sm"
+                        : "bg-card border-border/60 hover:bg-muted/50",
+                    )}
+                  >
                     <Checkbox
-                      id="recorrente"
-                      checked={isRecorrente}
-                      onCheckedChange={(checked) =>
-                        setIsRecorrente(checked === true)
-                      }
+                      checked={isContaFixa}
+                      onCheckedChange={(c) => {
+                        const isFixed = c === true;
+                        setIsContaFixa(isFixed);
+                        if (isFixed) {
+                          setIsRecorrente(false); // Desliga a outra
+                          setFormData((prev) => ({ ...prev, pago: false })); // Força "Não Pago"
+                        }
+                      }}
+                      className="mt-0.5"
                     />
-                    <Label
-                      htmlFor="recorrente"
-                      className="cursor-pointer flex-1 font-medium text-primary"
-                    >
-                      {lancamentoToEdit
-                        ? "Aplicar recorrência a partir deste"
-                        : "Repetir (Parcelamento / Mensal)"}
-                    </Label>
-                  </div>
+                    <div className="flex flex-col gap-1">
+                      <p
+                        className={cn(
+                          "font-bold text-sm",
+                          isContaFixa ? "text-primary" : "text-foreground",
+                        )}
+                      >
+                        Tornar uma Conta Fixa
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Ficará salva na sua aba de Contas Fixas.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* CARD 2: PARCELAMENTO */}
+                  <label
+                    className={cn(
+                      "flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
+                      isRecorrente
+                        ? "bg-foreground/5 border-foreground/30 shadow-sm"
+                        : "bg-card border-border/60 hover:bg-muted/50",
+                    )}
+                  >
+                    <Checkbox
+                      checked={isRecorrente}
+                      onCheckedChange={(c) => {
+                        setIsRecorrente(c === true);
+                        if (c === true) setIsContaFixa(false); // Desliga a outra
+                      }}
+                      className="mt-0.5"
+                    />
+                    <div className="flex flex-col gap-1">
+                      <p className="font-bold text-sm text-foreground">
+                        Compra Parcelada / Temporária
+                      </p>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Repetir por um número específico de meses ou até uma
+                        data limite.
+                      </p>
+                    </div>
+                  </label>
+
+                  {/* CAIXA EXPANSÍVEL DO PARCELAMENTO */}
                   {isRecorrente && (
-                    <div className="grid gap-3">
+                    <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
                       <div className="space-y-2">
                         <Label>Como repetir?</Label>
                         <Select
@@ -442,12 +532,12 @@ export function LancamentoFormDialog({
                             setRecurrenceEndType(v)
                           }
                         >
-                          <SelectTrigger>
+                          <SelectTrigger className="bg-background">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="ocorrencias">
-                              Quantidade de vezes
+                              Quantidade de vezes (Parcelas)
                             </SelectItem>
                             <SelectItem value="ate_data">
                               Até uma data limite
@@ -465,17 +555,17 @@ export function LancamentoFormDialog({
                             onChange={(e) =>
                               setRecurrenceEndDate(e.target.value)
                             }
+                            className="bg-background"
                           />
                         </div>
                       )}
 
-                      {/* O NOVO SELETOR DE OCORRÊNCIAS COM BOTÕES + E - */}
                       {recurrenceEndType === "ocorrencias" && (
                         <div className="space-y-2">
                           <Label>
                             Quantos meses no total? (Incluindo este)
                           </Label>
-                          <div className="flex items-center justify-between bg-background border rounded-lg h-12 px-2 w-full max-w-[200px]">
+                          <div className="flex items-center justify-between bg-background border rounded-xl h-12 px-2 w-full max-w-[200px]">
                             <Button
                               type="button"
                               variant="ghost"
@@ -517,17 +607,22 @@ export function LancamentoFormDialog({
             <div className="h-4"></div>
           </form>
         </div>
+
         <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t bg-background/95 backdrop-blur z-10 flex gap-3">
           <Button
             variant="outline"
-            className="flex-1"
+            className="flex-1 rounded-xl"
             onClick={onClose}
             type="button"
           >
             Cancelar
           </Button>
-          <Button className="flex-1" type="submit" form="lancamento-form">
-            Salvar
+          <Button
+            className="flex-1 rounded-xl"
+            type="submit"
+            form="lancamento-form"
+          >
+            Salvar Lançamento
           </Button>
         </div>
       </DialogContent>

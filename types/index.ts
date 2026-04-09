@@ -1,5 +1,3 @@
-// types/index.ts
-
 export type TipoLancamento = "Receita" | "Despesa";
 
 export interface Lancamento {
@@ -16,6 +14,14 @@ export interface Lancamento {
   pago: boolean;
   observacoes?: string;
   created_at?: string;
+
+  // ==========================================
+  // NOVOS CAMPOS: FASE 2 (SOMBRAS E PARCELAS)
+  // ==========================================
+  conta_fixa_id?: number | null; // ID da Despesa Fixa Master (se for gerado por ela)
+  parcela_atual?: number | null; // Ex: 1
+  total_parcelas?: number | null; // Ex: 10
+  isShadow?: boolean; // FLAG FRONT-END: Indica se é uma projeção virtual (não existe no BD ainda)
 }
 
 export interface Meta {
@@ -46,11 +52,14 @@ export interface Meta {
 export interface DespesaFixa {
   id: number;
   user_id: string;
-  nome: string;
+  grupo_id?: string | null;
+  descricao?: string; // Usando descricao como padrão novo
+  nome?: string; // Mantido para compatibilidade com dados antigos
   valor: number;
   dia_vencimento: number;
   categoria?: string;
   forma_pagamento?: string;
+  status?: "ativo" | "pausado"; // NOVO: Permite congelar a cobrança no mês (Ex: Dízimo)
   created_at?: string;
 }
 
@@ -61,7 +70,7 @@ export interface Categoria {
 }
 
 // ============================================================================
-// NOVAS INTERFACES PARA A FEATURE DE GRUPOS (FASE 2)
+// INTERFACES PARA A FEATURE DE GRUPOS
 // ============================================================================
 
 export interface UserProfile {
@@ -74,7 +83,7 @@ export interface Grupo {
   id: string;
   nome: string;
   criador_id: string;
-  regra_divisao: "igual" | "proporcional";
+  regra_divisao: "igual" | "proportional"; // corrigido typo 'proporcional' -> 'proportional' se estiver em inglês no db, ou mantenha se for PT
   created_at?: string;
 }
 

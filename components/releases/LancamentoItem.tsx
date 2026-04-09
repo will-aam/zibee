@@ -1,5 +1,3 @@
-// componentes/LancamentoItem.tsx
-// Componente para exibir um lançamento individual na lista de lançamentos
 "use client";
 
 import { Button } from "@/components/ui/button";
@@ -10,6 +8,7 @@ import {
   CheckCircleIcon,
   ArrowUpRightIcon,
   ArrowDownRightIcon,
+  MapPinIcon, // <-- Nossa "Tachinha"
 } from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 import type { Lancamento } from "@/types";
@@ -32,6 +31,8 @@ export function LancamentoItem({
   onDelete,
 }: LancamentoItemProps) {
   const isReceita = lancamento.tipo === "Receita";
+  const isFixa = !!lancamento.conta_fixa_id || !!lancamento.isShadow;
+  const isParcelada = !!lancamento.total_parcelas;
 
   return (
     <div
@@ -39,12 +40,14 @@ export function LancamentoItem({
         "group flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-2xl border transition-all duration-200",
         isSelected
           ? "bg-primary/5 border-primary/30"
-          : "bg-card border-border/50 hover:border-border hover:shadow-sm",
+          : lancamento.isShadow
+            ? "bg-accent/10 border-border/80 border-dashed hover:border-border hover:shadow-sm" // Visual de "Sombra/Projeção"
+            : "bg-card border-border/50 hover:border-border hover:shadow-sm",
       )}
     >
       {/* ESQUERDA: Checkbox, Status e Info */}
       <div className="flex items-start sm:items-center gap-3 sm:gap-4">
-        {/* Botão de Status (Pago / Pendente) */}
+        {/* Botão de Status (Pago / Pendente) - A MÁGICA DA MATERIALIZAÇÃO ACONTECE AQUI */}
         <button
           onClick={onTogglePago}
           title={lancamento.pago ? "Marcar como pendente" : "Marcar como pago"}
@@ -53,13 +56,20 @@ export function LancamentoItem({
           {lancamento.pago ? (
             <CheckCircleIcon className="h-6 w-6 text-green-500" />
           ) : (
-            <div className="h-6 w-6 rounded-full border-2 border-muted-foreground/30 hover:border-muted-foreground/60 transition-colors" />
+            <div
+              className={cn(
+                "h-6 w-6 rounded-full border-2 transition-colors",
+                lancamento.isShadow
+                  ? "border-blue-500/40 hover:border-blue-500/80 bg-blue-500/5" // Sombras tem um hover azulzinho
+                  : "border-muted-foreground/30 hover:border-muted-foreground/60",
+              )}
+            />
           )}
         </button>
 
         {/* Textos e Detalhes */}
         <div className="flex flex-col min-w-0">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h3
               className={cn(
                 "font-semibold text-sm sm:text-base truncate",
@@ -68,6 +78,20 @@ export function LancamentoItem({
             >
               {lancamento.descricao}
             </h3>
+
+            {/* TAGS INTELIGENTES (FIXA / PARCELADA) */}
+            <div className="flex items-center gap-1.5">
+              {isFixa && (
+                <span className="flex items-center gap-0.5 bg-blue-500/10 text-blue-600 dark:text-blue-400 text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                  <MapPinIcon className="h-3 w-3" /> Fixa
+                </span>
+              )}
+              {isParcelada && (
+                <span className="flex items-center gap-0.5 bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider">
+                  {lancamento.parcela_atual}/{lancamento.total_parcelas}
+                </span>
+              )}
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-[11px] sm:text-xs text-muted-foreground mt-0.5">

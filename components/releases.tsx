@@ -1,4 +1,3 @@
-// components/releases.tsx
 "use client";
 
 import type React from "react";
@@ -11,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
-import { cn } from "@/lib/utils";
 import {
   PlusIcon,
   TrashIcon,
@@ -85,8 +83,6 @@ export default function Lancamentos() {
   const [filtrosCategoria, setFiltrosCategoria] = useState<string[]>([]);
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
-
-  // NOVO: Filtro de Natureza (preparado para receber as opções do LancamentosFilters)
   const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
 
   const [deleteConfig, setDeleteConfig] = useState<{
@@ -143,9 +139,10 @@ export default function Lancamentos() {
 
       const [ano, mes] = filtroMes.split("-");
       const dataInicio = `${filtroMes}-01`;
-      const dataFim = `${filtroMes}-${new Date(parseInt(ano), parseInt(mes), 0).getDate()}`;
+      const ultimoDia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
+      const dataFim = `${filtroMes}-${ultimoDia}`;
 
-      // AQUI NA PRÓXIMA FASE: Vamos buscar os Lançamentos E as Contas Fixas Pausadas/Ativas
+      // 1. BUSCAR LANÇAMENTOS DO MÊS
       let queryLancamentos = supabase
         .from("lancamentos")
         .select("*")
@@ -153,16 +150,25 @@ export default function Lancamentos() {
         .lte("data_vencimento", dataFim)
         .order("data_vencimento", { ascending: true });
 
+      // 2. BUSCAR CONTAS FIXAS ATIVAS (MASTER)
+      let queryFixas = supabase
+        .from("despesas_fixas")
+        .select("*")
+        .eq("status", "ativo");
+
       if (activeContext === "grupo" && groupId) {
         queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
+        queryFixas = queryFixas.eq("grupo_id", groupId);
       } else {
         queryLancamentos = queryLancamentos
           .eq("user_id", userId)
           .is("grupo_id", null);
+        queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
       }
 
-      const [resLancamentos, resCat, resPay] = await Promise.all([
+      const [resLancamentos, resFixas, resCat, resPay] = await Promise.all([
         queryLancamentos,
+        queryFixas,
         !memoryCache.categorias
           ? supabase.from("categorias").select("*").order("nome")
           : Promise.resolve({ data: memoryCache.categorias }),
@@ -172,10 +178,54 @@ export default function Lancamentos() {
       ]);
 
       if (resLancamentos.data) {
-        const dados = resLancamentos.data as unknown as Lancamento[];
-        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] = dados;
-        setLancamentos(dados);
+        const dadosLancamentos = resLancamentos.data as unknown as Lancamento[];
+        const dadosFixas = resFixas.data || [];
+
+        // 3. A MÁGICA: CRIANDO AS SOMBRAS
+        // Descobre quais Contas Fixas já têm um lançamento real associado neste mês
+        const contasFixasJaPagasNoMes = new Set(
+          dadosLancamentos
+            .filter((l) => l.conta_fixa_id != null)
+            .map((l) => l.conta_fixa_id),
+        );
+
+        const sombras: Lancamento[] = [];
+
+        dadosFixas.forEach((fixa) => {
+          if (!contasFixasJaPagasNoMes.has(fixa.id)) {
+            // Se o mês atual for fevereiro, o dia 31 não existe. Clamping ajusta isso.
+            const diaSeguro = Math.min(fixa.dia_vencimento, ultimoDia);
+            const diaStr = String(diaSeguro).padStart(2, "0");
+
+            sombras.push({
+              id: -fixa.id, // ID Negativo para o front-end não confundir com BD
+              user_id: fixa.user_id,
+              grupo_id: fixa.grupo_id,
+              descricao: fixa.descricao || fixa.nome || "Conta Fixa",
+              categoria: fixa.categoria || "Sem categoria",
+              tipo: "Despesa",
+              valor: fixa.valor,
+              forma_pagamento: fixa.forma_pagamento || "Pendente",
+              data_vencimento: `${filtroMes}-${diaStr}`,
+              pago: false,
+              conta_fixa_id: fixa.id,
+              isShadow: true, // A TAG DA MÁGICA
+            } as Lancamento);
+          }
+        });
+
+        // 4. FUSÃO (Lançamentos + Sombras) ordenados por data
+        const todosOsDados = [...dadosLancamentos, ...sombras].sort(
+          (a, b) =>
+            new Date(a.data_vencimento).getTime() -
+            new Date(b.data_vencimento).getTime(),
+        );
+
+        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+          todosOsDados;
+        setLancamentos(todosOsDados);
       }
+
       if (resCat.data && !memoryCache.categorias) {
         memoryCache.categorias = resCat.data;
         setCategoriasDB(resCat.data);
@@ -209,29 +259,38 @@ export default function Lancamentos() {
     const matchPagamento =
       filtrosPagamento.length === 0 ||
       filtrosPagamento.includes(l.forma_pagamento);
+
     let matchStatus = true;
     if (filtroStatus === "pago") matchStatus = l.pago === true;
     if (filtroStatus === "pendente") matchStatus = l.pago === false;
 
-    // AQUI ENTRARÁ O FILTRO DE NATUREZA NA PRÓXIMA FASE
-    // (ex: if filtroNatureza === 'fixa' => mostra só as sombras)
+    // FILTRO DE NATUREZA DA MÁGICA
+    let matchNatureza = true;
+    if (filtroNatureza === "unica")
+      matchNatureza = !l.conta_fixa_id && !l.total_parcelas;
+    if (filtroNatureza === "fixa") matchNatureza = !!l.conta_fixa_id;
+    if (filtroNatureza === "parcelada") matchNatureza = !!l.total_parcelas;
 
     return (
       matchSearch &&
       matchTipo &&
       matchCategoria &&
       matchPagamento &&
-      matchStatus
+      matchStatus &&
+      matchNatureza
     );
   });
 
   const handleSelectAll = () => {
+    const lancamentosSelecionaveis = lancamentosFiltrados.filter(
+      (l) => !l.isShadow,
+    ); // Não deixa selecionar sombras
     if (
-      selectedIds.length === lancamentosFiltrados.length &&
-      lancamentosFiltrados.length > 0
+      selectedIds.length === lancamentosSelecionaveis.length &&
+      lancamentosSelecionaveis.length > 0
     )
       setSelectedIds([]);
-    else setSelectedIds(lancamentosFiltrados.map((l) => l.id));
+    else setSelectedIds(lancamentosSelecionaveis.map((l) => l.id));
   };
 
   const handleBulkDeleteClick = () => {
@@ -240,6 +299,16 @@ export default function Lancamentos() {
   };
 
   const handleDeleteClick = (id: number) => {
+    // Proíbe excluir Sombra
+    const lanc = lancamentos.find((l) => l.id === id);
+    if (lanc?.isShadow) {
+      toast({
+        title: "Ação não permitida",
+        description:
+          "Esta é uma Conta Fixa. Edite a regra original em configurações para apagá-la.",
+      });
+      return;
+    }
     setDeleteConfig({ isOpen: true, type: "single", id });
   };
 
@@ -295,9 +364,42 @@ export default function Lancamentos() {
     }
   };
 
+  // MÁGICA DA MATERIALIZAÇÃO: Se clicar em pago numa Sombra, vira lançamento real!
   const togglePago = async (lancamento: Lancamento) => {
     try {
       const novoStatus = !lancamento.pago;
+
+      // 1. MATERIALIZAÇÃO DE SOMBRA
+      if (lancamento.isShadow) {
+        // Separa propriedades para não mandar id fantasma nem isShadow pro banco
+        const { id, isShadow, ...dadosProBanco } = lancamento;
+        const payloadInsert = { ...dadosProBanco, pago: true };
+
+        const tempId = Date.now(); // ID Fake temporário para a tela responder rápido
+        const telaAtualizada = lancamentos.map((l) =>
+          l.id === lancamento.id
+            ? ({ ...payloadInsert, id: tempId } as Lancamento)
+            : l,
+        );
+        setLancamentos(telaAtualizada);
+        toast({ title: "Conta Fixa paga! Lançamento gerado." });
+
+        const { data, error } = await supabase
+          .from("lancamentos")
+          .insert([payloadInsert])
+          .select()
+          .single();
+        if (error) throw error;
+
+        // Troca o ID Fake pelo ID real gerado pelo banco
+        setLancamentos((prev) => prev.map((l) => (l.id === tempId ? data : l)));
+        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+          telaAtualizada;
+        window.dispatchEvent(new Event("zibee:transaction-changed"));
+        return;
+      }
+
+      // 2. TOGGLE NORMAL DE UM LANÇAMENTO REAL
       const updated = lancamentos.map((l) =>
         l.id === lancamento.id ? { ...l, pago: novoStatus } : l,
       );
@@ -326,6 +428,15 @@ export default function Lancamentos() {
   };
 
   const handleEdit = (lancamento: Lancamento) => {
+    // Proíbe editar Sombra (ela reflete a master)
+    if (lancamento.isShadow) {
+      toast({
+        title: "Ação não permitida",
+        description:
+          "Esta é uma Conta Fixa projetada. Para editar valor ou data, altere a Conta Fixa mestre.",
+      });
+      return;
+    }
     setLancamentoEditando(lancamento);
     setIsDialogOpen(true);
   };
@@ -375,11 +486,8 @@ export default function Lancamentos() {
               />
             </div>
 
-            {/* O SEU COMPONENTE DE FILTROS AQUI */}
             <LancamentosFilters
               filtrosTipo={filtrosTipo}
-              filtroNatureza={filtroNatureza}
-              setFiltroNatureza={setFiltroNatureza}
               setFiltrosTipo={setFiltrosTipo}
               filtrosCategoria={filtrosCategoria}
               setFiltrosCategoria={setFiltrosCategoria}
@@ -387,9 +495,10 @@ export default function Lancamentos() {
               setFiltrosPagamento={setFiltrosPagamento}
               filtroStatus={filtroStatus}
               setFiltroStatus={setFiltroStatus}
+              filtroNatureza={filtroNatureza}
+              setFiltroNatureza={setFiltroNatureza}
               categoriasOptions={categoriasDB}
               pagamentoOptions={formasPagamentoDB}
-              // Na próxima etapa, passaremos o filtroNatureza para ele
             />
 
             <div className="flex items-center justify-between pt-1">
@@ -397,8 +506,10 @@ export default function Lancamentos() {
                 <Checkbox
                   id="select-all"
                   checked={
-                    lancamentosFiltrados.length > 0 &&
-                    selectedIds.length === lancamentosFiltrados.length
+                    lancamentosFiltrados.filter((l) => !l.isShadow).length >
+                      0 &&
+                    selectedIds.length ===
+                      lancamentosFiltrados.filter((l) => !l.isShadow).length
                   }
                   onCheckedChange={handleSelectAll}
                   className="rounded-lg"
@@ -444,7 +555,8 @@ export default function Lancamentos() {
                 {(filtrosTipo.length > 0 ||
                   filtrosCategoria.length > 0 ||
                   searchQuery ||
-                  filtroStatus) && (
+                  filtroStatus ||
+                  filtroNatureza !== "todas") && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -469,6 +581,7 @@ export default function Lancamentos() {
                     lancamento={lancamento}
                     isSelected={selectedIds.includes(lancamento.id)}
                     onSelect={() => {
+                      if (lancamento.isShadow) return; // Proíbe selecionar sombra pra excluir em massa
                       if (selectedIds.includes(lancamento.id)) {
                         setSelectedIds((prev) =>
                           prev.filter((id) => id !== lancamento.id),

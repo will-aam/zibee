@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import {
   PlusIcon,
   TrashIcon,
@@ -150,11 +151,8 @@ export default function Lancamentos() {
         .lte("data_vencimento", dataFim)
         .order("data_vencimento", { ascending: true });
 
-      // 2. BUSCAR CONTAS FIXAS ATIVAS (MASTER)
-      let queryFixas = supabase
-        .from("despesas_fixas")
-        .select("*")
-        .eq("status", "ativo");
+      // 2. BUSCAR CONTAS FIXAS ATIVAS E PAUSADAS
+      let queryFixas = supabase.from("despesas_fixas").select("*");
 
       if (activeContext === "grupo" && groupId) {
         queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
@@ -181,8 +179,7 @@ export default function Lancamentos() {
         const dadosLancamentos = resLancamentos.data as unknown as Lancamento[];
         const dadosFixas = resFixas.data || [];
 
-        // 3. A MÁGICA: CRIANDO AS SOMBRAS
-        // Descobre quais Contas Fixas já têm um lançamento real associado neste mês
+        // 3. A MÁGICA: CRIANDO AS SOMBRAS (Apenas para Fixas "Ativas")
         const contasFixasJaPagasNoMes = new Set(
           dadosLancamentos
             .filter((l) => l.conta_fixa_id != null)
@@ -192,13 +189,15 @@ export default function Lancamentos() {
         const sombras: Lancamento[] = [];
 
         dadosFixas.forEach((fixa) => {
+          // Ignora se estiver pausada
+          if (fixa.status === "pausado") return;
+
           if (!contasFixasJaPagasNoMes.has(fixa.id)) {
-            // Se o mês atual for fevereiro, o dia 31 não existe. Clamping ajusta isso.
             const diaSeguro = Math.min(fixa.dia_vencimento, ultimoDia);
             const diaStr = String(diaSeguro).padStart(2, "0");
 
             sombras.push({
-              id: -fixa.id, // ID Negativo para o front-end não confundir com BD
+              id: -fixa.id, // ID Negativo: é sombra
               user_id: fixa.user_id,
               grupo_id: fixa.grupo_id,
               descricao: fixa.descricao || fixa.nome || "Conta Fixa",
@@ -209,7 +208,7 @@ export default function Lancamentos() {
               data_vencimento: `${filtroMes}-${diaStr}`,
               pago: false,
               conta_fixa_id: fixa.id,
-              isShadow: true, // A TAG DA MÁGICA
+              isShadow: true,
             } as Lancamento);
           }
         });
@@ -264,7 +263,6 @@ export default function Lancamentos() {
     if (filtroStatus === "pago") matchStatus = l.pago === true;
     if (filtroStatus === "pendente") matchStatus = l.pago === false;
 
-    // FILTRO DE NATUREZA DA MÁGICA
     let matchNatureza = true;
     if (filtroNatureza === "unica")
       matchNatureza = !l.conta_fixa_id && !l.total_parcelas;
@@ -284,7 +282,7 @@ export default function Lancamentos() {
   const handleSelectAll = () => {
     const lancamentosSelecionaveis = lancamentosFiltrados.filter(
       (l) => !l.isShadow,
-    ); // Não deixa selecionar sombras
+    ); // Não deixa selecionar sombras em massa
     if (
       selectedIds.length === lancamentosSelecionaveis.length &&
       lancamentosSelecionaveis.length > 0
@@ -299,16 +297,7 @@ export default function Lancamentos() {
   };
 
   const handleDeleteClick = (id: number) => {
-    // Proíbe excluir Sombra
-    const lanc = lancamentos.find((l) => l.id === id);
-    if (lanc?.isShadow) {
-      toast({
-        title: "Ação não permitida",
-        description:
-          "Esta é uma Conta Fixa. Edite a regra original em configurações para apagá-la.",
-      });
-      return;
-    }
+    // Agora é permitido! Passamos o ID (se for negativo, a confirmDeletion sabe tratar)
     setDeleteConfig({ isOpen: true, type: "single", id });
   };
 
@@ -340,19 +329,34 @@ export default function Lancamentos() {
         toast({ title: `${idsToDelete.length} excluídos.` });
         window.dispatchEvent(new Event("zibee:transaction-changed"));
       } else if (deleteConfig.type === "single" && deleteConfig.id) {
-        const idToDelete = deleteConfig.id;
-        const remaining = lancamentos.filter((l) => l.id !== idToDelete);
+        // -----------------------------------------------------
+        // MÁGICA DA EXCLUSÃO (Sombras x Reais)
+        // -----------------------------------------------------
+        const isShadow = deleteConfig.id < 0;
+        const realId = isShadow ? -deleteConfig.id : deleteConfig.id; // Transforma ID negativo em positivo
+
+        const remaining = lancamentos.filter((l) => l.id !== deleteConfig.id);
         setLancamentos(remaining);
         memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
           remaining;
 
-        let query = supabase.from("lancamentos").delete().eq("id", idToDelete);
+        let query;
+        if (isShadow) {
+          // Se é sombra, exclui na tabela Mestre (Contas Fixas)
+          query = supabase.from("despesas_fixas").delete().eq("id", realId);
+        } else {
+          // Se é lançamento real, exclui no Lançamentos
+          query = supabase.from("lancamentos").delete().eq("id", realId);
+        }
+
         if (activeContext === "grupo" && currentGroupId)
           query = query.eq("grupo_id", currentGroupId);
         else query = query.eq("user_id", userId).is("grupo_id", null);
 
         await query;
-        toast({ title: "Excluído com sucesso" });
+        toast({
+          title: isShadow ? "Conta Fixa cancelada!" : "Excluído com sucesso",
+        });
         window.dispatchEvent(new Event("zibee:transaction-changed"));
       }
     } catch {
@@ -364,18 +368,16 @@ export default function Lancamentos() {
     }
   };
 
-  // MÁGICA DA MATERIALIZAÇÃO: Se clicar em pago numa Sombra, vira lançamento real!
   const togglePago = async (lancamento: Lancamento) => {
     try {
       const novoStatus = !lancamento.pago;
 
       // 1. MATERIALIZAÇÃO DE SOMBRA
       if (lancamento.isShadow) {
-        // Separa propriedades para não mandar id fantasma nem isShadow pro banco
         const { id, isShadow, ...dadosProBanco } = lancamento;
         const payloadInsert = { ...dadosProBanco, pago: true };
 
-        const tempId = Date.now(); // ID Fake temporário para a tela responder rápido
+        const tempId = Date.now();
         const telaAtualizada = lancamentos.map((l) =>
           l.id === lancamento.id
             ? ({ ...payloadInsert, id: tempId } as Lancamento)
@@ -391,7 +393,6 @@ export default function Lancamentos() {
           .single();
         if (error) throw error;
 
-        // Troca o ID Fake pelo ID real gerado pelo banco
         setLancamentos((prev) => prev.map((l) => (l.id === tempId ? data : l)));
         memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
           telaAtualizada;
@@ -428,18 +429,14 @@ export default function Lancamentos() {
   };
 
   const handleEdit = (lancamento: Lancamento) => {
-    // Proíbe editar Sombra (ela reflete a master)
-    if (lancamento.isShadow) {
-      toast({
-        title: "Ação não permitida",
-        description:
-          "Esta é uma Conta Fixa projetada. Para editar valor ou data, altere a Conta Fixa mestre.",
-      });
-      return;
-    }
+    // Agora o botão de editar da Sombra funciona! Vamos mandar pro modal do formulário e resolver lá.
     setLancamentoEditando(lancamento);
     setIsDialogOpen(true);
   };
+
+  // Variável para descobrir se estamos excluindo uma sombra no AlertDialog
+  const isShadowDeleting =
+    deleteConfig.type === "single" && deleteConfig.id && deleteConfig.id < 0;
 
   return (
     <>
@@ -474,7 +471,6 @@ export default function Lancamentos() {
 
         {/* CONTEÚDO PRINCIPAL CHAPADO NA TELA */}
         <div className="flex flex-col gap-4">
-          {/* TOPO: BUSCA E FILTROS */}
           <div className="flex flex-col gap-4">
             <div className="relative group">
               <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
@@ -581,7 +577,7 @@ export default function Lancamentos() {
                     lancamento={lancamento}
                     isSelected={selectedIds.includes(lancamento.id)}
                     onSelect={() => {
-                      if (lancamento.isShadow) return; // Proíbe selecionar sombra pra excluir em massa
+                      if (lancamento.isShadow) return;
                       if (selectedIds.includes(lancamento.id)) {
                         setSelectedIds((prev) =>
                           prev.filter((id) => id !== lancamento.id),
@@ -626,13 +622,17 @@ export default function Lancamentos() {
             <AlertDialogTitle>
               {deleteConfig.type === "bulk"
                 ? "Excluir lançamentos selecionados?"
-                : "Excluir lançamento?"}
+                : isShadowDeleting
+                  ? "Excluir Conta Fixa?"
+                  : "Excluir lançamento?"}
             </AlertDialogTitle>
 
             <AlertDialogDescription>
               {deleteConfig.type === "bulk"
                 ? `Você está prestes a excluir ${selectedIds.length} lançamentos. Esta ação não pode ser desfeita.`
-                : "Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita."}
+                : isShadowDeleting
+                  ? "Você apagará esta regra de cobrança para os meses futuros. Os pagamentos já realizados nos meses anteriores serão mantidos no histórico."
+                  : "Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita."}
             </AlertDialogDescription>
           </AlertDialogHeader>
 

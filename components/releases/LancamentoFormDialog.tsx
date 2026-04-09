@@ -15,6 +15,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
+import { Switch } from "@/components/ui/switch"; // Novo para a Pausa
 import {
   Dialog,
   DialogContent,
@@ -26,6 +27,7 @@ import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 
 type RecurrenceEndType = "ate_data" | "ocorrencias";
+type RepeatType = "unica" | "fixa" | "parcelada"; // Novo formato de escolha
 const MAX_RECURRENCE_MONTHS = 600;
 
 interface LancamentoFormDialogProps {
@@ -55,20 +57,21 @@ export function LancamentoFormDialog({
 
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
 
-  // --- NOVOS ESTADOS DE REPETIÇÃO ---
-  const [isContaFixa, setIsContaFixa] = useState(false);
-  const [isRecorrente, setIsRecorrente] = useState(false);
-
+  // --- NOVOS ESTADOS HUMANOS ---
+  const [repeatType, setRepeatType] = useState<RepeatType>("unica");
   const [recurrenceEndType, setRecurrenceEndType] =
     useState<RecurrenceEndType>("ocorrencias");
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState(2);
 
+  // Estado para o botão de PAUSAR conta fixa
+  const [statusFixa, setStatusFixa] = useState<"ativo" | "pausado">("ativo");
+
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData(lancamentoToEdit);
-      setIsContaFixa(false);
-      setIsRecorrente(false);
+      setRepeatType(lancamentoToEdit.isShadow ? "fixa" : "unica");
+      setStatusFixa("ativo"); // Como a sombra só aparece se estiver ativa, inicia como ativo
       setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
       setRecurrenceOccurrences(2);
@@ -83,8 +86,8 @@ export function LancamentoFormDialog({
         pago: false,
         observacoes: "",
       });
-      setIsContaFixa(false);
-      setIsRecorrente(false);
+      setRepeatType("unica");
+      setStatusFixa("ativo");
       setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
       setRecurrenceOccurrences(2);
@@ -116,22 +119,20 @@ export function LancamentoFormDialog({
     return target;
   };
 
-  const createRecurrenceItems = (
-    basePayload: Omit<Lancamento, "id">,
-    includeCurrent: boolean,
-  ) => {
+  const createRecurrenceItems = (basePayload: Omit<Lancamento, "id">) => {
     const items: Omit<Lancamento, "id">[] = [];
     const baseDate = parseDateLocal(basePayload.data_vencimento);
 
-    if (includeCurrent) items.push(basePayload);
-
     if (recurrenceEndType === "ocorrencias") {
-      for (let i = 1; i < recurrenceOccurrences; i++) {
-        const nextDate = addMonthsKeepingDay(baseDate, i);
+      const total = recurrenceOccurrences;
+      for (let i = 1; i <= total; i++) {
+        const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
           ...basePayload,
           data_vencimento: formatDateLocal(nextDate),
-          pago: false,
+          pago: i === 1 ? formData.pago || false : false, // Mantém pago só na primeira parcela se marcado
+          parcela_atual: i,
+          total_parcelas: total,
         });
       }
       return items;
@@ -139,28 +140,38 @@ export function LancamentoFormDialog({
 
     if (recurrenceEndType === "ate_data") {
       const end = parseDateLocal(recurrenceEndDate);
+      let parcelasCount = 0;
+
+      // Conta primeiro quantas parcelas vai dar
       for (
-        let monthOffset = 1;
+        let monthOffset = 0;
         monthOffset <= MAX_RECURRENCE_MONTHS;
         monthOffset++
       ) {
         const nextDate = addMonthsKeepingDay(baseDate, monthOffset);
         if (nextDate > end) break;
+        parcelasCount++;
+      }
+
+      // Agora gera os itens
+      for (let i = 1; i <= parcelasCount; i++) {
+        const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
           ...basePayload,
           data_vencimento: formatDateLocal(nextDate),
-          pago: false,
+          pago: i === 1 ? formData.pago || false : false,
+          parcela_atual: i,
+          total_parcelas: parcelasCount,
         });
       }
     }
-
     return items;
   };
 
   const validateRecurrence = () => {
-    if (isContaFixa) return true; // Conta fixa só precisa do dia, que já vem da data
+    if (repeatType === "fixa") return true;
 
-    if (!isRecorrente || formData.tipo !== "Despesa") return true;
+    if (repeatType !== "parcelada" || formData.tipo !== "Despesa") return true;
 
     if (!formData.data_vencimento) {
       toast({
@@ -216,39 +227,66 @@ export function LancamentoFormDialog({
 
       if (lancamentoToEdit) {
         // --- MODO EDIÇÃO ---
-        const updatePayload = {
-          descricao: formData.descricao,
-          categoria: formData.categoria,
-          tipo: formData.tipo,
-          valor: formData.valor,
-          forma_pagamento: formData.forma_pagamento,
-          data_vencimento: formData.data_vencimento,
-          pago: formData.pago,
-          observacoes: formData.observacoes,
-          link: formData.link,
-        };
 
-        let query = supabase
-          .from("lancamentos")
-          .update(updatePayload)
-          .eq("id", lancamentoToEdit.id);
-        if (activeContext === "grupo" && groupId)
-          query = query.eq("grupo_id", groupId);
-        else query = query.eq("user_id", userId).is("grupo_id", null);
+        if (lancamentoToEdit.isShadow) {
+          // EDIÇÃO DA TABELA MASTER (DESPESAS FIXAS)
+          const dia = parseInt(formData.data_vencimento!.split("-")[2]);
+          const updateMasterPayload = {
+            descricao: formData.descricao,
+            valor: formData.valor,
+            dia_vencimento: dia,
+            categoria: formData.categoria,
+            forma_pagamento: formData.forma_pagamento,
+            status: statusFixa, // Aqui aplicamos a pausa se o usuário pediu!
+          };
 
-        await query;
+          let query = supabase
+            .from("despesas_fixas")
+            .update(updateMasterPayload)
+            .eq("id", lancamentoToEdit.conta_fixa_id);
 
-        // Se marcou como parcelado durante a edição a partir deste mês
-        if (isRecorrente && formData.tipo === "Despesa") {
-          const recurrenceItems = createRecurrenceItems(basePayload, false);
-          if (recurrenceItems.length > 0)
-            await supabase.from("lancamentos").insert(recurrenceItems);
+          if (activeContext === "grupo" && groupId)
+            query = query.eq("grupo_id", groupId);
+          else query = query.eq("user_id", userId).is("grupo_id", null);
+
+          await query;
+          toast({
+            title:
+              statusFixa === "pausado"
+                ? "Conta Fixa Pausada!"
+                : "Conta Fixa Atualizada!",
+          });
+        } else {
+          // EDIÇÃO DE LANÇAMENTO COMUM
+          const updatePayload = {
+            descricao: formData.descricao,
+            categoria: formData.categoria,
+            tipo: formData.tipo,
+            valor: formData.valor,
+            forma_pagamento: formData.forma_pagamento,
+            data_vencimento: formData.data_vencimento,
+            pago: formData.pago,
+            observacoes: formData.observacoes,
+            link: formData.link,
+          };
+
+          let query = supabase
+            .from("lancamentos")
+            .update(updatePayload)
+            .eq("id", lancamentoToEdit.id);
+
+          if (activeContext === "grupo" && groupId)
+            query = query.eq("grupo_id", groupId);
+          else query = query.eq("user_id", userId).is("grupo_id", null);
+
+          await query;
+          toast({ title: "Lançamento Atualizado!" });
         }
-        toast({ title: "Lançamento Atualizado!" });
       } else {
         // --- MODO CRIAÇÃO NOVO ---
-        if (isContaFixa && formData.tipo === "Despesa") {
-          // 1. SALVA APENAS NA TABELA DE CONTAS FIXAS (MASTER)
+
+        if (repeatType === "fixa" && formData.tipo === "Despesa") {
+          // SALVA APENAS NA TABELA DE CONTAS FIXAS (MASTER)
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const payloadFixa = {
             descricao: formData.descricao,
@@ -258,6 +296,7 @@ export function LancamentoFormDialog({
             forma_pagamento: formData.forma_pagamento,
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
+            status: "ativo", // Nasce ativa
           };
 
           const { error: errFixa } = await supabase
@@ -266,9 +305,9 @@ export function LancamentoFormDialog({
           if (errFixa) throw errFixa;
 
           toast({ title: "Conta Fixa Cadastrada com Sucesso!" });
-        } else if (isRecorrente && formData.tipo === "Despesa") {
+        } else if (repeatType === "parcelada" && formData.tipo === "Despesa") {
           // SALVA LANÇAMENTOS PARCELADOS (VÁRIOS MESES NA TABELA NORMAL)
-          const recurrenceItems = createRecurrenceItems(basePayload, true);
+          const recurrenceItems = createRecurrenceItems(basePayload);
           await supabase.from("lancamentos").insert(recurrenceItems);
           toast({ title: "Parcelas Criadas com Sucesso!" });
         } else {
@@ -355,6 +394,7 @@ export function LancamentoFormDialog({
                   onValueChange={(v: any) =>
                     setFormData({ ...formData, tipo: v })
                   }
+                  disabled={!!lancamentoToEdit} // Trava alteração de tipo na edição
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -428,9 +468,28 @@ export function LancamentoFormDialog({
               />
             </div>
 
+            {/* SEÇÃO INOVADORA DE PAUSA (Só aparece ao editar uma sombra) */}
+            {lancamentoToEdit?.isShadow && (
+              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-bold">Cobrança Ativa</Label>
+                  <p className="text-xs text-muted-foreground">
+                    Desative para pausar esta conta fixa nos próximos meses.
+                  </p>
+                </div>
+                <Switch
+                  checked={statusFixa === "ativo"}
+                  onCheckedChange={(c) =>
+                    setStatusFixa(c ? "ativo" : "pausado")
+                  }
+                />
+              </div>
+            )}
+
+            {/* SEÇÃO DE PAGAMENTO E REPETIÇÃO */}
             <div className="flex flex-col gap-2 mt-2">
               {/* CHECKBOX DE PAGO (SÓ APARECE SE NÃO FOR CONTA FIXA) */}
-              {!isContaFixa && (
+              {repeatType !== "fixa" && !lancamentoToEdit?.isShadow && (
                 <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
                   <Checkbox
                     id="pago"
@@ -450,82 +509,56 @@ export function LancamentoFormDialog({
                 </div>
               )}
 
-              {/* OPÇÕES DE REPETIÇÃO (SÓ APARECE PARA DESPESAS NOVAS) */}
+              {/* OPÇÕES DE REPETIÇÃO HUMANIZADAS (SÓ APARECE PARA DESPESAS NOVAS) */}
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
-                <div className="space-y-3 mt-4 pt-4 border-t border-border/50">
-                  <Label className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">
-                    Opções de Repetição
+                <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
+                  <Label className="text-muted-foreground font-bold">
+                    Como essa despesa se repete?
                   </Label>
 
-                  {/* CARD 1: TORNAR CONTA FIXA */}
-                  <label
-                    className={cn(
-                      "flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
-                      isContaFixa
-                        ? "bg-primary/10 border-primary shadow-sm"
-                        : "bg-card border-border/60 hover:bg-muted/50",
-                    )}
-                  >
-                    <Checkbox
-                      checked={isContaFixa}
-                      onCheckedChange={(c) => {
-                        const isFixed = c === true;
-                        setIsContaFixa(isFixed);
-                        if (isFixed) {
-                          setIsRecorrente(false); // Desliga a outra
-                          setFormData((prev) => ({ ...prev, pago: false })); // Força "Não Pago"
-                        }
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <Button
+                      type="button"
+                      variant={repeatType === "unica" ? "default" : "outline"}
+                      className="w-full justify-center"
+                      onClick={() => {
+                        setRepeatType("unica");
+                        setFormData((prev) => ({ ...prev, pago: false }));
                       }}
-                      className="mt-0.5"
-                    />
-                    <div className="flex flex-col gap-1">
-                      <p
-                        className={cn(
-                          "font-bold text-sm",
-                          isContaFixa ? "text-primary" : "text-foreground",
-                        )}
-                      >
-                        Tornar uma Conta Fixa
-                      </p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Ficará salva na sua aba de Contas Fixas.
-                      </p>
-                    </div>
-                  </label>
-
-                  {/* CARD 2: PARCELAMENTO */}
-                  <label
-                    className={cn(
-                      "flex items-start gap-3 p-4 rounded-2xl border cursor-pointer transition-all",
-                      isRecorrente
-                        ? "bg-foreground/5 border-foreground/30 shadow-sm"
-                        : "bg-card border-border/60 hover:bg-muted/50",
-                    )}
-                  >
-                    <Checkbox
-                      checked={isRecorrente}
-                      onCheckedChange={(c) => {
-                        setIsRecorrente(c === true);
-                        if (c === true) setIsContaFixa(false); // Desliga a outra
+                    >
+                      Única
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={repeatType === "fixa" ? "default" : "outline"}
+                      className="w-full justify-center"
+                      onClick={() => {
+                        setRepeatType("fixa");
+                        setFormData((prev) => ({ ...prev, pago: false }));
                       }}
-                      className="mt-0.5"
-                    />
-                    <div className="flex flex-col gap-1">
-                      <p className="font-bold text-sm text-foreground">
-                        Compra Parcelada / Temporária
-                      </p>
-                      <p className="text-xs text-muted-foreground leading-relaxed">
-                        Repetir por um número específico de meses ou até uma
-                        data limite.
-                      </p>
-                    </div>
-                  </label>
+                    >
+                      Assinatura (Fixa)
+                    </Button>
+                    <Button
+                      type="button"
+                      variant={
+                        repeatType === "parcelada" ? "default" : "outline"
+                      }
+                      className="w-full justify-center"
+                      onClick={() => {
+                        setRepeatType("parcelada");
+                        setFormData((prev) => ({ ...prev, pago: false }));
+                      }}
+                    >
+                      Parcelada
+                    </Button>
+                  </div>
 
                   {/* CAIXA EXPANSÍVEL DO PARCELAMENTO */}
-                  {isRecorrente && (
-                    <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                  {repeatType === "parcelada" && (
+                    <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2 mt-2">
                       <div className="space-y-2">
-                        <Label>Como repetir?</Label>
+                        <Label>Até quando se repete?</Label>
                         <Select
                           value={recurrenceEndType}
                           onValueChange={(v: RecurrenceEndType) =>
@@ -537,7 +570,7 @@ export function LancamentoFormDialog({
                           </SelectTrigger>
                           <SelectContent>
                             <SelectItem value="ocorrencias">
-                              Quantidade de vezes (Parcelas)
+                              Quantidade de Parcelas
                             </SelectItem>
                             <SelectItem value="ate_data">
                               Até uma data limite
@@ -548,7 +581,7 @@ export function LancamentoFormDialog({
 
                       {recurrenceEndType === "ate_data" && (
                         <div className="space-y-2">
-                          <Label>Data final</Label>
+                          <Label>Data da última parcela</Label>
                           <Input
                             type="date"
                             value={recurrenceEndDate}

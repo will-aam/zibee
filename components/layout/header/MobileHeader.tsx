@@ -18,6 +18,7 @@ interface MobileHeaderProps {
   totalReceitas: number;
   totalDespesas: number;
   totalDespesasFixas: number;
+  listaFixas?: any[]; // <-- NOVO: Recebe a lista do pai
   onNavigate: (tab: string) => void;
   onOpenProfile: () => void;
   onOpenFilter: () => void;
@@ -72,6 +73,7 @@ export function MobileHeader({
   totalReceitas,
   totalDespesas,
   totalDespesasFixas,
+  listaFixas = [], // <-- NOVO: Padrão vazio
   onNavigate,
   onOpenProfile,
   onOpenFilter,
@@ -106,10 +108,9 @@ export function MobileHeader({
             </p>
           </div>
 
-          {/* GRUPO DE BOTÕES DE AÇÃO NO TOPO (Agora com 3 opções) */}
           <div className="flex items-center gap-1">
             <button
-              onClick={() => onNavigate("receitas")} // Navega para o Resumo
+              onClick={() => onNavigate("receitas")}
               className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/10"
               title="Resumo"
             >
@@ -141,6 +142,7 @@ export function MobileHeader({
           entradasConfirmadas={totalReceitas}
           gastosVariaveis={totalDespesas}
           contasFixasMensais={totalDespesasFixas}
+          listaFixas={listaFixas} // <-- NOVO: Passando pro Modal do celular
           onNavigate={onNavigate}
         />
       )}

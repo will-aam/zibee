@@ -5,7 +5,6 @@ import { useRouter } from "next/navigation";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
-import { useToast } from "@/hooks/use-toast";
 import { DesktopHeader } from "./DesktopHeader";
 import { MobileHeader } from "./MobileHeader";
 import { MobileNav } from "./MobileNav";
@@ -43,11 +42,12 @@ export default function Header({
     seed: "Zibee-1",
   });
 
-  // ESTADOS DOS TOTAIS (Para o Resumo Mobile)
+  // ESTADOS DOS TOTAIS
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
   const [totalDespesas, setTotalDespesas] = React.useState(0);
   const [totalDespesasFixas, setTotalDespesasFixas] = React.useState(0);
+  const [listaFixas, setListaFixas] = React.useState<any[]>([]); // NOVO: Para o modal mobile
 
   const userId = session.data?.user?.id;
   const userEmail = session.data?.user?.email;
@@ -55,8 +55,8 @@ export default function Header({
 
   const saldoGeral = React.useMemo(() => {
     if (!totalReceitas || totalReceitas <= 0) return 0;
-    return totalReceitas - totalDespesas;
-  }, [totalReceitas, totalDespesas]);
+    return totalReceitas - totalDespesas - totalDespesasFixas; // Agora subtrai as fixas
+  }, [totalReceitas, totalDespesas, totalDespesasFixas]);
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
@@ -68,12 +68,10 @@ export default function Header({
     });
   };
 
-  // --- NOVA FUNÇÃO DE LEITURA DO RANGE DE DATAS ---
   const readRange = React.useCallback(() => {
     let from = localStorage.getItem(STORAGE_FROM_KEY);
     let to = localStorage.getItem(STORAGE_TO_KEY);
 
-    // Se o localStorage estiver vazio, define o mês atual como padrão
     if (!from || !to) {
       const hoje = new Date();
       const ano = hoje.getFullYear();
@@ -83,7 +81,6 @@ export default function Header({
       from = `${ano}-${mes}-01`;
       to = `${ano}-${mes}-${String(ultimoDia).padStart(2, "0")}`;
 
-      // Salva no localStorage para que os outros painéis leiam essa mesma configuração inicial
       localStorage.setItem(STORAGE_FROM_KEY, from);
       localStorage.setItem(STORAGE_TO_KEY, to);
     }
@@ -91,16 +88,13 @@ export default function Header({
     return { from, to };
   }, []);
 
-  // BUSCA DE TOTAIS (Respeitando Pessoal/Grupo)
   const loadTotals = React.useCallback(async () => {
     if (!userId) return setLoadingTotals(false);
     setLoadingTotals(true);
 
-    // Substitui a leitura direta pelo localStorage pela função que garante o valor padrão
     const { from, to } = readRange();
 
     try {
-      // 1. Achar Grupo se necessário
       let groupId = null;
       if (activeContext === "grupo") {
         const { data: g } = await supabase
@@ -125,11 +119,18 @@ export default function Header({
         .select("valor")
         .eq("tipo", "Receita")
         .eq("pago", true);
+
       let queryD = supabase
         .from("lancamentos")
         .select("valor")
-        .eq("tipo", "Despesa");
-      let queryF = supabase.from("despesas_fixas").select("valor");
+        .eq("tipo", "Despesa")
+        .is("conta_fixa_id", null); // MÁGICA: Isola as variáveis
+
+      let queryF = supabase
+        .from("despesas_fixas")
+        .select("*") // MÁGICA: Busca tudo (nome, data, etc)
+        .eq("status", "ativo")
+        .order("dia_vencimento", { ascending: true });
 
       if (activeContext === "grupo" && groupId) {
         queryR = queryR.eq("grupo_id", groupId);
@@ -141,7 +142,6 @@ export default function Header({
         queryF = queryF.eq("user_id", userId).is("grupo_id", null);
       }
 
-      // 'from' e 'to' nunca serão undefined agora graças ao readRange, mas mantemos o if por segurança
       if (from) {
         queryR = queryR.gte("data_vencimento", from);
         queryD = queryD.gte("data_vencimento", from);
@@ -163,9 +163,12 @@ export default function Header({
       setTotalDespesas(
         d?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
       );
+
+      const fixasValidas = f || [];
       setTotalDespesasFixas(
-        f?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
+        fixasValidas.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
       );
+      setListaFixas(fixasValidas); // Guardando para o Mobile
     } catch (e) {
       console.error(e);
     } finally {
@@ -177,20 +180,15 @@ export default function Header({
     loadTotals();
   }, [loadTotals]);
 
-  // Procure este bloco no seu Header/index.tsx e deixe exatamente assim:
   React.useEffect(() => {
     window.addEventListener(FILTER_EVENT, loadTotals);
-    // 1. ADICIONE ESTA LINHA: Escutar mudanças de lançamentos
     window.addEventListener("zibee:transaction-changed", loadTotals);
-
     return () => {
       window.removeEventListener(FILTER_EVENT, loadTotals);
-      // 2. ADICIONE ESTA LINHA: Limpar o ouvinte
       window.removeEventListener("zibee:transaction-changed", loadTotals);
     };
   }, [loadTotals]);
 
-  // Restante da lógica (Check Premium e Avatar) permanece igual...
   React.useEffect(() => {
     if (!userId || !userEmail) return;
     const check = async () => {
@@ -269,6 +267,7 @@ export default function Header({
         totalReceitas={totalReceitas}
         totalDespesas={totalDespesas}
         totalDespesasFixas={totalDespesasFixas}
+        listaFixas={listaFixas} // MÁGICA: Lista descendo pro Mobile
         onNavigate={onNavigate!}
         onOpenProfile={() => setOpenProfileDrawer(true)}
         onOpenFilter={() => setOpenFilterDrawer(true)}

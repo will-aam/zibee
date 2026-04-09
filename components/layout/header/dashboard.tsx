@@ -401,8 +401,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const fetchedTotalFixas =
         dadosFixasValidos.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
         0;
+      const todosOsGastos = [
+        ...(variaveisData || []),
+        ...(dadosFixasValidos || []),
+      ];
 
-      const categoriasMap = variaveisData?.reduce((acc: any, curr) => {
+      const categoriasMap = todosOsGastos.reduce((acc: any, curr) => {
         const k = curr.categoria || "Sem categoria";
         acc[k] = (acc[k] || 0) + Number(curr.valor);
         return acc;
@@ -647,7 +651,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
             <ArrowTrendingDownIcon className="h-5 w-5 text-orange-500" /> Onde
-            estou gastando mais? (Variável)
+            estou gastando?
           </h2>
           <div className="space-y-5">
             {categoriasChart.length > 0 ? (
@@ -666,8 +670,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       className="h-full bg-orange-500 transition-all duration-700 ease-out"
                       style={{
                         width:
-                          totalDespesas > 0
-                            ? `${(item.value / totalDespesas) * 100}%`
+                          totalDespesas + totalDespesasFixas > 0
+                            ? `${(item.value / (totalDespesas + totalDespesasFixas)) * 100}%`
                             : "0%",
                       }}
                     />

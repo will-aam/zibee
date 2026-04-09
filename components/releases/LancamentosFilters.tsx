@@ -30,18 +30,22 @@ interface LancamentosFiltersProps {
   setFiltrosPagamento: React.Dispatch<React.SetStateAction<string[]>>;
   filtroStatus: string | null;
   setFiltroStatus: React.Dispatch<React.SetStateAction<string | null>>;
+  filtroNatureza: string;
+  setFiltroNatureza: React.Dispatch<React.SetStateAction<string>>;
   categoriasOptions: { id: number; nome: string }[];
   pagamentoOptions: { id: number; nome: string }[];
 }
 
-const FilterPill = ({ label, isActive, count, onClick }: any) => (
+const FilterPill = ({ label, isActive, count, onClick, highlight }: any) => (
   <button
     onClick={onClick}
     className={cn(
       "flex items-center gap-1 rounded-full border px-4 py-2 text-sm font-medium transition-colors whitespace-nowrap select-none shrink-0",
-      isActive
+      isActive && !highlight
         ? "bg-primary text-primary-foreground border-primary"
-        : "bg-background hover:bg-accent text-muted-foreground",
+        : highlight
+          ? "bg-foreground text-background border-foreground shadow-sm"
+          : "bg-background hover:bg-accent text-muted-foreground",
     )}
   >
     {label}
@@ -92,6 +96,88 @@ const FilterContent = ({
     </div>
   );
 };
+
+// --- NOVO FILTRO DE NATUREZA ---
+const ResponsiveFilterNatureza = ({
+  currentNatureza,
+  setNatureza,
+}: {
+  currentNatureza: string;
+  setNatureza: React.Dispatch<React.SetStateAction<string>>;
+}) => {
+  const isDesktop = useMediaQuery("(min-width: 768px)");
+  const [open, setOpen] = React.useState(false);
+
+  const opcoes = [
+    { id: "todas", label: "Todas" },
+    { id: "unica", label: "Despesas Únicas" },
+    { id: "fixa", label: "Assinaturas (Fixas)" },
+    { id: "parcelada", label: "Parceladas" },
+  ];
+
+  const labelAtivo =
+    opcoes.find((o) => o.id === currentNatureza)?.label || "Natureza";
+  const isActive = currentNatureza !== "todas";
+
+  const handleSelect = (id: string) => {
+    setNatureza(id);
+    setOpen(false);
+  };
+
+  const content = (
+    <div className="flex flex-col gap-1">
+      {opcoes.map((op) => (
+        <Button
+          key={op.id}
+          variant={currentNatureza === op.id ? "secondary" : "ghost"}
+          className={cn(
+            "justify-start font-medium",
+            currentNatureza === op.id && "bg-primary/10 text-primary",
+          )}
+          onClick={() => handleSelect(op.id)}
+        >
+          {op.label}
+        </Button>
+      ))}
+    </div>
+  );
+
+  const trigger = (
+    <div>
+      <FilterPill label={labelAtivo} highlight={isActive} />
+    </div>
+  );
+
+  if (isDesktop) {
+    return (
+      <Popover open={open} onOpenChange={setOpen}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+        <PopoverContent className="w-[220px] p-2" align="start">
+          <h4 className="font-medium leading-none mb-3 px-2 pt-2 text-muted-foreground text-xs uppercase tracking-wider">
+            Natureza da Despesa
+          </h4>
+          {content}
+        </PopoverContent>
+      </Popover>
+    );
+  }
+
+  return (
+    <Sheet open={open} onOpenChange={setOpen}>
+      <SheetTrigger asChild>{trigger}</SheetTrigger>
+      <SheetContent
+        side="bottom"
+        className="rounded-t-3xl w-full px-5 py-6 h-auto pb-8"
+      >
+        <SheetHeader className="mb-4 text-left">
+          <SheetTitle>Natureza da Despesa</SheetTitle>
+        </SheetHeader>
+        {content}
+      </SheetContent>
+    </Sheet>
+  );
+};
+// ---------------------------------
 
 const ResponsiveFilter = ({
   title,
@@ -159,7 +245,7 @@ const ResponsiveFilter = ({
       </SheetTrigger>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl w-full px-5 py-6 h-auto max-h-[85vh] overflow-y-auto"
+        className="rounded-t-3xl w-full px-5 py-6 h-auto max-h-[85vh] overflow-y-auto"
       >
         <SheetHeader className="mb-4 text-left">
           <SheetTitle>{title}</SheetTitle>
@@ -181,55 +267,6 @@ const ResponsiveFilter = ({
     </Sheet>
   );
 };
-
-export function LancamentosFilters({
-  filtrosTipo,
-  setFiltrosTipo,
-  filtrosCategoria,
-  setFiltrosCategoria,
-  filtrosPagamento,
-  setFiltrosPagamento,
-  filtroStatus,
-  setFiltroStatus,
-  categoriasOptions,
-  pagamentoOptions,
-}: LancamentosFiltersProps) {
-  return (
-    <div className="max-w-full overflow-x-auto scrollbar-hide pb-3">
-      <div className="flex items-center w-max gap-2 pr-4">
-        <ResponsiveFilter
-          label="Tipo"
-          title="Filtrar por Tipo"
-          options={["Despesa", "Receita"]}
-          selectedValues={filtrosTipo}
-          setSelectedValues={setFiltrosTipo}
-        />
-
-        <ResponsiveFilter
-          label="Categoria"
-          title="Categorias"
-          options={categoriasOptions.map((c) => c.nome)}
-          selectedValues={filtrosCategoria}
-          setSelectedValues={setFiltrosCategoria}
-        />
-
-        <ResponsiveFilter
-          label="Pagamento"
-          title="Formas de Pagamento"
-          options={pagamentoOptions.map((p) => p.nome)}
-          selectedValues={filtrosPagamento}
-          setSelectedValues={setFiltrosPagamento}
-        />
-
-        <ResponsiveFilterStatus
-          label="Status"
-          currentStatus={filtroStatus}
-          setStatus={setFiltroStatus}
-        />
-      </div>
-    </div>
-  );
-}
 
 const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
   const isDesktop = useMediaQuery("(min-width: 768px)");
@@ -281,7 +318,7 @@ const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
       <SheetTrigger asChild>{trigger}</SheetTrigger>
       <SheetContent
         side="bottom"
-        className="rounded-t-2xl w-full px-5 py-6 h-auto"
+        className="rounded-t-3xl w-full px-5 py-6 h-auto"
       >
         <SheetHeader className="mb-4 text-left">
           <SheetTitle>Status</SheetTitle>
@@ -298,3 +335,63 @@ const ResponsiveFilterStatus = ({ label, currentStatus, setStatus }: any) => {
     </Sheet>
   );
 };
+
+export function LancamentosFilters({
+  filtrosTipo,
+  setFiltrosTipo,
+  filtrosCategoria,
+  setFiltrosCategoria,
+  filtrosPagamento,
+  setFiltrosPagamento,
+  filtroStatus,
+  setFiltroStatus,
+  filtroNatureza,
+  setFiltroNatureza,
+  categoriasOptions,
+  pagamentoOptions,
+}: LancamentosFiltersProps) {
+  return (
+    <div className="max-w-full overflow-x-auto scrollbar-hide pb-3 pt-1">
+      <div className="flex items-center w-max gap-2 pr-4">
+        {/* FILTRO PRINCIPAL (NATUREZA) NO INÍCIO */}
+        <ResponsiveFilterNatureza
+          currentNatureza={filtroNatureza}
+          setNatureza={setFiltroNatureza}
+        />
+
+        {/* DIVISOR VISUAL */}
+        <div className="w-px h-6 bg-border mx-1" />
+
+        <ResponsiveFilterStatus
+          label="Status"
+          currentStatus={filtroStatus}
+          setStatus={setFiltroStatus}
+        />
+
+        <ResponsiveFilter
+          label="Tipo"
+          title="Filtrar por Tipo"
+          options={["Despesa", "Receita"]}
+          selectedValues={filtrosTipo}
+          setSelectedValues={setFiltrosTipo}
+        />
+
+        <ResponsiveFilter
+          label="Categoria"
+          title="Categorias"
+          options={categoriasOptions.map((c) => c.nome)}
+          selectedValues={filtrosCategoria}
+          setSelectedValues={setFiltrosCategoria}
+        />
+
+        <ResponsiveFilter
+          label="Pagamento"
+          title="Formas de Pagamento"
+          options={pagamentoOptions.map((p) => p.nome)}
+          selectedValues={filtrosPagamento}
+          setSelectedValues={setFiltrosPagamento}
+        />
+      </div>
+    </div>
+  );
+}

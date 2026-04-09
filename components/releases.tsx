@@ -1,3 +1,4 @@
+// components/releases.tsx
 "use client";
 
 import type React from "react";
@@ -26,9 +27,6 @@ import { LancamentoItem } from "./releases/LancamentoItem";
 import { LancamentosFilters } from "./releases/LancamentosFilters";
 import { LancamentoFormDialog } from "./releases/LancamentoFormDialog";
 
-// COMPONENTE DE CONTAS FIXAS
-import FixedExpenses from "@/components/features/fixed-expenses";
-
 // IMPORTAÇÃO DO ALERT DIALOG DA NOSSA UI
 import {
   AlertDialog,
@@ -53,9 +51,6 @@ export default function Lancamentos() {
   const session = authClient.useSession();
   const userId = session.data?.user.id;
   const { activeContext } = useWorkspace();
-
-  // --- CONTROLE DA TAB ---
-  const [viewTab, setViewTab] = useState<"mensais" | "fixas">("mensais");
 
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
 
@@ -84,10 +79,15 @@ export default function Lancamentos() {
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+
+  // --- FILTROS ---
   const [filtrosTipo, setFiltrosTipo] = useState<string[]>([]);
   const [filtrosCategoria, setFiltrosCategoria] = useState<string[]>([]);
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
+
+  // NOVO: Filtro de Natureza (preparado para receber as opções do LancamentosFilters)
+  const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
 
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
@@ -145,6 +145,7 @@ export default function Lancamentos() {
       const dataInicio = `${filtroMes}-01`;
       const dataFim = `${filtroMes}-${new Date(parseInt(ano), parseInt(mes), 0).getDate()}`;
 
+      // AQUI NA PRÓXIMA FASE: Vamos buscar os Lançamentos E as Contas Fixas Pausadas/Ativas
       let queryLancamentos = supabase
         .from("lancamentos")
         .select("*")
@@ -211,6 +212,10 @@ export default function Lancamentos() {
     let matchStatus = true;
     if (filtroStatus === "pago") matchStatus = l.pago === true;
     if (filtroStatus === "pendente") matchStatus = l.pago === false;
+
+    // AQUI ENTRARÁ O FILTRO DE NATUREZA NA PRÓXIMA FASE
+    // (ex: if filtroNatureza === 'fixa' => mostra só as sombras)
+
     return (
       matchSearch &&
       matchTipo &&
@@ -327,9 +332,9 @@ export default function Lancamentos() {
 
   return (
     <>
-      <div className="w-full max-w-7xl mx-auto px-4 md:px-8 pt-6 pb-24">
+      <div className="w-full px-4 pt-6 pb-24">
         {/* CABEÇALHO SUPERIOR */}
-        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
               Lançamentos{" "}
@@ -338,16 +343,14 @@ export default function Lancamentos() {
               )}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Gerencie suas despesas e receitas mensais ou fixas.
+              Gerencie todas as suas despesas e receitas do mês.
             </p>
           </div>
 
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            {viewTab === "mensais" && (
-              <div>
-                <MonthSelector date={date} setDate={setDate} />
-              </div>
-            )}
+            <div>
+              <MonthSelector date={date} setDate={setDate} />
+            </div>
             <Button
               onClick={handleNovoLancamento}
               size="icon"
@@ -358,175 +361,127 @@ export default function Lancamentos() {
           </div>
         </div>
 
-        {/* TABS CONECTADAS */}
-        <div className="w-full">
-          <div className="flex items-end w-full">
-            <button
-              onClick={() => setViewTab("mensais")}
-              className={cn(
-                "relative flex-1 text-center text-sm font-semibold cursor-pointer select-none",
-                "px-3 pt-3 pb-3",
-                "transition-all duration-300 ease-out",
-                viewTab === "mensais"
-                  ? "bg-card text-foreground rounded-t-2xl z-10 -mb-px"
-                  : "bg-transparent text-muted-foreground hover:text-foreground",
-              )}
-            >
-              Mês Atual
-            </button>
+        {/* CONTEÚDO PRINCIPAL CHAPADO NA TELA */}
+        <div className="flex flex-col gap-4">
+          {/* TOPO: BUSCA E FILTROS */}
+          <div className="flex flex-col gap-4">
+            <div className="relative group">
+              <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+              <Input
+                placeholder="Buscar lançamentos..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
+              />
+            </div>
 
-            <button
-              onClick={() => setViewTab("fixas")}
-              className={cn(
-                "relative flex-1 text-center text-sm font-semibold cursor-pointer select-none",
-                "px-3 pt-3 pb-3",
-                "transition-all duration-300 ease-out",
-                viewTab === "fixas"
-                  ? "bg-card text-foreground rounded-t-2xl z-10 -mb-px"
-                  : "bg-transparent text-muted-foreground hover:text-foreground",
+            {/* O SEU COMPONENTE DE FILTROS AQUI */}
+            <LancamentosFilters
+              filtrosTipo={filtrosTipo}
+              filtroNatureza={filtroNatureza}
+              setFiltroNatureza={setFiltroNatureza}
+              setFiltrosTipo={setFiltrosTipo}
+              filtrosCategoria={filtrosCategoria}
+              setFiltrosCategoria={setFiltrosCategoria}
+              filtrosPagamento={filtrosPagamento}
+              setFiltrosPagamento={setFiltrosPagamento}
+              filtroStatus={filtroStatus}
+              setFiltroStatus={setFiltroStatus}
+              categoriasOptions={categoriasDB}
+              pagamentoOptions={formasPagamentoDB}
+              // Na próxima etapa, passaremos o filtroNatureza para ele
+            />
+
+            <div className="flex items-center justify-between pt-1">
+              <div className="flex items-center gap-2 px-1">
+                <Checkbox
+                  id="select-all"
+                  checked={
+                    lancamentosFiltrados.length > 0 &&
+                    selectedIds.length === lancamentosFiltrados.length
+                  }
+                  onCheckedChange={handleSelectAll}
+                  className="rounded-lg"
+                />
+                <Label
+                  htmlFor="select-all"
+                  className="cursor-pointer font-medium text-sm text-muted-foreground"
+                >
+                  Selecionar Todos
+                </Label>
+              </div>
+
+              {selectedIds.length > 0 && (
+                <Button
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleBulkDeleteClick}
+                  className="h-8 rounded-lg"
+                >
+                  <TrashIcon className="h-3.5 w-3.5 mr-1.5" /> Excluir (
+                  {selectedIds.length})
+                </Button>
               )}
-            >
-              Contas Fixas
-            </button>
+            </div>
           </div>
 
-          {/* CONTEÚDO PRINCIPAL */}
-          <div
-            className={cn(
-              "bg-card shadow-sm min-h-[60vh] overflow-hidden transition-all duration-300 ease-out rounded-b-3xl",
-              viewTab === "mensais"
-                ? "rounded-r-3xl rounded-tl-none rounded-tr-3xl"
-                : "rounded-l-3xl rounded-tr-none rounded-tl-3xl",
-            )}
-          >
-            {/* VISÃO 1: MENSAIS */}
-            {viewTab === "mensais" && (
-              <div className="p-4 sm:p-8">
-                <div className="flex flex-col gap-4 mb-6">
-                  <div className="relative group">
-                    <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                    <Input
-                      placeholder="Buscar lançamentos..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
-                    />
-                  </div>
-
-                  <LancamentosFilters
-                    filtrosTipo={filtrosTipo}
-                    setFiltrosTipo={setFiltrosTipo}
-                    filtrosCategoria={filtrosCategoria}
-                    setFiltrosCategoria={setFiltrosCategoria}
-                    filtrosPagamento={filtrosPagamento}
-                    setFiltrosPagamento={setFiltrosPagamento}
-                    filtroStatus={filtroStatus}
-                    setFiltroStatus={setFiltroStatus}
-                    categoriasOptions={categoriasDB}
-                    pagamentoOptions={formasPagamentoDB}
-                  />
-
-                  <div className="flex items-center justify-between pt-1">
-                    <div className="flex items-center gap-2 px-1">
-                      <Checkbox
-                        id="select-all"
-                        checked={
-                          lancamentosFiltrados.length > 0 &&
-                          selectedIds.length === lancamentosFiltrados.length
-                        }
-                        onCheckedChange={handleSelectAll}
-                        className="rounded-lg"
-                      />
-                      <Label
-                        htmlFor="select-all"
-                        className="cursor-pointer font-medium text-sm text-muted-foreground"
-                      >
-                        Selecionar Todos
-                      </Label>
-                    </div>
-
-                    {selectedIds.length > 0 && (
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        onClick={handleBulkDeleteClick}
-                        className="h-8 rounded-lg"
-                      >
-                        <TrashIcon className="h-3.5 w-3.5 mr-1.5" /> Excluir (
-                        {selectedIds.length})
-                      </Button>
-                    )}
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  {loading ? (
-                    <div className="flex justify-center py-12">
-                      <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
-                    </div>
-                  ) : lancamentosFiltrados.length === 0 ? (
-                    <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
-                      <FunnelIcon className="h-10 w-10 text-muted-foreground/30 mb-3" />
-                      <p className="text-muted-foreground font-medium">
-                        Nenhum lançamento encontrado.
-                      </p>
-                      <p className="text-xs text-muted-foreground/70 mb-4">
-                        Mude o mês ou ajuste os filtros.
-                      </p>
-
-                      {(filtrosTipo.length > 0 ||
-                        filtrosCategoria.length > 0 ||
-                        searchQuery ||
-                        filtroStatus) && (
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() => {
-                            setSearchQuery("");
-                            setFiltrosTipo([]);
-                            setFiltrosCategoria([]);
-                            setFiltrosPagamento([]);
-                            setFiltroStatus(null);
-                          }}
-                        >
-                          Limpar filtros
-                        </Button>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="flex flex-col gap-2">
-                      {lancamentosFiltrados.map((lancamento) => (
-                        <LancamentoItem
-                          key={lancamento.id}
-                          lancamento={lancamento}
-                          isSelected={selectedIds.includes(lancamento.id)}
-                          onSelect={() => {
-                            if (selectedIds.includes(lancamento.id)) {
-                              setSelectedIds((prev) =>
-                                prev.filter((id) => id !== lancamento.id),
-                              );
-                            } else {
-                              setSelectedIds((prev) => [
-                                ...prev,
-                                lancamento.id,
-                              ]);
-                            }
-                          }}
-                          onTogglePago={() => togglePago(lancamento)}
-                          onEdit={() => handleEdit(lancamento)}
-                          onDelete={() => handleDeleteClick(lancamento.id)}
-                        />
-                      ))}
-                    </div>
-                  )}
-                </div>
+          {/* LISTA DE ITENS */}
+          <div className="space-y-3">
+            {loading ? (
+              <div className="flex justify-center py-12">
+                <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
               </div>
-            )}
+            ) : lancamentosFiltrados.length === 0 ? (
+              <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
+                <FunnelIcon className="h-10 w-10 text-muted-foreground/30 mb-3" />
+                <p className="text-muted-foreground font-medium">
+                  Nenhum lançamento encontrado.
+                </p>
+                <p className="text-xs text-muted-foreground/70 mb-4">
+                  Mude o mês ou ajuste os filtros.
+                </p>
 
-            {/* VISÃO 2: CONTAS FIXAS */}
-            {viewTab === "fixas" && (
-              <div>
-                <FixedExpenses />
+                {(filtrosTipo.length > 0 ||
+                  filtrosCategoria.length > 0 ||
+                  searchQuery ||
+                  filtroStatus) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      setSearchQuery("");
+                      setFiltrosTipo([]);
+                      setFiltrosCategoria([]);
+                      setFiltrosPagamento([]);
+                      setFiltroStatus(null);
+                      setFiltroNatureza("todas");
+                    }}
+                  >
+                    Limpar filtros
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="flex flex-col gap-2">
+                {lancamentosFiltrados.map((lancamento) => (
+                  <LancamentoItem
+                    key={lancamento.id}
+                    lancamento={lancamento}
+                    isSelected={selectedIds.includes(lancamento.id)}
+                    onSelect={() => {
+                      if (selectedIds.includes(lancamento.id)) {
+                        setSelectedIds((prev) =>
+                          prev.filter((id) => id !== lancamento.id),
+                        );
+                      } else {
+                        setSelectedIds((prev) => [...prev, lancamento.id]);
+                      }
+                    }}
+                    onTogglePago={() => togglePago(lancamento)}
+                    onEdit={() => handleEdit(lancamento)}
+                    onDelete={() => handleDeleteClick(lancamento.id)}
+                  />
+                ))}
               </div>
             )}
           </div>

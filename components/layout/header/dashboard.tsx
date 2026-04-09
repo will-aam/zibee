@@ -25,6 +25,12 @@ import {
   ResponsiveContainer,
   CartesianGrid,
 } from "recharts";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 interface DashboardProps {
   onNavigate?: (tab: string) => void;
@@ -34,7 +40,6 @@ const STORAGE_MONTH_KEY = "dashboardFiltroMes";
 const STORAGE_FROM_KEY = "dashboardFiltroDe";
 const STORAGE_TO_KEY = "dashboardFiltroAte";
 const FILTER_EVENT = "dashboard:filter-changed";
-// Chave compartilhada com o mobile para sincronizar o "Modo Privacidade"
 const PRIVACY_STORAGE_KEY = "mobile-dashboard-values-hidden";
 
 function pad2(n: number) {
@@ -50,24 +55,141 @@ function monthToRange(anoMes: string) {
   return { from: `${anoMes}-01`, to: `${anoMes}-${pad2(ultimoDia)}` };
 }
 
-// CACHE EM MEMÓRIA ATUALIZADO PARA SUPORTAR CONTEXTO (PESSOAL / GRUPO)
 const dashboardCache = {
   dataByRange: {} as Record<string, any>,
   totalDespesasFixas: {} as Record<string, number>,
   metaFixada: {} as Record<string, any | null>,
+  listaFixas: {} as Record<string, any[]>,
 };
+
+// ============================================================================
+// SUBCOMPONENTE: CARDS DE RESUMO DO DASHBOARD
+// ============================================================================
+function DashboardSummaryCards({
+  totalReceitas,
+  totalVariaveis,
+  totalFixas,
+  listaFixas,
+  saldoGeral,
+  hidden,
+  formatMoney,
+  activeContext,
+}: any) {
+  const [isFixasModalOpen, setIsFixasModalOpen] = useState(false);
+
+  return (
+    <>
+      <div
+        className={`grid gap-6 ${activeContext === "pessoal" ? "grid-cols-4" : "grid-cols-3"}`}
+      >
+        {/* 1. ENTRADAS CONFIRMADAS */}
+        <div className="pb-4 border-b border-border/50">
+          <div className="flex items-center gap-2 text-sm font-medium text-green-600 mb-1">
+            <ArrowTrendingUpIcon className="h-4 w-4" /> Entradas Confirmadas
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-foreground">
+            {formatMoney(totalReceitas)}
+          </div>
+        </div>
+
+        {/* 2. GASTOS VARIÁVEIS (Isolado de fixas) */}
+        <div className="pb-4 border-b border-border/50">
+          <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
+            <ArrowTrendingDownIcon className="h-4 w-4" /> Gastos Variáveis
+          </div>
+          <div className="text-3xl font-bold tracking-tight text-foreground">
+            {formatMoney(totalVariaveis)}
+          </div>
+        </div>
+
+        {/* 3. CONTAS FIXAS MENSAIS (SOMENTE PESSOAL) */}
+        {activeContext === "pessoal" && (
+          <div
+            onClick={() => setIsFixasModalOpen(true)}
+            className="pb-4 border-b border-border/50 cursor-pointer"
+          >
+            <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1">
+              <WalletIcon className="h-4 w-4" /> Contas Fixas
+            </div>
+            <div className="text-3xl font-bold tracking-tight text-foreground">
+              {formatMoney(totalFixas)}
+            </div>
+          </div>
+        )}
+
+        {/* 4. SALDO GERAL */}
+        <div className="pb-4 border-b border-border/50">
+          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
+            Saldo Geral Previsto
+          </div>
+          <div
+            className={`text-3xl font-bold tracking-tight ${
+              saldoGeral >= 0 ? "text-foreground" : "text-destructive"
+            }`}
+          >
+            {totalReceitas > 0 ? formatMoney(saldoGeral) : "****"}
+          </div>
+          {totalReceitas <= 0 && (
+            <p className="text-[11px] text-muted-foreground mt-1">
+              Sem entradas confirmadas
+            </p>
+          )}
+        </div>
+      </div>
+
+      {/* MODAL INFORMATIVO DE CONTAS FIXAS */}
+      <Dialog open={isFixasModalOpen} onOpenChange={setIsFixasModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-3xl overflow-hidden p-0 gap-0">
+          <DialogHeader className="p-6 pb-4 bg-muted/30 border-b border-border/50">
+            <DialogTitle className="flex items-center gap-2 text-xl">
+              <WalletIcon className="h-6 w-6 text-blue-500" />
+              Minhas Contas Fixas
+            </DialogTitle>
+          </DialogHeader>
+          <div className="max-h-[60vh] overflow-y-auto p-2">
+            {listaFixas.length > 0 ? (
+              <div className="flex flex-col">
+                {listaFixas.map((fixa: any) => (
+                  <div
+                    key={fixa.id}
+                    className="flex items-center justify-between p-4 hover:bg-accent/30 border-b border-border/40 last:border-0 transition-colors"
+                  >
+                    <div>
+                      <p className="font-semibold text-foreground">
+                        {fixa.descricao || fixa.nome}
+                      </p>
+                      <p className="text-xs text-muted-foreground flex items-center gap-1 mt-0.5">
+                        <CalendarIcon className="h-3 w-3" /> Dia{" "}
+                        {fixa.dia_vencimento}
+                      </p>
+                    </div>
+                    <span className="font-bold text-foreground">
+                      {formatMoney(fixa.valor)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="p-8 text-center text-muted-foreground">
+                Nenhuma conta fixa ativa no momento.
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+// ============================================================================
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
   const session = authClient.useSession();
   const userId = session.data?.user.id;
-  const { activeContext } = useWorkspace(); // <-- Puxando o contexto
+  const { activeContext } = useWorkspace();
 
   const [mesSelecionado, setMesSelecionado] = useState("todos");
-
-  // Estado global de privacidade (Olhinho)
   const [hidden, setHidden] = useState(false);
 
-  // Escuta se o Mobile mandou ocultar
   const loadPrivacyState = useCallback(() => {
     try {
       const saved = localStorage.getItem(PRIVACY_STORAGE_KEY);
@@ -137,6 +259,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [totalDespesasFixas, setTotalDespesasFixas] = useState(
     dashboardCache.totalDespesasFixas[activeContext] || 0,
   );
+  const [listaFixas, setListaFixas] = useState<any[]>(
+    dashboardCache.listaFixas[activeContext] || [],
+  );
   const [metaFixada, setMetaFixada] = useState<any>(
     dashboardCache.metaFixada[activeContext] || null,
   );
@@ -152,7 +277,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const { from, to, key } = readRange();
       if (!dashboardCache.dataByRange[key]) setLoading(true);
 
-      // BUSCAR GRUPO ID (SE FOR MODO GRUPO)
       let currentGroupId = null;
       if (activeContext === "grupo") {
         const { data: myGroup } = await supabase
@@ -173,13 +297,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         if (!currentGroupId) {
           setLoading(false);
           return;
-        } // Se não achou grupo, para.
+        }
       }
 
-      let queryDespesas = supabase
+      let queryDespesasVariaveis = supabase
         .from("lancamentos")
         .select("*")
-        .eq("tipo", "Despesa");
+        .eq("tipo", "Despesa")
+        .is("conta_fixa_id", null);
 
       let queryReceitas = supabase
         .from("lancamentos")
@@ -195,12 +320,17 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .order("data_vencimento", { ascending: true })
         .limit(5);
 
-      // NOVA QUERY: Busca as Contas Fixas (sempre atualizadas)
-      let queryFixasDashboard = supabase.from("despesas_fixas").select("valor");
+      let queryFixasDashboard = supabase
+        .from("despesas_fixas")
+        .select("*")
+        .eq("status", "ativo")
+        .order("dia_vencimento", { ascending: true });
 
-      // FILTROS MAGICOS DE CONTEXTO
       if (activeContext === "grupo" && currentGroupId) {
-        queryDespesas = queryDespesas.eq("grupo_id", currentGroupId);
+        queryDespesasVariaveis = queryDespesasVariaveis.eq(
+          "grupo_id",
+          currentGroupId,
+        );
         queryReceitas = queryReceitas.eq("grupo_id", currentGroupId);
         queryVencimentos = queryVencimentos.eq("grupo_id", currentGroupId);
         queryFixasDashboard = queryFixasDashboard.eq(
@@ -208,7 +338,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           currentGroupId,
         );
       } else {
-        queryDespesas = queryDespesas
+        queryDespesasVariaveis = queryDespesasVariaveis
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryReceitas = queryReceitas
@@ -223,24 +353,30 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       }
 
       if (from) {
-        queryDespesas = queryDespesas.gte("data_vencimento", from);
+        queryDespesasVariaveis = queryDespesasVariaveis.gte(
+          "data_vencimento",
+          from,
+        );
         queryReceitas = queryReceitas.gte("data_vencimento", from);
         queryVencimentos = queryVencimentos.gte("data_vencimento", from);
       }
       if (to) {
-        queryDespesas = queryDespesas.lte("data_vencimento", to);
+        queryDespesasVariaveis = queryDespesasVariaveis.lte(
+          "data_vencimento",
+          to,
+        );
         queryReceitas = queryReceitas.lte("data_vencimento", to);
         queryVencimentos = queryVencimentos.lte("data_vencimento", to);
       }
 
       const [
-        { data: lancamentosData },
+        { data: variaveisData },
         { data: receitasData },
         { data: vencimentosData },
-        { data: fixasData }, // Trazemos sempre a versão fresca das Contas Fixas
+        { data: fixasData },
         { data: metaData },
       ] = await Promise.all([
-        queryDespesas,
+        queryDespesasVariaveis,
         queryReceitas,
         queryVencimentos,
         queryFixasDashboard,
@@ -255,18 +391,18 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           : Promise.resolve({ data: null }),
       ]);
 
-      const fetchedDespesasBrutas = lancamentosData || [];
-      const fetchedTotalDesp =
-        lancamentosData?.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
-        0;
+      const fetchedDespesasBrutas = variaveisData || [];
+      const fetchedTotalVariaveis =
+        variaveisData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       const fetchedTotalRec =
         receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
 
-      // ATUALIZA O TOTAL DAS CONTAS FIXAS DINAMICAMENTE
+      const dadosFixasValidos = fixasData || [];
       const fetchedTotalFixas =
-        fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+        dadosFixasValidos.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
+        0;
 
-      const categoriasMap = lancamentosData?.reduce((acc: any, curr) => {
+      const categoriasMap = variaveisData?.reduce((acc: any, curr) => {
         const k = curr.categoria || "Sem categoria";
         acc[k] = (acc[k] || 0) + Number(curr.valor);
         return acc;
@@ -280,14 +416,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const fetchedVencimentos = vencimentosData || [];
 
       setDespesasBrutas(fetchedDespesasBrutas);
-      setTotalDespesas(fetchedTotalDesp);
+      setTotalDespesas(fetchedTotalVariaveis);
       setTotalReceitas(fetchedTotalRec);
       setCategoriasChart(fetchedCategoriasChart);
       setProximosVencimentos(fetchedVencimentos);
-      setTotalDespesasFixas(fetchedTotalFixas); // Define o valor fresquinho
+
+      setTotalDespesasFixas(fetchedTotalFixas);
+      setListaFixas(dadosFixasValidos);
 
       dashboardCache.dataByRange[key] = {
-        totalDespesas: fetchedTotalDesp,
+        totalDespesas: fetchedTotalVariaveis,
         totalReceitas: fetchedTotalRec,
         categoriasChart: fetchedCategoriasChart,
         proximosVencimentos: fetchedVencimentos,
@@ -295,6 +433,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       };
 
       if (activeContext === "pessoal") {
+        dashboardCache.totalDespesasFixas[activeContext] = fetchedTotalFixas;
+        dashboardCache.listaFixas[activeContext] = dadosFixasValidos;
+
         if (metaData !== null) {
           setMetaFixada(metaData);
           dashboardCache.metaFixada[activeContext] = metaData;
@@ -335,12 +476,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     [hidden],
   );
 
-  // MÁGICA ACONTECE AQUI: Nova lógica do Saldo Geral
   const saldoGeral = useMemo(() => {
-    // Se não tem entrada, não exibe saldo
     if (!totalReceitas || totalReceitas <= 0) return 0;
-
-    // Entradas Confirmadas - Gastos Variáveis - Contas Fixas Mensais = Saldo Geral
     return totalReceitas - totalDespesas - totalDespesasFixas;
   }, [totalReceitas, totalDespesas, totalDespesasFixas]);
 
@@ -409,70 +546,23 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </button>
         </div>
 
-        <div
-          className={`grid gap-6 ${activeContext === "pessoal" ? "grid-cols-4" : "grid-cols-3"}`}
-        >
-          {/* 1. NOVO CARD: SALDO GERAL */}
-          <div className="pb-4 border-b border-border/50">
-            <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
-              Saldo Geral
-            </div>
-            <div
-              className={`text-3xl font-bold tracking-tight ${
-                saldoGeral >= 0 ? "text-foreground" : "text-destructive"
-              }`}
-            >
-              {totalReceitas > 0 ? formatMoney(saldoGeral) : "****"}
-            </div>
-            {totalReceitas <= 0 && (
-              <p className="text-[11px] text-muted-foreground mt-1">
-                Sem entradas confirmadas
-              </p>
-            )}
-          </div>
-
-          {/* 2. ENTRADAS CONFIRMADAS */}
-          <div className="pb-4 border-b border-border/50">
-            <div className="flex items-center gap-2 text-sm font-medium text-green-600 mb-1">
-              <ArrowTrendingUpIcon className="h-4 w-4" /> Entradas Confirmadas
-            </div>
-            <div className="text-3xl font-bold tracking-tight text-foreground">
-              {formatMoney(totalReceitas)}
-            </div>
-          </div>
-
-          {/* 3. GASTOS VARIÁVEIS */}
-          <div className="pb-4 border-b border-border/50">
-            <div className="flex items-center gap-2 text-sm font-medium text-destructive mb-1">
-              <ArrowTrendingDownIcon className="h-4 w-4" /> Gastos Variáveis
-            </div>
-            <div className="text-3xl font-bold tracking-tight text-foreground">
-              {formatMoney(totalDespesas)}
-            </div>
-          </div>
-
-          {/* 4. CONTAS FIXAS MENSAIS (SOMENTE PESSOAL) */}
-          {activeContext === "pessoal" && (
-            <div
-              onClick={() => onNavigate && onNavigate("despesas_fixas")}
-              className="pb-4 border-b border-border/50 cursor-pointer hover:opacity-70 transition-opacity group"
-            >
-              <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1 group-hover:text-blue-600 transition-colors">
-                <WalletIcon className="h-4 w-4" /> Contas Fixas Mensais
-              </div>
-              <div className="text-3xl font-bold tracking-tight text-foreground">
-                {formatMoney(totalDespesasFixas)}
-              </div>
-            </div>
-          )}
-        </div>
+        <DashboardSummaryCards
+          totalReceitas={totalReceitas}
+          totalVariaveis={totalDespesas}
+          totalFixas={totalDespesasFixas}
+          listaFixas={listaFixas}
+          saldoGeral={saldoGeral}
+          hidden={hidden}
+          formatMoney={formatMoney}
+          activeContext={activeContext}
+        />
       </section>
 
       {/* SEÇÃO 2: EVOLUÇÃO DAS DESPESAS - APENAS DESKTOP */}
       <section className="pt-4 hidden md:block">
         <div className="flex items-center justify-between mb-6">
           <h2 className="text-lg font-semibold text-foreground/80">
-            Evolução das Despesas
+            Evolução dos Gastos Variáveis
           </h2>
           <div className="flex bg-muted/50 rounded-lg p-1 border border-border/30">
             {(["7D", "30D", "ALL"] as const).map((periodo) => (
@@ -557,7 +647,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
             <ArrowTrendingDownIcon className="h-5 w-5 text-orange-500" /> Onde
-            estou gastando?
+            estou gastando mais? (Variável)
           </h2>
           <div className="space-y-5">
             {categoriasChart.length > 0 ? (

@@ -15,19 +15,28 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Switch } from "@/components/ui/switch"; // Novo para a Pausa
+import { Switch } from "@/components/ui/switch";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { CalendarDaysIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
 type RecurrenceEndType = "ate_data" | "ocorrencias";
-type RepeatType = "unica" | "fixa" | "parcelada"; // Novo formato de escolha
+type RepeatType = "unica" | "fixa" | "parcelada";
 const MAX_RECURRENCE_MONTHS = 600;
 
 interface LancamentoFormDialogProps {
@@ -71,7 +80,7 @@ export function LancamentoFormDialog({
     if (lancamentoToEdit) {
       setFormData(lancamentoToEdit);
       setRepeatType(lancamentoToEdit.isShadow ? "fixa" : "unica");
-      setStatusFixa("ativo"); // Como a sombra só aparece se estiver ativa, inicia como ativo
+      setStatusFixa("ativo");
       setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
       setRecurrenceOccurrences(2);
@@ -130,7 +139,7 @@ export function LancamentoFormDialog({
         items.push({
           ...basePayload,
           data_vencimento: formatDateLocal(nextDate),
-          pago: i === 1 ? formData.pago || false : false, // Mantém pago só na primeira parcela se marcado
+          pago: i === 1 ? formData.pago || false : false,
           parcela_atual: i,
           total_parcelas: total,
         });
@@ -142,7 +151,6 @@ export function LancamentoFormDialog({
       const end = parseDateLocal(recurrenceEndDate);
       let parcelasCount = 0;
 
-      // Conta primeiro quantas parcelas vai dar
       for (
         let monthOffset = 0;
         monthOffset <= MAX_RECURRENCE_MONTHS;
@@ -153,7 +161,6 @@ export function LancamentoFormDialog({
         parcelasCount++;
       }
 
-      // Agora gera os itens
       for (let i = 1; i <= parcelasCount; i++) {
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
@@ -226,10 +233,7 @@ export function LancamentoFormDialog({
       } as Omit<Lancamento, "id">;
 
       if (lancamentoToEdit) {
-        // --- MODO EDIÇÃO ---
-
         if (lancamentoToEdit.isShadow) {
-          // EDIÇÃO DA TABELA MASTER (DESPESAS FIXAS)
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const updateMasterPayload = {
             descricao: formData.descricao,
@@ -237,7 +241,7 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria,
             forma_pagamento: formData.forma_pagamento,
-            status: statusFixa, // Aqui aplicamos a pausa se o usuário pediu!
+            status: statusFixa,
           };
 
           let query = supabase
@@ -257,7 +261,6 @@ export function LancamentoFormDialog({
                 : "Conta Fixa Atualizada!",
           });
         } else {
-          // EDIÇÃO DE LANÇAMENTO COMUM
           const updatePayload = {
             descricao: formData.descricao,
             categoria: formData.categoria,
@@ -283,10 +286,7 @@ export function LancamentoFormDialog({
           toast({ title: "Lançamento Atualizado!" });
         }
       } else {
-        // --- MODO CRIAÇÃO NOVO ---
-
         if (repeatType === "fixa" && formData.tipo === "Despesa") {
-          // SALVA APENAS NA TABELA DE CONTAS FIXAS (MASTER)
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const payloadFixa = {
             descricao: formData.descricao,
@@ -296,7 +296,7 @@ export function LancamentoFormDialog({
             forma_pagamento: formData.forma_pagamento,
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
-            status: "ativo", // Nasce ativa
+            status: "ativo",
           };
 
           const { error: errFixa } = await supabase
@@ -306,12 +306,10 @@ export function LancamentoFormDialog({
 
           toast({ title: "Conta Fixa Cadastrada com Sucesso!" });
         } else if (repeatType === "parcelada" && formData.tipo === "Despesa") {
-          // SALVA LANÇAMENTOS PARCELADOS (VÁRIOS MESES NA TABELA NORMAL)
           const recurrenceItems = createRecurrenceItems(basePayload);
           await supabase.from("lancamentos").insert(recurrenceItems);
           toast({ title: "Parcelas Criadas com Sucesso!" });
         } else {
-          // SALVA LANÇAMENTO ÚNICO NORMAL (TABELA NORMAL)
           await supabase.from("lancamentos").insert([basePayload]);
           toast({ title: "Lançamento Criado!" });
         }
@@ -368,7 +366,7 @@ export function LancamentoFormDialog({
                 <Label>Valor</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    R$
+                    R${" "}
                   </span>
                   <Input
                     type="number"
@@ -394,7 +392,7 @@ export function LancamentoFormDialog({
                   onValueChange={(v: any) =>
                     setFormData({ ...formData, tipo: v })
                   }
-                  disabled={!!lancamentoToEdit} // Trava alteração de tipo na edição
+                  disabled={!!lancamentoToEdit}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -459,16 +457,50 @@ export function LancamentoFormDialog({
                   ? "Data do Recebimento"
                   : "Data de Vencimento"}
               </Label>
-              <Input
-                type="date"
-                value={formData.data_vencimento || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, data_vencimento: e.target.value })
-                }
-              />
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal h-10",
+                      !formData.data_vencimento && "text-muted-foreground",
+                    )}
+                  >
+                    <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
+                    {formData.data_vencimento
+                      ? format(
+                          parseDateLocal(formData.data_vencimento),
+                          "dd 'de' MMMM 'de' yyyy",
+                          { locale: ptBR },
+                        )
+                      : "Selecione a data"}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    locale={ptBR}
+                    selected={
+                      formData.data_vencimento
+                        ? parseDateLocal(formData.data_vencimento)
+                        : undefined
+                    }
+                    onSelect={(date) => {
+                      if (date) {
+                        setFormData({
+                          ...formData,
+                          data_vencimento: formatDateLocal(date),
+                        });
+                      }
+                    }}
+                    initialFocus
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
 
-            {/* SEÇÃO INOVADORA DE PAUSA (Só aparece ao editar uma sombra) */}
+            {/* SEÇÃO INOVADORA DE PAUSA */}
             {lancamentoToEdit?.isShadow && (
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
                 <div className="space-y-0.5">
@@ -488,7 +520,6 @@ export function LancamentoFormDialog({
 
             {/* SEÇÃO DE PAGAMENTO E REPETIÇÃO */}
             <div className="flex flex-col gap-2 mt-2">
-              {/* CHECKBOX DE PAGO (SÓ APARECE SE NÃO FOR CONTA FIXA) */}
               {repeatType !== "fixa" && !lancamentoToEdit?.isShadow && (
                 <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
                   <Checkbox
@@ -509,7 +540,6 @@ export function LancamentoFormDialog({
                 </div>
               )}
 
-              {/* OPÇÕES DE REPETIÇÃO HUMANIZADAS (SÓ APARECE PARA DESPESAS NOVAS) */}
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
                   <Label className="text-muted-foreground font-bold">
@@ -554,7 +584,6 @@ export function LancamentoFormDialog({
                     </Button>
                   </div>
 
-                  {/* CAIXA EXPANSÍVEL DO PARCELAMENTO */}
                   {repeatType === "parcelada" && (
                     <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2 mt-2">
                       <div className="space-y-2">
@@ -582,14 +611,47 @@ export function LancamentoFormDialog({
                       {recurrenceEndType === "ate_data" && (
                         <div className="space-y-2">
                           <Label>Data da última parcela</Label>
-                          <Input
-                            type="date"
-                            value={recurrenceEndDate}
-                            onChange={(e) =>
-                              setRecurrenceEndDate(e.target.value)
-                            }
-                            className="bg-background"
-                          />
+                          <Popover>
+                            <PopoverTrigger asChild>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className={cn(
+                                  "w-full justify-start text-left font-normal h-10 bg-background",
+                                  !recurrenceEndDate && "text-muted-foreground",
+                                )}
+                              >
+                                <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
+                                {recurrenceEndDate
+                                  ? format(
+                                      parseDateLocal(recurrenceEndDate),
+                                      "dd 'de' MMMM 'de' yyyy",
+                                      { locale: ptBR },
+                                    )
+                                  : "Selecione a data limite"}
+                              </Button>
+                            </PopoverTrigger>
+                            <PopoverContent
+                              className="w-auto p-0"
+                              align="start"
+                            >
+                              <Calendar
+                                mode="single"
+                                locale={ptBR}
+                                selected={
+                                  recurrenceEndDate
+                                    ? parseDateLocal(recurrenceEndDate)
+                                    : undefined
+                                }
+                                onSelect={(date) => {
+                                  if (date) {
+                                    setRecurrenceEndDate(formatDateLocal(date));
+                                  }
+                                }}
+                                initialFocus
+                              />
+                            </PopoverContent>
+                          </Popover>
                         </div>
                       )}
 

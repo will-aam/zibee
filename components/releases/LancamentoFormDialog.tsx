@@ -66,14 +66,12 @@ export function LancamentoFormDialog({
 
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
 
-  // --- NOVOS ESTADOS HUMANOS ---
   const [repeatType, setRepeatType] = useState<RepeatType>("unica");
   const [recurrenceEndType, setRecurrenceEndType] =
     useState<RecurrenceEndType>("ocorrencias");
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState(2);
 
-  // Estado para o botão de PAUSAR conta fixa
   const [statusFixa, setStatusFixa] = useState<"ativo" | "pausado">("ativo");
 
   useEffect(() => {
@@ -236,7 +234,7 @@ export function LancamentoFormDialog({
         if (lancamentoToEdit.isShadow) {
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const updateMasterPayload = {
-            descricao: formData.descricao,
+            nome: formData.descricao,
             valor: formData.valor,
             dia_vencimento: dia,
             categoria: formData.categoria,
@@ -289,7 +287,7 @@ export function LancamentoFormDialog({
         if (repeatType === "fixa" && formData.tipo === "Despesa") {
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const payloadFixa = {
-            descricao: formData.descricao,
+            nome: formData.descricao,
             valor: formData.valor,
             dia_vencimento: dia,
             categoria: formData.categoria,
@@ -500,7 +498,7 @@ export function LancamentoFormDialog({
               </Popover>
             </div>
 
-            {/* SEÇÃO INOVADORA DE PAUSA */}
+            {/* SEÇÃO INOVADORA DE PAUSA (Só aparece ao editar uma sombra) */}
             {lancamentoToEdit?.isShadow && (
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
                 <div className="space-y-0.5">
@@ -520,6 +518,7 @@ export function LancamentoFormDialog({
 
             {/* SEÇÃO DE PAGAMENTO E REPETIÇÃO */}
             <div className="flex flex-col gap-2 mt-2">
+              {/* CHECKBOX DE PAGO (SÓ APARECE SE NÃO FOR CONTA FIXA) */}
               {repeatType !== "fixa" && !lancamentoToEdit?.isShadow && (
                 <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
                   <Checkbox
@@ -540,6 +539,7 @@ export function LancamentoFormDialog({
                 </div>
               )}
 
+              {/* OPÇÕES DE REPETIÇÃO HUMANIZADAS (SÓ APARECE PARA DESPESAS NOVAS) */}
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
                   <Label className="text-muted-foreground font-bold">
@@ -584,6 +584,7 @@ export function LancamentoFormDialog({
                     </Button>
                   </div>
 
+                  {/* CAIXA EXPANSÍVEL DO PARCELAMENTO */}
                   {repeatType === "parcelada" && (
                     <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2 mt-2">
                       <div className="space-y-2">

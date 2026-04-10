@@ -28,10 +28,10 @@ import {
   Cog6ToothIcon as CogSolid,
   UserGroupIcon as UserGroupSolid,
   FireIcon as FireSolid,
-  BriefcaseIcon as BriefcaseSolid, // NOVO: Ícone solid para Investimentos
-  CalculatorIcon as CalculatorSolid, // NOVO: Ícone solid para Resumo
+  BriefcaseIcon as BriefcaseSolid,
+  ReceiptPercentIcon as CalculatorSolid, // NOVO: Ícone solid para Planejamento
 } from "@heroicons/react/24/solid";
-import { CalculatorIcon } from "lucide-react";
+import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
 
 const sora = Sora({ subsets: ["latin"] });
 const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
@@ -80,8 +80,8 @@ export function DesktopHeader(props: DesktopHeaderProps) {
     },
     {
       id: "receitas",
-      label: "Resumo",
-      Icon: CalculatorIcon, // NOVO: Ícone outline para Resumo
+      label: "Planejamento",
+      Icon: ReceiptPercentIcon, // NOVO: Ícone outline para Planejamento
       IconActive: CalculatorSolid,
     },
     // NOVA ABA DE INVESTIMENTOS ADICIONADA AQUI

@@ -3,7 +3,7 @@
 import * as React from "react";
 import { Sora } from "next/font/google";
 import { FunnelIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
-import { CalculatorIcon } from "@heroicons/react/24/outline";
+import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 
 const sora = Sora({ subsets: ["latin"] });
@@ -112,9 +112,9 @@ export function MobileHeader({
             <button
               onClick={() => onNavigate("receitas")}
               className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/10"
-              title="Resumo"
+              title="Planejamento"
             >
-              <CalculatorIcon className="h-6 w-6 text-white" />
+              <ReceiptPercentIcon className="h-6 w-6 text-white" />
             </button>
             <button
               onClick={() => onNavigate("configuracoes")}

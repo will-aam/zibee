@@ -116,11 +116,6 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
       {/* CARDS DE AÇÕES RÁPIDAS */}
       <div className="grid grid-cols-2 gap-3">
         <ThemeToggleCard />
-        <QuickActionCard
-          icon={CalendarIcon}
-          label="Despesas Fixas"
-          onClick={() => onNavigate && onNavigate("despesas_fixas")}
-        />
       </div>
 
       {/* ÁREA LIMPA SEM CARDS: CATEGORIAS E PAGAMENTOS */}

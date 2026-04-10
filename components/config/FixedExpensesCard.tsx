@@ -62,12 +62,7 @@ export function FixedExpensesCard() {
 
   return (
     <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
-          <CalendarIcon className="h-5 w-5" />
-          Despesas Fixas Mensais
-        </CardTitle>
-      </CardHeader>
+      <CardHeader></CardHeader>
       <CardContent className="space-y-4">
         {/* Formulário de Adição */}
         <div className="space-y-2 rounded-lg border p-3 bg-muted/20">

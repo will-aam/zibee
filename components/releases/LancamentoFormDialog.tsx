@@ -74,9 +74,22 @@ export function LancamentoFormDialog({
 
   const [statusFixa, setStatusFixa] = useState<"ativo" | "pausado">("ativo");
 
+  // BLINDAGEM: Limpa as opções para evitar itens duplicados por causa de espaços
+  const categoriasUnicas = Array.from(
+    new Set(categoriasDB.map((c) => c.nome.trim())),
+  );
+  const pagamentosUnicos = Array.from(
+    new Set(formasPagamentoDB.map((p) => p.nome.trim())),
+  );
+
   useEffect(() => {
     if (lancamentoToEdit) {
-      setFormData(lancamentoToEdit);
+      setFormData({
+        ...lancamentoToEdit,
+        // Limpa os espaços ao editar para que o Select encontre a opção certa
+        categoria: lancamentoToEdit.categoria?.trim(),
+        forma_pagamento: lancamentoToEdit.forma_pagamento?.trim(),
+      });
       setRepeatType(lancamentoToEdit.isShadow ? "fixa" : "unica");
       setStatusFixa("ativo");
       setRecurrenceEndType("ocorrencias");
@@ -85,10 +98,10 @@ export function LancamentoFormDialog({
     } else {
       setFormData({
         descricao: "",
-        categoria: categoriasDB[0]?.nome || "Contas Fixas",
+        categoria: categoriasUnicas[0] || "Contas Fixas",
         tipo: "Despesa",
         valor: 0,
-        forma_pagamento: formasPagamentoDB[0]?.nome || "Pix",
+        forma_pagamento: pagamentosUnicos[0] || "Pix",
         data_vencimento: new Date().toISOString().split("T")[0],
         pago: false,
         observacoes: "",
@@ -226,6 +239,8 @@ export function LancamentoFormDialog({
     try {
       const basePayload = {
         ...formData,
+        categoria: formData.categoria?.trim(), // Salva a string limpa
+        forma_pagamento: formData.forma_pagamento?.trim(), // Salva a string limpa
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
       } as Omit<Lancamento, "id">;
@@ -237,8 +252,8 @@ export function LancamentoFormDialog({
             nome: formData.descricao,
             valor: formData.valor,
             dia_vencimento: dia,
-            categoria: formData.categoria,
-            forma_pagamento: formData.forma_pagamento,
+            categoria: formData.categoria?.trim(),
+            forma_pagamento: formData.forma_pagamento?.trim(),
             status: statusFixa,
           };
 
@@ -261,10 +276,10 @@ export function LancamentoFormDialog({
         } else {
           const updatePayload = {
             descricao: formData.descricao,
-            categoria: formData.categoria,
+            categoria: formData.categoria?.trim(),
             tipo: formData.tipo,
             valor: formData.valor,
-            forma_pagamento: formData.forma_pagamento,
+            forma_pagamento: formData.forma_pagamento?.trim(),
             data_vencimento: formData.data_vencimento,
             pago: formData.pago,
             observacoes: formData.observacoes,
@@ -290,8 +305,8 @@ export function LancamentoFormDialog({
             nome: formData.descricao,
             valor: formData.valor,
             dia_vencimento: dia,
-            categoria: formData.categoria,
-            forma_pagamento: formData.forma_pagamento,
+            categoria: formData.categoria?.trim(),
+            forma_pagamento: formData.forma_pagamento?.trim(),
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",
@@ -415,9 +430,9 @@ export function LancamentoFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {categoriasDB.map((c) => (
-                    <SelectItem key={c.id} value={c.nome}>
-                      {c.nome}
+                  {categoriasUnicas.map((nome) => (
+                    <SelectItem key={nome} value={nome}>
+                      {nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -440,9 +455,9 @@ export function LancamentoFormDialog({
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {formasPagamentoDB.map((f) => (
-                    <SelectItem key={f.id} value={f.nome}>
-                      {f.nome}
+                  {pagamentosUnicos.map((nome) => (
+                    <SelectItem key={nome} value={nome}>
+                      {nome}
                     </SelectItem>
                   ))}
                 </SelectContent>

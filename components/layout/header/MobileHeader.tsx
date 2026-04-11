@@ -7,16 +7,18 @@ import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 
 const sora = Sora({ subsets: ["latin"] });
 
-// --- COMPONENTE IONIC DA CALCULADORA ---
+// --- COMPONENTE IONIC DA CALCULADORA (SOLID E ALINHADO) ---
 const CalculatorIonicSolid = ({ className }: { className?: string }) => (
-  // @ts-expect-error Tag customizada do Ionicons
-  <ion-icon
-    name="calculator-outline"
-    class={className}
-    style={{ fontSize: "1.5rem", lineHeight: 1 }}
-  />
+  <div className="flex items-center justify-center">
+    {/* @ts-expect-error Tag customizada do Ionicons */}
+    <ion-icon
+      name="calculator"
+      class={className}
+      style={{ fontSize: "1.5rem", lineHeight: 1 }}
+    />
+  </div>
 );
-// ----------------------------------------
+// -----------------------------------------------------------
 
 interface MobileHeaderProps {
   activeTab: string;
@@ -28,7 +30,7 @@ interface MobileHeaderProps {
   totalReceitas: number;
   totalDespesas: number;
   totalDespesasFixas: number;
-  listaFixas?: any[]; // <-- NOVO: Recebe a lista do pai
+  listaFixas?: any[];
   onNavigate: (tab: string) => void;
   onOpenProfile: () => void;
   onOpenFilter: () => void;
@@ -83,7 +85,7 @@ export function MobileHeader({
   totalReceitas,
   totalDespesas,
   totalDespesasFixas,
-  listaFixas = [], // <-- NOVO: Padrão vazio
+  listaFixas = [],
   onNavigate,
   onOpenProfile,
   onOpenFilter,
@@ -152,7 +154,7 @@ export function MobileHeader({
           entradasConfirmadas={totalReceitas}
           gastosVariaveis={totalDespesas}
           contasFixasMensais={totalDespesasFixas}
-          listaFixas={listaFixas} // <-- NOVO: Passando pro Modal do celular
+          listaFixas={listaFixas}
           onNavigate={onNavigate}
         />
       )}

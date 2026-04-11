@@ -63,9 +63,8 @@ export default function Lancamentos() {
     memoryCache.lancamentosPorMes[cacheKey] || [],
   );
 
-  // Inicia puxando as categorias específicas do contexto atual
   const [categoriasDB, setCategoriasDB] = useState<
-    { id: number; nome: string }[]
+    { id: number; nome: string; regra_orcamento?: string }[]
   >(memoryCache.categorias[activeContext] || []);
   const [formasPagamentoDB, setFormasPagamentoDB] = useState(
     memoryCache.formasPagamento || [],
@@ -583,26 +582,37 @@ export default function Lancamentos() {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {lancamentosFiltrados.map((lancamento) => (
-                  <LancamentoItem
-                    key={lancamento.id}
-                    lancamento={lancamento}
-                    isSelected={selectedIds.includes(lancamento.id)}
-                    onSelect={() => {
-                      if (lancamento.isShadow) return;
-                      if (selectedIds.includes(lancamento.id)) {
-                        setSelectedIds((prev) =>
-                          prev.filter((id) => id !== lancamento.id),
-                        );
-                      } else {
-                        setSelectedIds((prev) => [...prev, lancamento.id]);
-                      }
-                    }}
-                    onTogglePago={() => togglePago(lancamento)}
-                    onEdit={() => handleEdit(lancamento)}
-                    onDelete={() => handleDeleteClick(lancamento.id)}
-                  />
-                ))}
+                {lancamentosFiltrados.map((lancamento) => {
+                  // MÁGICA: Acha a regra da categoria no cache (com a blindagem de texto limpo)
+                  const nomeLimpo = (lancamento.categoria || "")
+                    .trim()
+                    .toLowerCase();
+                  const regra = categoriasDB.find(
+                    (c: any) => c.nome.trim().toLowerCase() === nomeLimpo,
+                  )?.regra_orcamento;
+
+                  return (
+                    <LancamentoItem
+                      key={lancamento.id}
+                      lancamento={lancamento}
+                      categoriaRegra={regra} // ENVIANDO A REGRA PARA O ITEM
+                      isSelected={selectedIds.includes(lancamento.id)}
+                      onSelect={() => {
+                        if (lancamento.isShadow) return;
+                        if (selectedIds.includes(lancamento.id)) {
+                          setSelectedIds((prev) =>
+                            prev.filter((id) => id !== lancamento.id),
+                          );
+                        } else {
+                          setSelectedIds((prev) => [...prev, lancamento.id]);
+                        }
+                      }}
+                      onTogglePago={() => togglePago(lancamento)}
+                      onEdit={() => handleEdit(lancamento)}
+                      onDelete={() => handleDeleteClick(lancamento.id)}
+                    />
+                  );
+                })}
               </div>
             )}
           </div>

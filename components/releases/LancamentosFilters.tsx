@@ -349,13 +349,23 @@ export function LancamentosFilters({
   categoriasOptions,
   pagamentoOptions,
 }: LancamentosFiltersProps) {
-  // Limpa possíveis duplicações causadas por espaços invisíveis vindas do banco
   const categoriasUnicas = Array.from(
-    new Set(categoriasOptions.map((c) => c.nome.trim())),
-  );
+    new Set(
+      categoriasOptions.map((c) => {
+        const nome = c.nome.trim().toLowerCase();
+        return nome.charAt(0).toUpperCase() + nome.slice(1);
+      }),
+    ),
+  ).sort();
+
   const pagamentosUnicos = Array.from(
-    new Set(pagamentoOptions.map((p) => p.nome.trim())),
-  );
+    new Set(
+      pagamentoOptions.map((p) => {
+        const nome = p.nome.trim().toLowerCase();
+        return nome.charAt(0).toUpperCase() + nome.slice(1);
+      }),
+    ),
+  ).sort();
 
   return (
     <div className="max-w-full overflow-x-auto scrollbar-hide pb-3 pt-1">

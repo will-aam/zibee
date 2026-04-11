@@ -181,6 +181,22 @@
   }
   body {
     @apply bg-background text-foreground;
+
+    /* BLOQUEIA A SELEÇÃO DE TEXTO GLOBALMENTE */
+    -webkit-user-select: none; /* Safari/iOS */
+    user-select: none; /* Padrão moderno */
+
+    /* BLOQUEIA O MENU DE CONTEXTO (LONG PRESS) NO IOS */
+    -webkit-touch-callout: none;
+  }
+
+  /* EXCEÇÃO OBRIGATÓRIA: Permite seleção apenas onde o usuário vai digitar */
+  input,
+  textarea,
+  select,
+  [contenteditable="true"] {
+    -webkit-user-select: auto;
+    user-select: auto;
   }
 }
 

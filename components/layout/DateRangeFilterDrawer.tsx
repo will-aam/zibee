@@ -3,12 +3,6 @@
 import * as React from "react";
 import { CalendarIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
 
 type PresetKey = "this_month" | "last_month" | "all_time" | "custom";
 
@@ -46,10 +40,6 @@ function parseYMD(s: string | null | undefined): Date | undefined {
   return Number.isNaN(dt.getTime()) ? undefined : dt;
 }
 
-function formatPtBR(d: Date) {
-  return d.toLocaleDateString("pt-BR");
-}
-
 function monthRange(year: number, month1to12: number) {
   const from = new Date(year, month1to12 - 1, 1);
   const to = new Date(year, month1to12, 0);
@@ -68,19 +58,15 @@ function getLastMonthRange() {
   return monthRange(year, month);
 }
 
-// CORREÇÃO: Garante que se não tiver nada, devolve as datas corretas deste mês
 function readStored(): DateRangeValue {
   const preset = localStorage.getItem(STORAGE_PRESET_KEY) as PresetKey;
   const from = localStorage.getItem(STORAGE_FROM_KEY);
   const to = localStorage.getItem(STORAGE_TO_KEY);
 
-  // Se não tem preset definido (1º acesso ou cookies limpos), força o mês atual
   if (!preset) {
     const r = getThisMonthRange();
     return { preset: "this_month", from: r.from, to: r.to };
   }
-
-  // Se o preset existe, retorna o que tá no cache
   return { preset, from: from || null, to: to || null };
 }
 
@@ -132,47 +118,107 @@ function PresetPill({
   );
 }
 
-function DateButton({
+// NOVO: Componente inteligente para digitação de data com máscara e validação
+function DateInput({
   label,
-  value,
+  value, // formato YYYY-MM-DD
   disabled,
-  onPick,
+  onChange, // devolve YYYY-MM-DD ou null
 }: {
   label: string;
   value: string | null;
   disabled?: boolean;
-  onPick: (d: Date | undefined) => void;
+  onChange: (ymd: string | null) => void;
 }) {
-  const selectedDate = parseYMD(value);
+  const [localValue, setLocalValue] = React.useState("");
+  const [error, setError] = React.useState(false);
+
+  // Sincroniza o valor de fora (YYYY-MM-DD) para dentro (DD/MM/YYYY)
+  React.useEffect(() => {
+    if (!value) {
+      setLocalValue("");
+      setError(false);
+      return;
+    }
+    const [y, m, d] = value.split("-");
+    if (y && m && d) {
+      setLocalValue(`${d}/${m}/${y}`);
+      setError(false);
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    let raw = e.target.value.replace(/\D/g, ""); // Remove tudo que não for número
+    if (raw.length > 8) raw = raw.slice(0, 8); // Limita a 8 dígitos numéricos
+
+    // Aplica a máscara DD/MM/YYYY automaticamente
+    let formatted = raw;
+    if (raw.length > 4) {
+      formatted = `${raw.slice(0, 2)}/${raw.slice(2, 4)}/${raw.slice(4)}`;
+    } else if (raw.length > 2) {
+      formatted = `${raw.slice(0, 2)}/${raw.slice(2)}`;
+    }
+
+    setLocalValue(formatted);
+
+    // Se apagou tudo, reseta o erro e avisa o componente pai
+    if (formatted.length === 0) {
+      setError(false);
+      onChange(null);
+      return;
+    }
+
+    // Se completou a digitação, faz a validação da data
+    if (raw.length === 8) {
+      const d = parseInt(raw.slice(0, 2), 10);
+      const m = parseInt(raw.slice(2, 4), 10);
+      const y = parseInt(raw.slice(4), 10);
+
+      const date = new Date(y, m - 1, d);
+
+      // Checa se é uma data real (evita coisas como 31/02/2024)
+      if (
+        date.getFullYear() === y &&
+        date.getMonth() === m - 1 &&
+        date.getDate() === d
+      ) {
+        setError(false);
+        onChange(
+          `${y}-${String(m).padStart(2, "0")}-${String(d).padStart(2, "0")}`,
+        );
+      } else {
+        setError(true);
+        onChange(null); // Data é inválida, anula pro componente pai
+      }
+    } else {
+      setError(false); // Enquanto está digitando, não exibe erro imediatamente
+    }
+  };
+
+  const handleBlur = () => {
+    // Se o usuário clicou fora e a data não terminou de ser digitada, acusa erro
+    if (localValue.length > 0 && localValue.length < 10) {
+      setError(true);
+      onChange(null);
+    }
+  };
 
   return (
     <div className="space-y-2">
       <p className="text-xs font-medium text-muted-foreground">{label}</p>
-
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button
-            type="button"
-            variant="outline"
-            className="w-full justify-between rounded-2xl"
-            disabled={disabled}
-          >
-            <span className="text-sm">
-              {selectedDate ? formatPtBR(selectedDate) : "Selecionar"}
-            </span>
-            <CalendarIcon className="h-4 w-4 text-muted-foreground" />
-          </Button>
-        </PopoverTrigger>
-
-        <PopoverContent className="w-auto p-0" align="start">
-          <Calendar
-            mode="single"
-            selected={selectedDate}
-            onSelect={onPick}
-            initialFocus
-          />
-        </PopoverContent>
-      </Popover>
+      <input
+        type="text"
+        placeholder="DD/MM/AAAA"
+        disabled={disabled}
+        value={localValue}
+        onChange={handleChange}
+        onBlur={handleBlur}
+        className={`flex h-10 w-full rounded-2xl border bg-background px-3 py-2 text-sm outline-none transition-colors placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 ${
+          error
+            ? "border-destructive text-destructive focus:ring-1 focus:ring-destructive"
+            : "border-input focus:ring-1 focus:ring-primary"
+        }`}
+      />
     </div>
   );
 }
@@ -196,7 +242,6 @@ export default function DateRangeFilterDrawer({
     setTo(stored.to);
   }, [open]);
 
-  // Se o usuário clicar nas pílulas de atalho, atualiza as datas
   React.useEffect(() => {
     if (!open) return;
 
@@ -240,7 +285,7 @@ export default function DateRangeFilterDrawer({
 
     if (preset !== "all_time") {
       if (!from || !to) {
-        setError("Selecione as duas datas.");
+        setError("Selecione (ou digite) datas válidas.");
         return;
       }
       const df = parseYMD(from)?.getTime();
@@ -250,7 +295,7 @@ export default function DateRangeFilterDrawer({
         return;
       }
       if (df > dt) {
-        setError("O 'De' não pode ser maior que o 'Até'.");
+        setError("A data 'De' não pode ser maior que o 'Até'.");
         return;
       }
     }
@@ -266,7 +311,8 @@ export default function DateRangeFilterDrawer({
     onClose();
   }
 
-  const disableDates = preset === "all_time";
+  // Só permite digitar nas datas quando a opção for Personalizado
+  const disableDates = preset !== "custom";
 
   return (
     <div className="fixed inset-0 z-120" aria-modal="true" role="dialog">
@@ -274,6 +320,7 @@ export default function DateRangeFilterDrawer({
         className="absolute inset-0 bg-black/40"
         onClick={onClose}
         aria-label="Fechar"
+        tabIndex={-1}
       />
 
       <aside
@@ -341,23 +388,23 @@ export default function DateRangeFilterDrawer({
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-            <DateButton
+            <DateInput
               label="De"
               value={from}
               disabled={disableDates}
-              onPick={(d) => {
+              onChange={(ymd) => {
                 setPreset("custom");
-                setFrom(d ? toYMD(d) : null);
+                setFrom(ymd);
               }}
             />
 
-            <DateButton
+            <DateInput
               label="Até"
               value={to}
               disabled={disableDates}
-              onPick={(d) => {
+              onChange={(ymd) => {
                 setPreset("custom");
-                setTo(d ? toYMD(d) : null);
+                setTo(ymd);
               }}
             />
           </div>

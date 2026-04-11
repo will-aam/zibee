@@ -109,28 +109,6 @@ export function LancamentoItem({
                 <ArrowDownRightIcon className="h-3 w-3" />
               )}
               {lancamento.categoria}
-
-              {/* AS NOVAS TAGS 50/30/20 INTELIGENTES */}
-              {categoriaRegra === "50" && (
-                <span className="bg-blue-500/10 text-blue-500 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ml-1">
-                  Necessidade
-                </span>
-              )}
-              {categoriaRegra === "30" && (
-                <span className="bg-orange-500/10 text-orange-500 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ml-1">
-                  Desejo
-                </span>
-              )}
-              {categoriaRegra === "20" && (
-                <span className="bg-green-500/10 text-green-500 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ml-1">
-                  Poupança
-                </span>
-              )}
-              {categoriaRegra === "renda" && (
-                <span className="bg-green-500/10 text-green-500 text-[9px] font-bold px-1.5 py-0.5 rounded-sm uppercase tracking-wider ml-1">
-                  Entrada
-                </span>
-              )}
             </span>
 
             <span className="opacity-50">•</span>

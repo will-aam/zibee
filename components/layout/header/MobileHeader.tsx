@@ -147,13 +147,13 @@ export function MobileHeader({
         </div>
 
         <svg
-          className="absolute bottom-0 left-0 w-full h-16 block"
+          className="absolute bottom-0 left-0 w-full h-16 block text-background"
           viewBox="0 0 1440 120"
           preserveAspectRatio="none"
           aria-hidden="true"
         >
           <path
-            fill="hsl(var(--background))"
+            fill="currentColor"
             d="M0,64 C180,120 360,120 540,80 C720,40 900,20 1080,40 C1260,60 1350,95 1440,110 L1440,120 L0,120 Z"
           />
         </svg>

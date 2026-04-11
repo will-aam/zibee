@@ -14,14 +14,14 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "oklch(0.55 0.18 230)" },
-    { media: "(prefers-color-scheme: dark)", color: "oklch(0.65 0.15 230)" },
+    { media: "(prefers-color-scheme: light)", color: "#1D4ED8" },
+    { media: "(prefers-color-scheme: dark)", color: "#2563EB" },
   ],
   width: "device-width",
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover",
+  viewportFit: "cover", // Isso você já fez certo, garante o preenchimento total
 };
 
 export const metadata: Metadata = {
@@ -39,11 +39,10 @@ export const metadata: Metadata = {
   },
   appleWebApp: {
     capable: true,
-    statusBarStyle: "default",
+    statusBarStyle: "black-translucent",
     title: "Zibee",
   },
 };
-
 export default function RootLayout({
   children,
 }: Readonly<{

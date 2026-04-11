@@ -96,7 +96,7 @@ export default function MobileDashboardSummary({
 
   return (
     <>
-      <section className="-mt-12 px-4 md:hidden relative z-10">
+      <section className="-mt-[76px] px-4 md:hidden relative z-10">
         <div
           className="rounded-3xl 
 bg-card/80 

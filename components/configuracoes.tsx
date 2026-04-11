@@ -280,8 +280,8 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
                   <SelectValue placeholder="Classificação" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="50">Necessidade (50%)</SelectItem>
-                  <SelectItem value="30">Desejo (30%)</SelectItem>
+                  <SelectItem value="50">Necessidade básica (50%)</SelectItem>
+                  <SelectItem value="30">Desejo pessoal (30%)</SelectItem>
                   <SelectItem value="20">Poupança (20%)</SelectItem>
                   <SelectItem value="renda">Entrada</SelectItem>
                 </SelectContent>

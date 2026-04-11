@@ -636,7 +636,7 @@ export default function Receitas() {
               </div>
               <div>
                 <h4 className="font-bold text-foreground leading-none">
-                  50% Necessidades
+                  50% Necessidades básicas
                 </h4>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Fixas
@@ -677,7 +677,7 @@ export default function Receitas() {
               </div>
               <div>
                 <h4 className="font-bold text-foreground leading-none">
-                  30% Desejos
+                  30% Desejos pessoais
                 </h4>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
                   Variáveis

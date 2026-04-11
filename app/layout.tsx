@@ -7,7 +7,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { PWAUpdater } from "@/components/PWAUpdater";
-import "./globals.css";
+import "/globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
@@ -27,7 +27,6 @@ export const viewport: Viewport = {
 export const metadata: Metadata = {
   title: "Zibee",
   description: "Gerencie suas finanças pessoais",
-  // ESTRATÉGIA DE CACHE BUSTING: Adicionado ?v=2
   manifest: "/manifest.json?v=2",
   icons: {
     icon: [
@@ -52,6 +51,15 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
+      {/* --- INICIO DA TAG HEAD --- */}
+      <head>
+        <script
+          type="module"
+          src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
+        ></script>
+      </head>
+      {/* --- FIM DA TAG HEAD --- */}
+
       <body
         className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
       >
@@ -62,7 +70,6 @@ export default function RootLayout({
           disableTransitionOnChange
         >
           <WorkspaceProvider>
-            {/* INJETANDO O MONITOR DE ATUALIZAÇÃO DO PWA */}
             <PWAUpdater />
             {children}
           </WorkspaceProvider>

@@ -326,6 +326,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .eq("status", "ativo")
         .order("dia_vencimento", { ascending: true });
 
+      // ADICIONADO: Query para buscar as categorias e suas regras
+      let queryCategorias = supabase
+        .from("categorias")
+        .select("nome, regra_orcamento");
+
       if (activeContext === "grupo" && currentGroupId) {
         queryDespesasVariaveis = queryDespesasVariaveis.eq(
           "grupo_id",
@@ -337,6 +342,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           "grupo_id",
           currentGroupId,
         );
+        queryCategorias = queryCategorias.eq("grupo_id", currentGroupId);
       } else {
         queryDespesasVariaveis = queryDespesasVariaveis
           .eq("user_id", userId)
@@ -348,6 +354,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryFixasDashboard = queryFixasDashboard
+          .eq("user_id", userId)
+          .is("grupo_id", null);
+        queryCategorias = queryCategorias
           .eq("user_id", userId)
           .is("grupo_id", null);
       }
@@ -374,12 +383,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         { data: receitasData },
         { data: vencimentosData },
         { data: fixasData },
+        { data: categoriasData }, // ADICIONADO
         { data: metaData },
       ] = await Promise.all([
         queryDespesasVariaveis,
         queryReceitas,
         queryVencimentos,
         queryFixasDashboard,
+        queryCategorias, // ADICIONADO
         activeContext === "pessoal" &&
         dashboardCache.metaFixada[activeContext] === undefined
           ? supabase
@@ -406,14 +417,30 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         ...(dadosFixasValidos || []),
       ];
 
+      // 1. Mapeando as regras de forma super segura (Tudo minúsculo e sem espaços extras)
+      const regrasMap: Record<string, string> = {};
+      categoriasData?.forEach((cat) => {
+        if (cat.nome) {
+          regrasMap[cat.nome.trim().toLowerCase()] = cat.regra_orcamento;
+        }
+      });
+
       const categoriasMap = todosOsGastos.reduce((acc: any, curr) => {
         const k = curr.categoria || "Sem categoria";
         acc[k] = (acc[k] || 0) + Number(curr.valor);
         return acc;
       }, {});
 
+      // 2. Injetando a regra comparando as strings limpas
       const fetchedCategoriasChart = Object.entries(categoriasMap || {})
-        .map(([name, value]) => ({ name, value: Number(value) }))
+        .map(([name, value]) => {
+          const nomeLimpo = name.trim().toLowerCase();
+          return {
+            name,
+            value: Number(value),
+            regra: regrasMap[nomeLimpo] || "30", // Fallback apenas se não achar de jeito nenhum
+          };
+        })
         .sort((a, b) => b.value - a.value)
         .slice(0, 5);
 
@@ -658,8 +685,24 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               categoriasChart.map((item, index) => (
                 <div key={index} className="space-y-1.5">
                   <div className="flex items-center justify-between text-sm">
-                    <span className="font-medium text-foreground">
+                    {/* ADICIONADO AQUI AS TAGS INTELIGENTES */}
+                    <span className="font-medium text-foreground flex items-center gap-2">
                       {item.name}
+                      {item.regra === "50" && (
+                        <span className="text-[9px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">
+                          Necessidade
+                        </span>
+                      )}
+                      {item.regra === "30" && (
+                        <span className="text-[9px] bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">
+                          Desejo
+                        </span>
+                      )}
+                      {item.regra === "20" && (
+                        <span className="text-[9px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">
+                          Poupança
+                        </span>
+                      )}
                     </span>
                     <span className="text-muted-foreground font-medium">
                       {formatMoney(item.value)}

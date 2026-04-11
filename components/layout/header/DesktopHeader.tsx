@@ -18,7 +18,7 @@ import {
   UserGroupIcon,
   FunnelIcon,
   FireIcon,
-  BriefcaseIcon, // NOVO: Ícone outline para Investimentos
+  BriefcaseIcon,
 } from "@heroicons/react/24/outline";
 
 import {
@@ -29,12 +29,28 @@ import {
   UserGroupIcon as UserGroupSolid,
   FireIcon as FireSolid,
   BriefcaseIcon as BriefcaseSolid,
-  ReceiptPercentIcon as CalculatorSolid, // NOVO: Ícone solid para Planejamento
 } from "@heroicons/react/24/solid";
-import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
+
+// Removidos os ReceiptPercentIcon daqui de cima
 
 const sora = Sora({ subsets: ["latin"] });
 const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
+
+const CalculatorOutline = ({ className }: { className?: string }) => (
+  <ion-icon
+    name="calculator-outline"
+    class={className}
+    style={{ fontSize: "1.5rem", lineHeight: 1 }}
+  ></ion-icon>
+);
+
+const CalculatorSolid = ({ className }: { className?: string }) => (
+  <ion-icon
+    name="calculator"
+    class={className}
+    style={{ fontSize: "1.5rem", lineHeight: 1 }}
+  ></ion-icon>
+);
 
 interface DesktopHeaderProps {
   activeTab: string;
@@ -81,10 +97,9 @@ export function DesktopHeader(props: DesktopHeaderProps) {
     {
       id: "receitas",
       label: "Planejamento",
-      Icon: ReceiptPercentIcon, // NOVO: Ícone outline para Planejamento
-      IconActive: CalculatorSolid,
+      Icon: CalculatorOutline, // TROCADo AQUI
+      IconActive: CalculatorSolid, // TROCADo AQUI
     },
-    // NOVA ABA DE INVESTIMENTOS ADICIONADA AQUI
     {
       id: "investimentos",
       label: "Investimentos",

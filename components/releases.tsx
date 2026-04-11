@@ -38,10 +38,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// CACHE EM MEMÓRIA
+// CACHE EM MEMÓRIA (Agora separa as categorias por contexto: Pessoal/Grupo)
 const memoryCache = {
   lancamentosPorMes: {} as Record<string, Lancamento[]>,
-  categorias: null as { id: number; nome: string }[] | null,
+  categorias: {} as Record<string, { id: number; nome: string }[]>,
   formasPagamento: null as { id: number; nome: string }[] | null,
 };
 
@@ -62,9 +62,11 @@ export default function Lancamentos() {
   const [lancamentos, setLancamentos] = useState<Lancamento[]>(
     memoryCache.lancamentosPorMes[cacheKey] || [],
   );
-  const [categoriasDB, setCategoriasDB] = useState(
-    memoryCache.categorias || [],
-  );
+
+  // Inicia puxando as categorias específicas do contexto atual
+  const [categoriasDB, setCategoriasDB] = useState<
+    { id: number; nome: string }[]
+  >(memoryCache.categorias[activeContext] || []);
   const [formasPagamentoDB, setFormasPagamentoDB] = useState(
     memoryCache.formasPagamento || [],
   );
@@ -154,22 +156,27 @@ export default function Lancamentos() {
       // 2. BUSCAR CONTAS FIXAS ATIVAS E PAUSADAS
       let queryFixas = supabase.from("despesas_fixas").select("*");
 
+      // 3. BUSCAR AS CATEGORIAS MÁGICAS (Agora individuais por contexto)
+      let queryCat = supabase.from("categorias").select("*").order("nome");
+
       if (activeContext === "grupo" && groupId) {
         queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
         queryFixas = queryFixas.eq("grupo_id", groupId);
+        queryCat = queryCat.eq("grupo_id", groupId);
       } else {
         queryLancamentos = queryLancamentos
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
+        queryCat = queryCat.eq("user_id", userId).is("grupo_id", null);
       }
 
       const [resLancamentos, resFixas, resCat, resPay] = await Promise.all([
         queryLancamentos,
         queryFixas,
-        !memoryCache.categorias
-          ? supabase.from("categorias").select("*").order("nome")
-          : Promise.resolve({ data: memoryCache.categorias }),
+        !memoryCache.categorias[activeContext]
+          ? queryCat
+          : Promise.resolve({ data: memoryCache.categorias[activeContext] }),
         !memoryCache.formasPagamento
           ? supabase.from("formas_pagamento").select("*").order("nome")
           : Promise.resolve({ data: memoryCache.formasPagamento }),
@@ -189,7 +196,6 @@ export default function Lancamentos() {
         const sombras: Lancamento[] = [];
 
         dadosFixas.forEach((fixa) => {
-          // Ignora se estiver pausada
           if (fixa.status === "pausado") return;
 
           if (!contasFixasJaPagasNoMes.has(fixa.id)) {
@@ -197,7 +203,7 @@ export default function Lancamentos() {
             const diaStr = String(diaSeguro).padStart(2, "0");
 
             sombras.push({
-              id: -fixa.id, // ID Negativo: é sombra
+              id: -fixa.id,
               user_id: fixa.user_id,
               grupo_id: fixa.grupo_id,
               descricao: fixa.descricao || fixa.nome || "Conta Fixa",
@@ -225,8 +231,8 @@ export default function Lancamentos() {
         setLancamentos(todosOsDados);
       }
 
-      if (resCat.data && !memoryCache.categorias) {
-        memoryCache.categorias = resCat.data;
+      if (resCat.data) {
+        memoryCache.categorias[activeContext] = resCat.data;
         setCategoriasDB(resCat.data);
       }
       if (resPay.data && !memoryCache.formasPagamento) {
@@ -282,7 +288,7 @@ export default function Lancamentos() {
   const handleSelectAll = () => {
     const lancamentosSelecionaveis = lancamentosFiltrados.filter(
       (l) => !l.isShadow,
-    ); // Não deixa selecionar sombras em massa
+    );
     if (
       selectedIds.length === lancamentosSelecionaveis.length &&
       lancamentosSelecionaveis.length > 0
@@ -297,7 +303,6 @@ export default function Lancamentos() {
   };
 
   const handleDeleteClick = (id: number) => {
-    // Agora é permitido! Passamos o ID (se for negativo, a confirmDeletion sabe tratar)
     setDeleteConfig({ isOpen: true, type: "single", id });
   };
 
@@ -329,11 +334,8 @@ export default function Lancamentos() {
         toast({ title: `${idsToDelete.length} excluídos.` });
         window.dispatchEvent(new Event("zibee:transaction-changed"));
       } else if (deleteConfig.type === "single" && deleteConfig.id) {
-        // -----------------------------------------------------
-        // MÁGICA DA EXCLUSÃO (Sombras x Reais)
-        // -----------------------------------------------------
         const isShadow = deleteConfig.id < 0;
-        const realId = isShadow ? -deleteConfig.id : deleteConfig.id; // Transforma ID negativo em positivo
+        const realId = isShadow ? -deleteConfig.id : deleteConfig.id;
 
         const remaining = lancamentos.filter((l) => l.id !== deleteConfig.id);
         setLancamentos(remaining);
@@ -342,10 +344,8 @@ export default function Lancamentos() {
 
         let query;
         if (isShadow) {
-          // Se é sombra, exclui na tabela Mestre (Contas Fixas)
           query = supabase.from("despesas_fixas").delete().eq("id", realId);
         } else {
-          // Se é lançamento real, exclui no Lançamentos
           query = supabase.from("lancamentos").delete().eq("id", realId);
         }
 
@@ -429,12 +429,10 @@ export default function Lancamentos() {
   };
 
   const handleEdit = (lancamento: Lancamento) => {
-    // Agora o botão de editar da Sombra funciona! Vamos mandar pro modal do formulário e resolver lá.
     setLancamentoEditando(lancamento);
     setIsDialogOpen(true);
   };
 
-  // Variável para descobrir se estamos excluindo uma sombra no AlertDialog
   const isShadowDeleting =
     deleteConfig.type === "single" && deleteConfig.id && deleteConfig.id < 0;
 

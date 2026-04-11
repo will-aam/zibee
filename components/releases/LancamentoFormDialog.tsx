@@ -30,7 +30,10 @@ import {
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
 import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
-import { CalendarDaysIcon } from "@heroicons/react/24/outline";
+import {
+  CalendarDaysIcon,
+  InformationCircleIcon,
+} from "@heroicons/react/24/outline"; // <-- ATUALIZADO AQUI
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -86,7 +89,6 @@ export function LancamentoFormDialog({
     if (lancamentoToEdit) {
       setFormData({
         ...lancamentoToEdit,
-        // Limpa os espaços ao editar para que o Select encontre a opção certa
         categoria: lancamentoToEdit.categoria?.trim(),
         forma_pagamento: lancamentoToEdit.forma_pagamento?.trim(),
       });
@@ -239,8 +241,8 @@ export function LancamentoFormDialog({
     try {
       const basePayload = {
         ...formData,
-        categoria: formData.categoria?.trim(), // Salva a string limpa
-        forma_pagamento: formData.forma_pagamento?.trim(), // Salva a string limpa
+        categoria: formData.categoria?.trim(),
+        forma_pagamento: formData.forma_pagamento?.trim(),
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
       } as Omit<Lancamento, "id">;
@@ -557,9 +559,57 @@ export function LancamentoFormDialog({
               {/* OPÇÕES DE REPETIÇÃO HUMANIZADAS (SÓ APARECE PARA DESPESAS NOVAS) */}
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
-                  <Label className="text-muted-foreground font-bold">
-                    Como essa despesa se repete?
-                  </Label>
+                  {/* --- BLOCO NOVO COM POPOVER --- */}
+                  <div className="flex items-center gap-2">
+                    <Label className="text-muted-foreground font-bold">
+                      Como essa despesa se repete?
+                    </Label>
+
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <button
+                          type="button"
+                          className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+                          aria-label="Entender tipos de repetição"
+                        >
+                          <InformationCircleIcon className="h-5 w-5" />
+                        </button>
+                      </PopoverTrigger>
+                      <PopoverContent
+                        className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-[9999]"
+                        align="start"
+                        side="top"
+                      >
+                        <div className="space-y-3 text-sm">
+                          <h4 className="font-bold text-foreground">
+                            Tipos de Repetição
+                          </h4>
+                          <div className="space-y-2 text-muted-foreground">
+                            <p>
+                              <strong className="text-foreground">
+                                Única:
+                              </strong>{" "}
+                              acontece só uma vez.
+                            </p>
+                            <p>
+                              <strong className="text-foreground">
+                                Recorrente:
+                              </strong>{" "}
+                              repete todo mês até você pausar ou remover.
+                            </p>
+                            <p>
+                              <strong className="text-foreground">
+                                Parcelada:
+                              </strong>{" "}
+                              repete por um número de parcelas ou até uma data
+                              final.
+                            </p>
+                          </div>
+                        </div>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
+                  {/* ------------------------------ */}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Button

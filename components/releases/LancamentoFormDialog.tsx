@@ -582,7 +582,7 @@ export function LancamentoFormDialog({
                         setFormData((prev) => ({ ...prev, pago: false }));
                       }}
                     >
-                      Assinatura (Fixa)
+                      Recorrente
                     </Button>
                     <Button
                       type="button"

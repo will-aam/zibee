@@ -97,7 +97,7 @@ export function MobileHeader({
     <section className={`md:hidden ${sora.className}`}>
       <header
         id="mobile-header-top"
-        className="bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
+        className="bg-#009ed8 text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-20"
       >
         <div className="flex items-center gap-4 mb-2">
           <button

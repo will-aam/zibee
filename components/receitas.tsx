@@ -757,7 +757,7 @@ export default function Receitas() {
       </section>
       {/* --- BLOCO 4: SIMULADOR DE CENÁRIOS ("E SE...") --- */}
       {/* O !mt-6 força a seção a ignorar o gap gigante da página e colar nos cards acima */}
-      <section className="mt-6!">
+      {/* <section className="mt-6!">
         <div className="bg-muted/30 border border-dashed rounded-3xl p-5 sm:p-6 space-y-5 relative overflow-hidden">
           <div className="relative z-10">
             <h3 className="font-bold text-lg flex items-center gap-2 text-foreground">
@@ -839,7 +839,7 @@ export default function Receitas() {
             </span>
           </div>
         </div>
-      </section>
+      </section> */}
     </div>
   );
 }

@@ -14,7 +14,7 @@ const geistMono = Geist_Mono({ subsets: ["latin"], variable: "--font-mono" });
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: "(prefers-color-scheme: light)", color: "#007fc5" },
+    { media: "(prefers-color-scheme: light)", color: "#009ed8" },
     { media: "(prefers-color-scheme: dark)", color: "#009ed8" },
   ],
   width: "device-width",

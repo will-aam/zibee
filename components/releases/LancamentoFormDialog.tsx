@@ -576,7 +576,7 @@ export function LancamentoFormDialog({
                         </button>
                       </PopoverTrigger>
                       <PopoverContent
-                        className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-[9999]"
+                        className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-9999"
                         align="start"
                         side="top"
                       >

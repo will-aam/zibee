@@ -5,14 +5,14 @@ import {
   HomeIcon,
   DocumentTextIcon,
   UserGroupIcon,
-  BriefcaseIcon, // Novo ícone para Investimentos
+  BriefcaseIcon,
   FireIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
   DocumentTextIcon as DocumentTextSolid,
   UserGroupIcon as UserGroupSolid,
-  BriefcaseIcon as BriefcaseSolid, // Novo ícone para Investimentos
+  BriefcaseIcon as BriefcaseSolid,
   FireIcon as FireSolid,
 } from "@heroicons/react/24/solid";
 
@@ -22,11 +22,12 @@ interface MobileNavProps {
 }
 
 export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
+  // Ajustamos os paddings e adicionamos o efeitinho de pular (-translate-y-1)
   const navButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-full transition-all duration-300 ease-in-out active:scale-95 ${
       isActive
-        ? "bg-primary/15 text-primary px-5 py-2.5"
-        : "text-muted-foreground px-4 py-2.5"
+        ? "bg-primary/15 text-primary px-3.5 py-2 -translate-y-1 shadow-sm"
+        : "text-muted-foreground px-2 py-2"
     }`;
 
   const tabs = [
@@ -43,7 +44,6 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
       Icon: UserGroupIcon,
       IconActive: UserGroupSolid,
     },
-    // SAIU O RESUMO, ENTROU INVESTIMENTOS AQUI
     {
       id: "investimentos",
       label: "Investimentos",
@@ -54,8 +54,9 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
   ];
 
   return (
-    <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] ">
-      <div className="flex items-center justify-around px-2 h-20">
+    <div className="fixed bottom-0 left-0 w-full z-50 md:hidden bg-background/95 backdrop-blur-md pb-[env(safe-area-inset-bottom)] border-t border-border/50">
+      {/* Trocamos justify-around por justify-between px-3 para distribuir o espaço de forma mais inteligente */}
+      <div className="flex items-center justify-between px-3 h-16 sm:h-20">
         {tabs.map(({ id, label, Icon, IconActive }) => {
           const isActive = activeTab === id;
           return (
@@ -63,17 +64,21 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
               key={id}
               onClick={() => onNavigate(id)}
               className={navButtonClass(isActive)}
+              aria-label={label}
             >
               {isActive ? (
-                <IconActive className="h-7 w-7 shrink-0" />
+                // Ícones reduzidos para h-6 w-6 (Padrão de UI Mobile)
+                <IconActive className="h-6 w-6 shrink-0 transition-transform duration-300" />
               ) : (
-                <Icon className="h-7 w-7 shrink-0" />
+                <Icon className="h-6 w-6 shrink-0 transition-transform duration-300" />
               )}
+
               <span
-                className={`overflow-hidden whitespace-nowrap text-sm font-semibold transition-all duration-300 ${
+                // Fonte reduzida para text-xs e max-w ajustado para 85px (cabe "Investimentos")
+                className={`overflow-hidden whitespace-nowrap text-xs font-bold transition-all duration-300 ${
                   isActive
-                    ? "max-w-[100px] ml-2 opacity-100"
-                    : "max-w-0 opacity-0"
+                    ? "max-w-[85px] ml-1.5 opacity-100"
+                    : "max-w-0 ml-0 opacity-0"
                 }`}
               >
                 {label}

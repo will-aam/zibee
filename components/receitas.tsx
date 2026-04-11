@@ -60,18 +60,10 @@ export default function Receitas() {
   const [receitas, setReceitas] = useState<ReceitaFixa[]>(
     memoryCache.receitas || [],
   );
-
-  // ESTADOS DO TETO DE GASTOS (FLUXO DE CAIXA)
   const [totalDespesasFixas, setTotalDespesasFixas] = useState(
     memoryCache.totalDespesasFixas || 0,
   );
   const [totalVariaveis, setTotalVariaveis] = useState(0);
-
-  // ESTADOS DA INTELIGÊNCIA 50/30/20 (BASEADO NAS CATEGORIAS)
-  const [totalNecessidades, setTotalNecessidades] = useState(0);
-  const [totalDesejos, setTotalDesejos] = useState(0);
-  const [totalPoupados, setTotalPoupados] = useState(0);
-
   const [avatarMap, setAvatarMap] = useState<Record<string, string>>(
     memoryCache.avatares || {},
   );
@@ -155,36 +147,26 @@ export default function Receitas() {
       const inicio = `${mesReferencia}-01`;
       const fim = `${mesReferencia}-${new Date(Number(ano), Number(mes), 0).getDate()}`;
 
-      // BUSCA AS RECEITAS (RENDA BASE)
-      let queryReceitas = supabase
-        .from("receitas_fixas")
-        .select("*")
-        .order("valor", { ascending: false });
-
-      // BUSCA GASTOS E SUAS CATEGORIAS
       let queryVariaveis = supabase
         .from("lancamentos")
-        .select("valor, categoria")
+        .select("valor")
         .eq("tipo", "Despesa")
         .is("conta_fixa_id", null)
         .gte("data_vencimento", inicio)
         .lte("data_vencimento", fim);
-
+      let queryReceitas = supabase
+        .from("receitas_fixas")
+        .select("*")
+        .order("valor", { ascending: false });
       let queryFixas = supabase
         .from("despesas_fixas")
-        .select("valor, categoria")
+        .select("valor")
         .eq("status", "ativo");
-
-      // BUSCA AS REGRAS DAS CATEGORIAS DO USUÁRIO
-      let queryCategorias = supabase
-        .from("categorias")
-        .select("nome, regra_orcamento");
 
       if (activeContext === "grupo" && groupId) {
         queryVariaveis = queryVariaveis.eq("grupo_id", groupId);
         queryReceitas = queryReceitas.eq("grupo_id", groupId);
         queryFixas = queryFixas.eq("grupo_id", groupId);
-        queryCategorias = queryCategorias.eq("grupo_id", groupId);
       } else {
         queryVariaveis = queryVariaveis
           .eq("user_id", userId)
@@ -193,63 +175,14 @@ export default function Receitas() {
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
-        queryCategorias = queryCategorias
-          .eq("user_id", userId)
-          .is("grupo_id", null);
       }
 
-      const [resReceitas, resFixas, resVariaveis, resCategorias] =
-        await Promise.all([
-          queryReceitas,
-          queryFixas,
-          queryVariaveis,
-          queryCategorias,
-        ]);
+      const [resReceitas, resFixas, resVariaveis] = await Promise.all([
+        queryReceitas,
+        queryFixas,
+        queryVariaveis,
+      ]);
 
-      // 1. MAPEIA AS REGRAS DAS CATEGORIAS
-      const regrasMap: Record<string, string> = {};
-      resCategorias.data?.forEach((cat) => {
-        regrasMap[cat.nome] = cat.regra_orcamento;
-      });
-
-      // 2. PROCESSA OS GASTOS (FLUXO DE CAIXA + INTELIGÊNCIA 50/30/20)
-      let sumFixas = 0;
-      let sumVariaveis = 0;
-      let sum50 = 0; // Necessidades
-      let sum30 = 0; // Desejos
-      let sum20 = 0; // Poupança
-
-      resFixas.data?.forEach((f) => {
-        const val = Number(f.valor);
-        sumFixas += val; // Pro Teto de Gastos
-
-        const regra = regrasMap[f.categoria] || "50"; // Default de segurança
-        if (regra === "50") sum50 += val;
-        if (regra === "30") sum30 += val;
-        if (regra === "20") sum20 += val;
-      });
-
-      resVariaveis.data?.forEach((v) => {
-        const val = Number(v.valor);
-        sumVariaveis += val; // Pro Teto de Gastos
-
-        const regra = regrasMap[v.categoria] || "30"; // Default de segurança
-        if (regra === "50") sum50 += val;
-        if (regra === "30") sum30 += val;
-        if (regra === "20") sum20 += val;
-      });
-
-      setTotalDespesasFixas(sumFixas);
-      setTotalVariaveis(sumVariaveis);
-      setTotalNecessidades(sum50);
-      setTotalDesejos(sum30);
-      setTotalPoupados(sum20);
-
-      memoryCache.totalDespesasFixas = sumFixas;
-      const cacheKey = `${mesReferencia}_${activeContext}`;
-      memoryCache.variaveisPorMes[cacheKey] = sumVariaveis;
-
-      // 3. PROCESSA AS RENDAS E AVATARES
       if (resReceitas.data) {
         memoryCache.receitas = resReceitas.data;
         setReceitas(resReceitas.data);
@@ -269,6 +202,25 @@ export default function Receitas() {
             setAvatarMap(map);
           }
         }
+      }
+
+      if (resFixas.data) {
+        const somaFixas = resFixas.data.reduce(
+          (acc, item) => acc + Number(item.valor),
+          0,
+        );
+        memoryCache.totalDespesasFixas = somaFixas;
+        setTotalDespesasFixas(somaFixas);
+      }
+
+      if (resVariaveis.data) {
+        const somaVariaveis = resVariaveis.data.reduce(
+          (acc, item) => acc + Number(item.valor),
+          0,
+        );
+        const cacheKey = `${mesReferencia}_${activeContext}`;
+        memoryCache.variaveisPorMes[cacheKey] = somaVariaveis;
+        setTotalVariaveis(somaVariaveis);
       }
     } catch (error) {
       console.error("Erro ao sincronizar dados", error);
@@ -363,6 +315,7 @@ export default function Receitas() {
 
     const val = Number(simulacaoValor);
 
+    // Validações de segurança para evitar bugs no layout
     if (isNaN(val) || val <= 0) {
       toast({
         title: "Digite um valor válido e maior que zero.",
@@ -394,7 +347,7 @@ export default function Receitas() {
     localStorage.setItem(
       SIMULADOR_STORAGE_KEY,
       JSON.stringify(novasSimulacoes),
-    );
+    ); // Salva no local
     setSimulacaoNome("");
     setSimulacaoValor("");
   };
@@ -405,13 +358,13 @@ export default function Receitas() {
     localStorage.setItem(
       SIMULADOR_STORAGE_KEY,
       JSON.stringify(novasSimulacoes),
-    );
+    ); // Atualiza no local
   };
 
   const formatMoney = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
-  // MATEMÁTICA DO ORÇAMENTO (Fluxo de Caixa)
+  // MATEMÁTICA DO ORÇAMENTO
   const totalReceitasBase = receitas.reduce((acc, item) => acc + item.valor, 0);
   const sobraAposFixas = totalReceitasBase - totalDespesasFixas;
   const saldoFinalReal = sobraAposFixas - totalVariaveis;
@@ -420,17 +373,15 @@ export default function Receitas() {
   const totalSimulado = simulacoes.reduce((acc, curr) => acc + curr.valor, 0);
   const saldoComSimulacao = saldoFinalReal - totalSimulado;
 
-  // MATEMÁTICA 50/30/20 IDEAL
+  // MATEMÁTICA 50/30/20
   const idealNecessidades = totalReceitasBase * 0.5;
   const idealDesejos = totalReceitasBase * 0.3;
   const idealPoupanca = totalReceitasBase * 0.2;
 
-  // AS PORCENTAGENS AGORA USAM A CLASSIFICAÇÃO INTELIGENTE
   const pctNecessidades =
-    idealNecessidades > 0 ? (totalNecessidades / idealNecessidades) * 100 : 0;
-  const pctDesejos = idealDesejos > 0 ? (totalDesejos / idealDesejos) * 100 : 0;
-  const pctPoupanca =
-    idealPoupanca > 0 ? (totalPoupados / idealPoupanca) * 100 : 0;
+    idealNecessidades > 0 ? (totalDespesasFixas / idealNecessidades) * 100 : 0;
+  const pctDesejos =
+    idealDesejos > 0 ? (totalVariaveis / idealDesejos) * 100 : 0;
 
   if (loading && !memoryCache.receitas && activeContext === "pessoal") {
     return (
@@ -688,14 +639,14 @@ export default function Receitas() {
                   50% Necessidades
                 </h4>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Gastos Essenciais
+                  Fixas
                 </span>
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1.5">
                 <span className="font-medium text-muted-foreground">
-                  Real: {formatMoney(totalNecessidades)}
+                  Real: {formatMoney(totalDespesasFixas)}
                 </span>
                 <span className="text-muted-foreground">
                   Ideal: {formatMoney(idealNecessidades)}
@@ -712,7 +663,7 @@ export default function Receitas() {
               />
               {pctNecessidades > 100 && (
                 <p className="text-xs text-destructive mt-2 font-medium">
-                  Você estourou o limite seguro para necessidades!
+                  Você estourou o limite seguro para contas fixas!
                 </p>
               )}
             </div>
@@ -729,14 +680,14 @@ export default function Receitas() {
                   30% Desejos
                 </h4>
                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider">
-                  Estilo de Vida
+                  Variáveis
                 </span>
               </div>
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1.5">
                 <span className="font-medium text-muted-foreground">
-                  Real: {formatMoney(totalDesejos)}
+                  Real: {formatMoney(totalVariaveis)}
                 </span>
                 <span className="text-muted-foreground">
                   Ideal: {formatMoney(idealDesejos)}
@@ -753,7 +704,7 @@ export default function Receitas() {
               />
               {pctDesejos > 100 && (
                 <p className="text-xs text-destructive mt-2 font-medium">
-                  Os gastos com desejos passaram do ideal.
+                  Os gastos variáveis já passaram do ideal.
                 </p>
               )}
             </div>
@@ -777,32 +728,27 @@ export default function Receitas() {
             <div>
               <div className="flex justify-between text-sm mb-1.5">
                 <span className="font-medium text-muted-foreground">
-                  Real Guardado: {formatMoney(totalPoupados)}
-                </span>
-                <span className="text-muted-foreground">
-                  Ideal: {formatMoney(idealPoupanca)}
+                  Ideal reservar:
                 </span>
               </div>
-              <Progress
-                value={Math.min(pctPoupanca, 100)}
-                className="h-2.5 bg-green-500/20 [&>div]:bg-green-500"
-              />
+              <div className="text-2xl font-bold tracking-tight text-foreground">
+                {formatMoney(idealPoupanca)}
+              </div>
               {/* FEEDBACK DINÂMICO DA POUPANÇA */}
               {saldoFinalReal >= idealPoupanca ? (
                 <p className="text-xs text-green-600 dark:text-green-500 mt-2 font-medium">
-                  Excelente! Seu saldo livre atual permite bater a meta do
-                  ideal.
+                  Excelente! Seu saldo livre atual permite guardar este valor.
                 </p>
               ) : saldoFinalReal > 0 ? (
                 <p className="text-xs text-orange-500 mt-2 font-medium leading-relaxed">
-                  Atenção: Seu saldo livre ({formatMoney(saldoFinalReal)}) não
-                  cobre o ideal porque você gastou além da conta. Tente guardar
-                  o que sobrou!
+                  Atenção: Seu saldo atual ({formatMoney(saldoFinalReal)}) não
+                  cobre o ideal porque os outros gastos passaram do limite.
+                  Guarde o que sobrou!
                 </p>
               ) : (
                 <p className="text-xs text-destructive mt-2 font-medium leading-relaxed">
-                  Sem saldo livre extra. Se você não investiu até agora, reveja
-                  seus gastos!
+                  Sem saldo livre. Reveja seus gastos variáveis para conseguir
+                  poupar no próximo mês.
                 </p>
               )}
             </div>
@@ -810,6 +756,7 @@ export default function Receitas() {
         </div>
       </section>
       {/* --- BLOCO 4: SIMULADOR DE CENÁRIOS ("E SE...") --- */}
+      {/* O !mt-6 força a seção a ignorar o gap gigante da página e colar nos cards acima */}
       <section className="mt-6!">
         <div className="bg-muted/30 border border-dashed rounded-3xl p-5 sm:p-6 space-y-5 relative overflow-hidden">
           <div className="relative z-10">
@@ -836,6 +783,7 @@ export default function Receitas() {
               value={simulacaoValor}
               onChange={(e) => setSimulacaoValor(e.target.value)}
               placeholder="Valor (R$)"
+              // Remove as setas do input e impede que o scroll do mouse altere o valor
               className="bg-background sm:w-32 [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
               onWheel={(e) => e.currentTarget.blur()}
             />

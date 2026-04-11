@@ -3,10 +3,20 @@
 import * as React from "react";
 import { Sora } from "next/font/google";
 import { FunnelIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
-import { ReceiptPercentIcon } from "@heroicons/react/24/outline";
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 
 const sora = Sora({ subsets: ["latin"] });
+
+// --- COMPONENTE IONIC DA CALCULADORA ---
+const CalculatorIonicSolid = ({ className }: { className?: string }) => (
+  // @ts-expect-error Tag customizada do Ionicons
+  <ion-icon
+    name="calculator-outline"
+    class={className}
+    style={{ fontSize: "1.5rem", lineHeight: 1 }}
+  />
+);
+// ----------------------------------------
 
 interface MobileHeaderProps {
   activeTab: string;
@@ -114,7 +124,7 @@ export function MobileHeader({
               className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/10"
               title="Planejamento"
             >
-              <ReceiptPercentIcon className="h-6 w-6 text-white" />
+              <CalculatorIonicSolid className="h-6 w-6 text-white" />
             </button>
             <button
               onClick={() => onNavigate("configuracoes")}

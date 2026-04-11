@@ -7,10 +7,20 @@ import { handleWhatsAppContact } from "@/lib/utils";
 
 import {
   Squares2X2Icon as Squares2X2Solid,
-  CalculatorIcon as CalculatorSolid,
   ClockIcon as ClockSolid,
   SparklesIcon as SparklesSolid,
 } from "@heroicons/react/24/solid";
+
+// --- COMPONENTE IONIC DA CALCULADORA ---
+const CalculatorIonic = ({ className }: { className?: string }) => (
+  // @ts-expect-error Tag customizada do Ionicons
+  <ion-icon
+    name="calculator"
+    class={className}
+    style={{ fontSize: "1.25rem", lineHeight: 1 }}
+  />
+);
+// ----------------------------------------
 
 export default function PaywallView() {
   return (
@@ -71,7 +81,7 @@ export default function PaywallView() {
             </li>
             <li className="flex gap-3 items-start bg-background/60 backdrop-blur-sm p-4 rounded-2xl border border-border/50 shadow-sm">
               <div className="p-2 bg-primary/10 rounded-xl shrink-0">
-                <CalculatorSolid className="w-5 h-5 text-primary" />
+                <CalculatorIonic className="w-5 h-5 text-primary" />
               </div>
               <div>
                 <strong className="block text-foreground">
@@ -167,7 +177,7 @@ export default function PaywallView() {
                 </li>
                 <li className="flex gap-4 items-start">
                   <div className="p-2.5 bg-primary/10 rounded-xl shrink-0 mt-0.5">
-                    <CalculatorSolid className="w-5 h-5 text-primary" />
+                    <CalculatorIonic className="w-5 h-5 text-primary" />
                   </div>
                   <div>
                     <strong className="block text-foreground text-base">

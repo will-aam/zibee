@@ -144,7 +144,6 @@ export default function Lancamentos() {
       const dataInicio = `${filtroMes}-01`;
       const ultimoDia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
       const dataFim = `${filtroMes}-${ultimoDia}`;
-
       // 1. BUSCAR LANÇAMENTOS DO MÊS
       let queryLancamentos = supabase
         .from("lancamentos")
@@ -156,19 +155,22 @@ export default function Lancamentos() {
       // 2. BUSCAR CONTAS FIXAS ATIVAS E PAUSADAS
       let queryFixas = supabase.from("despesas_fixas").select("*");
 
-      // 3. BUSCAR AS CATEGORIAS MÁGICAS (Agora individuais por contexto)
-      let queryCat = supabase.from("categorias").select("*").order("nome");
+      // 3. BUSCAR AS CATEGORIAS (Sempre pelo user_id, pois a tabela não tem grupo_id)
+      let queryCat = supabase
+        .from("categorias")
+        .select("*")
+        .eq("user_id", userId)
+        .order("nome");
 
       if (activeContext === "grupo" && groupId) {
         queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
         queryFixas = queryFixas.eq("grupo_id", groupId);
-        queryCat = queryCat.eq("grupo_id", groupId);
+        // Removido queryCat daqui!
       } else {
         queryLancamentos = queryLancamentos
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
-        queryCat = queryCat.eq("user_id", userId).is("grupo_id", null);
       }
 
       const [resLancamentos, resFixas, resCat, resPay] = await Promise.all([
@@ -259,11 +261,23 @@ export default function Lancamentos() {
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
     const matchTipo = filtrosTipo.length === 0 || filtrosTipo.includes(l.tipo);
+
+    // MÁGICA AQUI: Limpando os textos antes de comparar para evitar bugs
+    const categoriaLancamento = (l.categoria || "").trim().toLowerCase();
+    const categoriasSelecionadas = filtrosCategoria.map((c) =>
+      c.trim().toLowerCase(),
+    );
     const matchCategoria =
-      filtrosCategoria.length === 0 || filtrosCategoria.includes(l.categoria);
+      filtrosCategoria.length === 0 ||
+      categoriasSelecionadas.includes(categoriaLancamento);
+
+    const pagamentoLancamento = (l.forma_pagamento || "").trim().toLowerCase();
+    const pagamentosSelecionados = filtrosPagamento.map((p) =>
+      p.trim().toLowerCase(),
+    );
     const matchPagamento =
       filtrosPagamento.length === 0 ||
-      filtrosPagamento.includes(l.forma_pagamento);
+      pagamentosSelecionados.includes(pagamentoLancamento);
 
     let matchStatus = true;
     if (filtroStatus === "pago") matchStatus = l.pago === true;

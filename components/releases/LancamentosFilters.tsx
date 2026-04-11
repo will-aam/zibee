@@ -177,7 +177,6 @@ const ResponsiveFilterNatureza = ({
     </Sheet>
   );
 };
-// ---------------------------------
 
 const ResponsiveFilter = ({
   title,
@@ -350,24 +349,27 @@ export function LancamentosFilters({
   categoriasOptions,
   pagamentoOptions,
 }: LancamentosFiltersProps) {
+  // Limpa possíveis duplicações causadas por espaços invisíveis vindas do banco
+  const categoriasUnicas = Array.from(
+    new Set(categoriasOptions.map((c) => c.nome.trim())),
+  );
+  const pagamentosUnicos = Array.from(
+    new Set(pagamentoOptions.map((p) => p.nome.trim())),
+  );
+
   return (
     <div className="max-w-full overflow-x-auto scrollbar-hide pb-3 pt-1">
       <div className="flex items-center w-max gap-2 pr-4">
-        {/* FILTRO PRINCIPAL (NATUREZA) NO INÍCIO */}
         <ResponsiveFilterNatureza
           currentNatureza={filtroNatureza}
           setNatureza={setFiltroNatureza}
         />
-
-        {/* DIVISOR VISUAL */}
         <div className="w-px h-6 bg-border mx-1" />
-
         <ResponsiveFilterStatus
           label="Status"
           currentStatus={filtroStatus}
           setStatus={setFiltroStatus}
         />
-
         <ResponsiveFilter
           label="Tipo"
           title="Filtrar por Tipo"
@@ -375,19 +377,17 @@ export function LancamentosFilters({
           selectedValues={filtrosTipo}
           setSelectedValues={setFiltrosTipo}
         />
-
         <ResponsiveFilter
           label="Categoria"
           title="Categorias"
-          options={categoriasOptions.map((c) => c.nome)}
+          options={categoriasUnicas}
           selectedValues={filtrosCategoria}
           setSelectedValues={setFiltrosCategoria}
         />
-
         <ResponsiveFilter
           label="Pagamento"
           title="Formas de Pagamento"
-          options={pagamentoOptions.map((p) => p.nome)}
+          options={pagamentosUnicos}
           selectedValues={filtrosPagamento}
           setSelectedValues={setFiltrosPagamento}
         />

@@ -5,6 +5,8 @@ import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
+import { Checkbox } from "@/components/ui/checkbox";
+import { cn } from "@/lib/utils";
 import {
   ArrowTrendingDownIcon,
   ArrowTrendingUpIcon,
@@ -14,6 +16,7 @@ import {
   WalletIcon,
   EyeIcon,
   EyeSlashIcon,
+  ChevronDownIcon,
 } from "@heroicons/react/24/solid";
 import { ExclamationCircleIcon } from "@heroicons/react/24/outline";
 import {
@@ -189,6 +192,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   const [mesSelecionado, setMesSelecionado] = useState("todos");
   const [hidden, setHidden] = useState(false);
+  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null); // Guardar estado do grupo para o Checkbox
+
+  // ESTADO DO ACORDEÃO (Qual categoria está aberta?)
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
 
   const loadPrivacyState = useCallback(() => {
     try {
@@ -277,14 +284,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const { from, to, key } = readRange();
       if (!dashboardCache.dataByRange[key]) setLoading(true);
 
-      let currentGroupId = null;
+      let groupId = null;
       if (activeContext === "grupo") {
         const { data: myGroup } = await supabase
           .from("grupos")
           .select("id")
           .eq("criador_id", userId)
           .maybeSingle();
-        if (myGroup) currentGroupId = myGroup.id;
+        if (myGroup) groupId = myGroup.id;
         else {
           const { data: membership } = await supabase
             .from("membros_grupo")
@@ -292,13 +299,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             .eq("user_id", userId)
             .eq("status", "Aceito")
             .maybeSingle();
-          if (membership) currentGroupId = membership.grupo_id;
+          if (membership) groupId = membership.grupo_id;
         }
-        if (!currentGroupId) {
+        if (!groupId) {
           setLoading(false);
           return;
         }
       }
+
+      setCurrentGroupId(groupId);
 
       let queryDespesasVariaveis = supabase
         .from("lancamentos")
@@ -326,23 +335,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .eq("status", "ativo")
         .order("dia_vencimento", { ascending: true });
 
-      // ADICIONADO: Query para buscar as categorias e suas regras
-      let queryCategorias = supabase
-        .from("categorias")
-        .select("nome, regra_orcamento");
-
-      if (activeContext === "grupo" && currentGroupId) {
-        queryDespesasVariaveis = queryDespesasVariaveis.eq(
-          "grupo_id",
-          currentGroupId,
-        );
-        queryReceitas = queryReceitas.eq("grupo_id", currentGroupId);
-        queryVencimentos = queryVencimentos.eq("grupo_id", currentGroupId);
-        queryFixasDashboard = queryFixasDashboard.eq(
-          "grupo_id",
-          currentGroupId,
-        );
-        queryCategorias = queryCategorias.eq("grupo_id", currentGroupId);
+      if (activeContext === "grupo" && groupId) {
+        queryDespesasVariaveis = queryDespesasVariaveis.eq("grupo_id", groupId);
+        queryReceitas = queryReceitas.eq("grupo_id", groupId);
+        queryVencimentos = queryVencimentos.eq("grupo_id", groupId);
+        queryFixasDashboard = queryFixasDashboard.eq("grupo_id", groupId);
       } else {
         queryDespesasVariaveis = queryDespesasVariaveis
           .eq("user_id", userId)
@@ -354,9 +351,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryFixasDashboard = queryFixasDashboard
-          .eq("user_id", userId)
-          .is("grupo_id", null);
-        queryCategorias = queryCategorias
           .eq("user_id", userId)
           .is("grupo_id", null);
       }
@@ -383,14 +377,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         { data: receitasData },
         { data: vencimentosData },
         { data: fixasData },
-        { data: categoriasData }, // ADICIONADO
         { data: metaData },
       ] = await Promise.all([
         queryDespesasVariaveis,
         queryReceitas,
         queryVencimentos,
         queryFixasDashboard,
-        queryCategorias, // ADICIONADO
         activeContext === "pessoal" &&
         dashboardCache.metaFixada[activeContext] === undefined
           ? supabase
@@ -412,37 +404,41 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       const fetchedTotalFixas =
         dadosFixasValidos.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
         0;
+
       const todosOsGastos = [
         ...(variaveisData || []),
         ...(dadosFixasValidos || []),
       ];
 
-      // 1. Mapeando as regras de forma super segura (Tudo minúsculo e sem espaços extras)
-      const regrasMap: Record<string, string> = {};
-      categoriasData?.forEach((cat) => {
-        if (cat.nome) {
-          regrasMap[cat.nome.trim().toLowerCase()] = cat.regra_orcamento;
-        }
-      });
-
+      // 1. Agrupando categorias e guardando os itens (Acordeão)
       const categoriasMap = todosOsGastos.reduce((acc: any, curr) => {
         const k = curr.categoria || "Sem categoria";
-        acc[k] = (acc[k] || 0) + Number(curr.valor);
+        if (!acc[k]) acc[k] = { total: 0, items: [] };
+
+        acc[k].total += Number(curr.valor);
+        acc[k].items.push(curr);
         return acc;
       }, {});
 
-      // 2. Injetando a regra comparando as strings limpas
+      // 2. Formatando para o gráfico e ordenando os itens de cada categoria por data
       const fetchedCategoriasChart = Object.entries(categoriasMap || {})
-        .map(([name, value]) => {
-          const nomeLimpo = name.trim().toLowerCase();
+        .map(([name, data]: any) => {
           return {
             name,
-            value: Number(value),
-            regra: regrasMap[nomeLimpo] || "30", // Fallback apenas se não achar de jeito nenhum
+            value: Number(data.total),
+            items: data.items.sort((a: any, b: any) => {
+              const dateA = new Date(
+                a.data_vencimento || a.dia_vencimento,
+              ).getTime();
+              const dateB = new Date(
+                b.data_vencimento || b.dia_vencimento,
+              ).getTime();
+              return dateA - dateB;
+            }),
           };
         })
         .sort((a, b) => b.value - a.value)
-        .slice(0, 5);
+        .slice(0, 6); // Mostra até as 6 maiores categorias
 
       const fetchedVencimentos = vencimentosData || [];
 
@@ -495,6 +491,34 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     window.addEventListener(FILTER_EVENT, onFilterChanged);
     return () => window.removeEventListener(FILTER_EVENT, onFilterChanged);
   }, [fetchDashboardData]);
+
+  // Função para marcar como pago direto do Dashboard
+  const togglePagoLancamento = async (
+    lancamentoId: number,
+    currentStatus: boolean,
+  ) => {
+    try {
+      const novoStatus = !currentStatus;
+      let query = supabase
+        .from("lancamentos")
+        .update({ pago: novoStatus })
+        .eq("id", lancamentoId);
+
+      if (activeContext === "grupo" && currentGroupId) {
+        query = query.eq("grupo_id", currentGroupId);
+      } else {
+        query = query.eq("user_id", userId).is("grupo_id", null);
+      }
+
+      await query;
+      // Atualiza os dados da tela
+      fetchDashboardData();
+      // Emite evento para que outras abas (Lançamentos) saibam que algo mudou
+      window.dispatchEvent(new Event("zibee:transaction-changed"));
+    } catch (error) {
+      console.error("Erro ao atualizar pagamento:", error);
+    }
+  };
 
   const formatMoney = useCallback(
     (val: number) => {
@@ -673,54 +697,121 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         </div>
       </section>
 
-      {/* SEÇÃO 3: CATEGORIAS E PRÓXIMOS VENCIMENTOS */}
+      {/* SEÇÃO 3: CATEGORIAS EM ACORDEÃO E PRÓXIMOS VENCIMENTOS */}
       <div className="grid gap-12 md:grid-cols-2 pt-4">
         <section>
           <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
             <ArrowTrendingDownIcon className="h-5 w-5 text-orange-500" /> Onde
             estou gastando?
           </h2>
-          <div className="space-y-5">
+          <div className="space-y-4">
             {categoriasChart.length > 0 ? (
-              categoriasChart.map((item, index) => (
-                <div key={index} className="space-y-1.5">
-                  <div className="flex items-center justify-between text-sm">
-                    {/* ADICIONADO AQUI AS TAGS INTELIGENTES */}
-                    <span className="font-medium text-foreground flex items-center gap-2">
-                      {item.name}
-                      {item.regra === "50" && (
-                        <span className="text-[9px] bg-blue-500/10 text-blue-500 px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">
-                          Necessidade
-                        </span>
-                      )}
-                      {item.regra === "30" && (
-                        <span className="text-[9px] bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">
-                          Desejo
-                        </span>
-                      )}
-                      {item.regra === "20" && (
-                        <span className="text-[9px] bg-green-500/10 text-green-500 px-1.5 py-0.5 rounded-sm uppercase font-bold tracking-wider">
-                          Poupança
-                        </span>
-                      )}
-                    </span>
-                    <span className="text-muted-foreground font-medium">
-                      {formatMoney(item.value)}
-                    </span>
-                  </div>
-                  <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+              categoriasChart.map((item, index) => {
+                const isExpanded = expandedCategory === item.name;
+                return (
+                  <div key={index} className="space-y-1.5 transition-all">
+                    {/* CABEÇALHO DA CATEGORIA (Clicável) */}
                     <div
-                      className="h-full bg-orange-500 transition-all duration-700 ease-out"
-                      style={{
-                        width:
-                          totalDespesas + totalDespesasFixas > 0
-                            ? `${(item.value / (totalDespesas + totalDespesasFixas)) * 100}%`
-                            : "0%",
-                      }}
-                    />
+                      className="flex items-center justify-between text-sm cursor-pointer select-none hover:opacity-80 py-1"
+                      onClick={() =>
+                        setExpandedCategory(isExpanded ? null : item.name)
+                      }
+                    >
+                      <span className="font-medium text-foreground flex items-center gap-2">
+                        <ChevronDownIcon
+                          className={cn(
+                            "h-4 w-4 text-muted-foreground transition-transform duration-300",
+                            isExpanded && "rotate-180",
+                          )}
+                        />
+                        {item.name}
+                      </span>
+                      <span className="text-muted-foreground font-medium">
+                        {formatMoney(item.value)}
+                      </span>
+                    </div>
+
+                    {/* BARRA DE PROGRESSO */}
+                    <div className="h-1.5 w-full rounded-full bg-secondary overflow-hidden">
+                      <div
+                        className="h-full bg-orange-500 transition-all duration-700 ease-out"
+                        style={{
+                          width:
+                            totalDespesas + totalDespesasFixas > 0
+                              ? `${(item.value / (totalDespesas + totalDespesasFixas)) * 100}%`
+                              : "0%",
+                        }}
+                      />
+                    </div>
+
+                    {/* CONTEÚDO EXPANDIDO (Lista de despesas) */}
+                    {isExpanded && (
+                      <div className="pt-2 pb-2 pl-6 pr-2 space-y-3 animate-in slide-in-from-top-2 fade-in duration-200">
+                        {item.items.map((despesa: any, idx: number) => {
+                          const isFixedTemplate = !!despesa.dia_vencimento; // Verifica se é uma conta fixa recorrente
+                          const isPago = despesa.pago;
+                          const dataDisplay = isFixedTemplate
+                            ? `Todo dia ${despesa.dia_vencimento}`
+                            : new Date(
+                                despesa.data_vencimento,
+                              ).toLocaleDateString("pt-BR", {
+                                timeZone: "UTC",
+                              });
+
+                          return (
+                            <div
+                              key={idx}
+                              className="flex items-center justify-between text-xs border-b border-border/40 last:border-0 pb-2 last:pb-0"
+                            >
+                              <div className="flex items-center gap-3">
+                                {/* Exibe Checkbox para variáveis e ícone de carteira para fixas */}
+                                {!isFixedTemplate ? (
+                                  <Checkbox
+                                    checked={isPago}
+                                    onCheckedChange={() =>
+                                      togglePagoLancamento(despesa.id, isPago)
+                                    }
+                                    className="h-4 w-4 rounded-md"
+                                  />
+                                ) : (
+                                  <WalletIcon
+                                    className="h-4 w-4 text-blue-500/60"
+                                    title="Conta Fixa (Controle na aba Lançamentos)"
+                                  />
+                                )}
+                                <div className="flex flex-col">
+                                  <span
+                                    className={cn(
+                                      "font-medium",
+                                      isPago &&
+                                        "line-through text-muted-foreground",
+                                    )}
+                                  >
+                                    {despesa.descricao || despesa.nome}
+                                  </span>
+                                  <span className="text-[10px] text-muted-foreground">
+                                    {dataDisplay} {isFixedTemplate && " (Fixa)"}
+                                  </span>
+                                </div>
+                              </div>
+                              <span
+                                className={cn(
+                                  "font-semibold",
+                                  isPago
+                                    ? "text-muted-foreground"
+                                    : "text-foreground",
+                                )}
+                              >
+                                {formatMoney(Number(despesa.valor))}
+                              </span>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
                   </div>
-                </div>
-              ))
+                );
+              })
             ) : (
               <div className="text-sm text-muted-foreground bg-accent/30 p-4 rounded-xl border border-dashed">
                 Sem gastos registrados neste período.

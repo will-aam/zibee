@@ -11,7 +11,6 @@ import {
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { InstallButton } from "@/components/ui/install-button";
-import { ThemeToggleCard } from "@/components/config/ThemeToggleCard";
 import { useToast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -245,11 +244,6 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
         <div className="pb-2 flex justify-between items-center border-b">
           <h1 className="text-2xl font-bold">Configurações</h1>
           <InstallButton />
-        </div>
-
-        {/* CARDS DE AÇÕES RÁPIDAS */}
-        <div className="grid grid-cols-2 gap-3">
-          <ThemeToggleCard />
         </div>
 
         <div className="space-y-8 pt-2">

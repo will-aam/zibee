@@ -1,10 +1,35 @@
-// components/layout/header/MobileHeader.tsx
 "use client";
 
 import * as React from "react";
 import { Sora } from "next/font/google";
-import { FunnelIcon, Cog6ToothIcon } from "@heroicons/react/24/solid";
+import {
+  FunnelIcon,
+  Cog6ToothIcon,
+  EllipsisHorizontalIcon,
+  MoonIcon,
+  SunIcon,
+  ArrowDownTrayIcon,
+  ShareIcon,
+  EllipsisVerticalIcon,
+  SparklesIcon,
+} from "@heroicons/react/24/solid";
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { useTheme } from "next-themes";
 
 const sora = Sora({ subsets: ["latin"] });
 
@@ -91,6 +116,49 @@ export function MobileHeader({
   onOpenProfile,
   onOpenFilter,
 }: MobileHeaderProps) {
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  // ESTADOS DO PWA (Instalação)
+  const [promptInstall, setPromptInstall] = React.useState<any>(null);
+  const [isStandalone, setIsStandalone] = React.useState(true);
+  const [showInstructions, setShowInstructions] = React.useState(false);
+  const [isIOS, setIsIOS] = React.useState(false);
+
+  // EFEITOS (Hidratação do Tema + Verificação do PWA)
+  React.useEffect(() => {
+    setMounted(true);
+
+    const checkStandalone = () =>
+      window.matchMedia("(display-mode: standalone)").matches ||
+      (window.navigator as any).standalone === true;
+
+    setIsStandalone(checkStandalone());
+
+    const userAgent = window.navigator.userAgent.toLowerCase();
+    setIsIOS(/iphone|ipad|ipod/.test(userAgent));
+
+    const handler = (e: any) => {
+      e.preventDefault();
+      setPromptInstall(e);
+    };
+
+    window.addEventListener("beforeinstallprompt", handler);
+    return () => window.removeEventListener("beforeinstallprompt", handler);
+  }, []);
+
+  // FUNÇÃO DE INSTALAÇÃO NATIVA
+  const triggerNativeInstall = async () => {
+    if (promptInstall) {
+      promptInstall.prompt();
+      const { outcome } = await promptInstall.userChoice;
+      if (outcome === "accepted") {
+        setPromptInstall(null);
+        setShowInstructions(false);
+      }
+    }
+  };
+
   if (activeTab !== "dashboard") return null;
 
   return (
@@ -122,27 +190,71 @@ export function MobileHeader({
           </div>
 
           <div className="flex items-center gap-1">
-            <button
-              onClick={() => onNavigate("receitas")}
-              className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/10"
-              title="Planejamento"
-            >
-              <CalculatorIonicSolid className="h-6 w-6 text-white" />
-            </button>
-            <button
-              onClick={() => onNavigate("configuracoes")}
-              className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/10"
-              title="Configurações"
-            >
-              <Cog6ToothIcon className="h-6 w-6 text-white" />
-            </button>
-            <button
-              onClick={onOpenFilter}
-              className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition bg-white/10"
-              title="Filtrar"
-            >
-              <FunnelIcon className="h-6 w-6 text-white" />
-            </button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button
+                  className="shrink-0 p-2.5 rounded-2xl active:scale-95 transition bg-white/10 hover:bg-white/20"
+                  title="Menu de Opções"
+                >
+                  <EllipsisHorizontalIcon className="h-6 w-6 text-white" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-56 p-2 rounded-2xl z-150 shadow-xl border-border/50"
+              >
+                <DropdownMenuItem
+                  onClick={() => onNavigate("receitas")}
+                  className="gap-3 p-3 rounded-xl cursor-pointer"
+                >
+                  <CalculatorIonicSolid className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium text-sm">
+                    Balanço Financeiro
+                  </span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={onOpenFilter}
+                  className="gap-3 p-3 rounded-xl cursor-pointer"
+                >
+                  <FunnelIcon className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium text-sm">Filtrar Período</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuSeparator className="my-1 bg-border/50" />
+
+                {/* BOTÃO DE INSTALAR (SÓ APARECE SE NÃO ESTIVER INSTALADO) */}
+                {!isStandalone && (
+                  <DropdownMenuItem
+                    onClick={() => setShowInstructions(true)}
+                    className="gap-3 p-3 rounded-xl cursor-pointer text-primary focus:text-primary focus:bg-primary/10"
+                  >
+                    <ArrowDownTrayIcon className="h-5 w-5" />
+                    <span className="font-bold text-sm">Instalar App</span>
+                  </DropdownMenuItem>
+                )}
+
+                <DropdownMenuItem
+                  onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+                  className="gap-3 p-3 rounded-xl cursor-pointer"
+                >
+                  {mounted && theme === "dark" ? (
+                    <SunIcon className="h-5 w-5 text-muted-foreground" />
+                  ) : (
+                    <MoonIcon className="h-5 w-5 text-muted-foreground" />
+                  )}
+                  <span className="font-medium text-sm">Alternar Tema</span>
+                </DropdownMenuItem>
+
+                <DropdownMenuItem
+                  onClick={() => onNavigate("configuracoes")}
+                  className="gap-3 p-3 rounded-xl cursor-pointer"
+                >
+                  <Cog6ToothIcon className="h-5 w-5 text-muted-foreground" />
+                  <span className="font-medium text-sm">Configurações</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
 
@@ -171,6 +283,80 @@ export function MobileHeader({
           onNavigate={onNavigate}
         />
       )}
+
+      {/* MODAL DE INSTRUÇÕES DE INSTALAÇÃO */}
+      <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
+        <DialogContent className="sm:max-w-md w-[90vw] rounded-3xl z-9999">
+          <DialogHeader>
+            <DialogTitle className="text-xl flex items-center gap-2">
+              <SparklesIcon className="h-6 w-6 text-primary" />
+              Instalar Zibee
+            </DialogTitle>
+            <DialogDescription className="pt-2">
+              Tenha a experiência completa, rápida e sem distrações direto na
+              tela inicial do seu celular.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4 py-2">
+            {promptInstall ? (
+              <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl">
+                <p className="text-sm font-medium text-foreground mb-4">
+                  Seu dispositivo é totalmente compatível! Clique no botão
+                  abaixo para instalar automaticamente.
+                </p>
+                <Button
+                  onClick={triggerNativeInstall}
+                  className="w-full rounded-xl h-12 text-md font-bold"
+                >
+                  Instalar Automaticamente
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
+                  <p className="text-xs font-medium text-destructive">
+                    Instalação automática bloqueada pelo seu navegador atual.
+                    Siga o passo a passo manual:
+                  </p>
+                </div>
+
+                {isIOS ? (
+                  <div className="flex items-center gap-4 bg-muted/50 border border-border/50 p-4 rounded-2xl">
+                    <div className="bg-background p-2 rounded-xl shadow-sm shrink-0">
+                      <ShareIcon className="w-6 h-6 text-blue-500" />
+                    </div>
+                    <p className="text-sm leading-relaxed">
+                      Toque no botão <strong>Compartilhar</strong> na barra do
+                      Safari e selecione{" "}
+                      <strong>"Adicionar à Tela de Início"</strong>.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="flex items-center gap-4 bg-muted/50 border border-border/50 p-4 rounded-2xl">
+                    <div className="bg-background p-2 rounded-xl shadow-sm shrink-0">
+                      <EllipsisVerticalIcon className="w-6 h-6 text-foreground" />
+                    </div>
+                    <p className="text-sm leading-relaxed">
+                      Toque nos <strong>3 pontinhos</strong> do navegador e
+                      selecione <strong>"Instalar Aplicativo"</strong> ou{" "}
+                      <strong>"Adicionar à Tela Inicial"</strong>.
+                    </p>
+                  </div>
+                )}
+
+                <Button
+                  variant="outline"
+                  onClick={() => setShowInstructions(false)}
+                  className="w-full rounded-xl h-12 text-md font-bold"
+                >
+                  Entendi, vou fazer isso
+                </Button>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </section>
   );
 }

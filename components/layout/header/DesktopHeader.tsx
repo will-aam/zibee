@@ -38,25 +38,24 @@ import { useTheme } from "next-themes";
 const sora = Sora({ subsets: ["latin"] });
 const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
 
-// --- NOVOS COMPONENTES DA CALCULADORA (IONIC) ---
 const CalculatorOutline = ({ className }: { className?: string }) => (
   // @ts-expect-error Tag customizada do Ionicons
   <ion-icon
     name="calculator-outline"
     class={className}
     style={{ fontSize: "1.5rem", lineHeight: 1 }}
+    suppressHydrationWarning={true}
   />
 );
-
 const CalculatorSolid = ({ className }: { className?: string }) => (
   // @ts-expect-error Tag customizada do Ionicons
   <ion-icon
     name="calculator"
     class={className}
     style={{ fontSize: "1.5rem", lineHeight: 1 }}
+    suppressHydrationWarning={true}
   />
 );
-// ------------------------------------------------
 
 interface DesktopHeaderProps {
   activeTab: string;

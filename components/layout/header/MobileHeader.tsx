@@ -72,29 +72,35 @@ function getGreeting(): string {
 function MobileDashboardSummarySkeleton() {
   return (
     <section className="-mt-12 px-4 md:hidden">
-      <div className="rounded-3xl bg-background shadow-sm border overflow-hidden animate-pulse">
-        <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3">
-          <div className="flex-1">
-            <div className="h-4 w-24 rounded bg-muted" />
-            <div className="mt-3 h-8 w-44 rounded bg-muted" />
-          </div>
-          <div className="h-10 w-10 rounded-2xl bg-muted" />
-        </div>
-        <div className="h-px bg-border" />
-        <div className="p-2 space-y-1">
-          {[1, 2, 3].map((i) => (
-            <div
-              key={i}
-              className="w-full p-3 rounded-2xl flex items-center gap-3"
-            >
-              <div className="h-10 w-10 rounded-2xl bg-muted" />
-              <div className="flex-1">
-                <div className="h-4 w-32 rounded bg-muted" />
-                <div className="mt-2 h-3 w-20 rounded bg-muted" />
-              </div>
-              <div className="h-4 w-16 rounded bg-muted" />
+      {/* 1. CAIXA PRINCIPAL ESTÁTICA (Sem animate-pulse) */}
+      <div className="rounded-3xl bg-background/80 backdrop-blur-xl shadow-sm border border-border/50 overflow-hidden">
+        {/* 2. CONTEÚDO INTERNO PISCANDO (animate-pulse isolado aqui) */}
+        <div className="animate-pulse">
+          <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3">
+            <div className="flex-1">
+              <div className="h-4 w-24 rounded-md bg-muted/60" />
+              <div className="mt-3 h-8 w-44 rounded-lg bg-muted/60" />
             </div>
-          ))}
+            <div className="h-10 w-10 rounded-2xl bg-muted/60" />
+          </div>
+
+          <div className="h-px bg-border/50" />
+
+          <div className="p-2 space-y-1">
+            {[1, 2, 3].map((i) => (
+              <div
+                key={i}
+                className="w-full p-3 rounded-2xl flex items-center gap-3"
+              >
+                <div className="h-10 w-10 rounded-2xl bg-muted/60" />
+                <div className="flex-1">
+                  <div className="h-4 w-32 rounded-md bg-muted/60" />
+                  <div className="mt-2 h-3 w-20 rounded-md bg-muted/60" />
+                </div>
+                <div className="h-4 w-16 rounded-md bg-muted/60" />
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </section>

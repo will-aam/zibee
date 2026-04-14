@@ -19,6 +19,8 @@ import {
   FunnelIcon,
   FireIcon,
   BriefcaseIcon,
+  MoonIcon,
+  SunIcon,
 } from "@heroicons/react/24/outline";
 
 import {
@@ -31,7 +33,7 @@ import {
   BriefcaseIcon as BriefcaseSolid,
 } from "@heroicons/react/24/solid";
 
-// Removidos os ReceiptPercentIcon daqui de cima
+import { useTheme } from "next-themes";
 
 const sora = Sora({ subsets: ["latin"] });
 const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
@@ -78,6 +80,13 @@ export function DesktopHeader(props: DesktopHeaderProps) {
     onOpenFilter,
   } = props;
 
+  const { theme, setTheme } = useTheme();
+  const [mounted, setMounted] = React.useState(false);
+
+  React.useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const navButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${
       isActive
@@ -101,8 +110,8 @@ export function DesktopHeader(props: DesktopHeaderProps) {
     {
       id: "receitas",
       label: "Planejamento",
-      Icon: CalculatorOutline, // TROCADo AQUI
-      IconActive: CalculatorSolid, // TROCADo AQUI
+      Icon: CalculatorOutline,
+      IconActive: CalculatorSolid,
     },
     {
       id: "investimentos",
@@ -176,7 +185,7 @@ export function DesktopHeader(props: DesktopHeaderProps) {
       </nav>
 
       {/* CONTROLES DIREITA */}
-      <div className="flex items-center gap-4 ml-4">
+      <div className="flex items-center gap-3 ml-4">
         {activeTab === "dashboard" && (
           <Button
             variant="outline"
@@ -187,6 +196,22 @@ export function DesktopHeader(props: DesktopHeaderProps) {
             <span className="text-base font-medium">Filtrar</span>
           </Button>
         )}
+
+        {/* BOTÃO DE ALTERNAR TEMA */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="rounded-2xl h-11 w-11 hover:bg-muted/50"
+          onClick={() => setTheme(theme === "dark" ? "light" : "dark")}
+          title={mounted && theme === "dark" ? "Modo Claro" : "Modo Escuro"}
+        >
+          {mounted && theme === "dark" ? (
+            <SunIcon className="h-5 w-5 text-muted-foreground" />
+          ) : (
+            <MoonIcon className="h-5 w-5 text-muted-foreground" />
+          )}
+        </Button>
+
         <div className="h-8 w-px bg-border mx-1" />
         <Popover>
           <PopoverTrigger asChild>

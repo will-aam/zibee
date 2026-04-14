@@ -8,8 +8,9 @@ import {
   CheckCircleIcon,
   ArrowUpRightIcon,
   ArrowDownRightIcon,
+  EyeSlashIcon, // <-- Importado para o ícone de Oculto
 } from "@heroicons/react/24/solid";
-import { Pin } from "lucide-react"; // <-- NOVO: Importando do Lucide
+import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Lancamento } from "@/types";
 
@@ -36,33 +37,56 @@ export function LancamentoItem({
   const isFixa = !!lancamento.conta_fixa_id || !!lancamento.isShadow;
   const isParcelada = !!lancamento.total_parcelas;
 
+  // Verifica se é uma conta fixa que está pausada
+  const isPausada = (lancamento as any).status_fixa === "pausado";
+
   return (
     <div
       className={cn(
         "group flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 rounded-2xl border transition-all duration-200",
         isSelected
           ? "bg-primary/5 border-primary/30"
-          : lancamento.isShadow
-            ? "bg-accent/10 border-border/80 border-dashed hover:border-border hover:shadow-sm"
-            : "bg-card border-border/50 hover:border-border hover:shadow-sm",
+          : isPausada
+            ? "bg-muted/30 border-dashed border-border/50 opacity-60" // Estilo fantasma para pausadas
+            : lancamento.isShadow
+              ? "bg-accent/10 border-border/80 border-dashed hover:border-border hover:shadow-sm"
+              : "bg-card border-border/50 hover:border-border hover:shadow-sm",
       )}
     >
       {/* ESQUERDA: Checkbox, Status e Info */}
       <div className="flex items-start sm:items-center gap-3 sm:gap-4">
         <button
-          onClick={onTogglePago}
-          title={lancamento.pago ? "Marcar como pendente" : "Marcar como pago"}
-          className="pt-0.5 sm:pt-0 shrink-0 transition-transform active:scale-90"
+          onClick={isPausada ? undefined : onTogglePago} // Desativa o clique se estiver pausada
+          disabled={isPausada}
+          title={
+            isPausada
+              ? "Conta oculta (Reative para pagar)"
+              : lancamento.pago
+                ? "Marcar como pendente"
+                : "Marcar como pago"
+          }
+          className={cn(
+            "pt-0.5 sm:pt-0 shrink-0 transition-transform",
+            !isPausada && "active:scale-90",
+            isPausada && "cursor-not-allowed",
+          )}
         >
           {lancamento.pago ? (
-            <CheckCircleIcon className="h-6 w-6 text-green-500" />
+            <CheckCircleIcon
+              className={cn(
+                "h-6 w-6",
+                isPausada ? "text-muted-foreground" : "text-green-500",
+              )}
+            />
           ) : (
             <div
               className={cn(
                 "h-6 w-6 rounded-full border-2 transition-colors",
-                lancamento.isShadow
-                  ? "border-blue-500/40 hover:border-blue-500/80 bg-blue-500/5"
-                  : "border-muted-foreground/30 hover:border-muted-foreground/60",
+                isPausada
+                  ? "border-muted-foreground/30 bg-muted/20"
+                  : lancamento.isShadow
+                    ? "border-blue-500/40 hover:border-blue-500/80 bg-blue-500/5"
+                    : "border-muted-foreground/30 hover:border-muted-foreground/60",
               )}
             />
           )}
@@ -73,7 +97,10 @@ export function LancamentoItem({
             <h3
               className={cn(
                 "font-semibold text-sm sm:text-base truncate",
-                lancamento.pago ? "text-foreground" : "text-foreground/80",
+                lancamento.pago || isPausada
+                  ? "text-foreground/60"
+                  : "text-foreground",
+                isPausada && "line-through",
               )}
             >
               {lancamento.descricao}
@@ -82,8 +109,20 @@ export function LancamentoItem({
             {/* TAGS DE CONTA FIXA E PARCELA */}
             <div className="flex items-center gap-1.5">
               {isFixa && (
-                <span className="flex items-center gap-0.5 text-blue-600 dark:text-blue-400 text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider">
-                  <Pin className="h-3 w-3" /> Fixa
+                <span
+                  className={cn(
+                    "flex items-center gap-0.5 text-[10px] font-bold px-1.5 py-0.5 rounded-md uppercase tracking-wider",
+                    isPausada
+                      ? "bg-muted text-muted-foreground"
+                      : "text-blue-600 dark:text-blue-400",
+                  )}
+                >
+                  {isPausada ? (
+                    <EyeSlashIcon className="h-3 w-3" />
+                  ) : (
+                    <Pin className="h-3 w-3" />
+                  )}
+                  {isPausada ? "Oculta" : "Fixa"}
                 </span>
               )}
               {isParcelada && (
@@ -100,7 +139,9 @@ export function LancamentoItem({
                 "font-medium flex items-center gap-0.5",
                 isReceita
                   ? "text-green-600 dark:text-green-500"
-                  : "text-destructive/80",
+                  : isPausada
+                    ? "text-muted-foreground"
+                    : "text-destructive/80",
               )}
             >
               {isReceita ? (
@@ -133,7 +174,7 @@ export function LancamentoItem({
             isReceita
               ? "text-green-600 dark:text-green-500"
               : "text-foreground",
-            !lancamento.pago && "opacity-70",
+            (!lancamento.pago || isPausada) && "opacity-70",
           )}
         >
           {isReceita ? "+" : "-"}{" "}

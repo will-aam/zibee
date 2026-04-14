@@ -1,6 +1,7 @@
 "use client";
 
 import type React from "react";
+import { Switch } from "@/components/ui/switch";
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
@@ -86,6 +87,7 @@ export default function Lancamentos() {
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
+  const [mostrarOcultos, setMostrarOcultos] = useState(false);
 
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
@@ -143,6 +145,7 @@ export default function Lancamentos() {
       const dataInicio = `${filtroMes}-01`;
       const ultimoDia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
       const dataFim = `${filtroMes}-${ultimoDia}`;
+
       // 1. BUSCAR LANÇAMENTOS DO MÊS
       let queryLancamentos = supabase
         .from("lancamentos")
@@ -164,7 +167,6 @@ export default function Lancamentos() {
       if (activeContext === "grupo" && groupId) {
         queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
         queryFixas = queryFixas.eq("grupo_id", groupId);
-        // Removido queryCat daqui!
       } else {
         queryLancamentos = queryLancamentos
           .eq("user_id", userId)
@@ -187,7 +189,7 @@ export default function Lancamentos() {
         const dadosLancamentos = resLancamentos.data as unknown as Lancamento[];
         const dadosFixas = resFixas.data || [];
 
-        // 3. A MÁGICA: CRIANDO AS SOMBRAS (Apenas para Fixas "Ativas")
+        // 3. A MÁGICA: CRIANDO AS SOMBRAS (Agora inclui as pausadas também)
         const contasFixasJaPagasNoMes = new Set(
           dadosLancamentos
             .filter((l) => l.conta_fixa_id != null)
@@ -197,8 +199,7 @@ export default function Lancamentos() {
         const sombras: Lancamento[] = [];
 
         dadosFixas.forEach((fixa) => {
-          if (fixa.status === "pausado") return;
-
+          // REMOVIDO O BLOQUEIO: if (fixa.status === "pausado") return;
           if (!contasFixasJaPagasNoMes.has(fixa.id)) {
             const diaSeguro = Math.min(fixa.dia_vencimento, ultimoDia);
             const diaStr = String(diaSeguro).padStart(2, "0");
@@ -216,7 +217,8 @@ export default function Lancamentos() {
               pago: false,
               conta_fixa_id: fixa.id,
               isShadow: true,
-            } as Lancamento);
+              status_fixa: fixa.status, // <-- IMPORTANTE: ADICIONE ESTA LINHA
+            } as any);
           }
         });
 
@@ -256,6 +258,9 @@ export default function Lancamentos() {
   }, [fetchAllData]);
 
   const lancamentosFiltrados = lancamentos.filter((l) => {
+    // SE FOR UMA CONTA PAUSADA E O BOTÃO TIVER DESLIGADO, ESCONDA:
+    if ((l as any).status_fixa === "pausado" && !mostrarOcultos) return false;
+
     const matchSearch = l.descricao
       .toLowerCase()
       .includes(searchQuery.toLowerCase());
@@ -300,7 +305,7 @@ export default function Lancamentos() {
 
   const handleSelectAll = () => {
     const lancamentosSelecionaveis = lancamentosFiltrados.filter(
-      (l) => !l.isShadow,
+      (l) => !l.isShadow && (l as any).status_fixa !== "pausado",
     );
     if (
       selectedIds.length === lancamentosSelecionaveis.length &&
@@ -509,24 +514,51 @@ export default function Lancamentos() {
             />
 
             <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-2 px-1">
-                <Checkbox
-                  id="select-all"
-                  checked={
-                    lancamentosFiltrados.filter((l) => !l.isShadow).length >
-                      0 &&
-                    selectedIds.length ===
-                      lancamentosFiltrados.filter((l) => !l.isShadow).length
-                  }
-                  onCheckedChange={handleSelectAll}
-                  className="rounded-lg"
-                />
-                <Label
-                  htmlFor="select-all"
-                  className="cursor-pointer font-medium text-sm text-muted-foreground"
-                >
-                  Selecionar Todos
-                </Label>
+              {/* CHECKBOXES E TOGGLES DO MENU */}
+              <div className="flex items-center gap-4 sm:gap-6 px-1">
+                <div className="flex items-center gap-2">
+                  <Checkbox
+                    id="select-all"
+                    checked={
+                      lancamentosFiltrados.filter(
+                        (l) =>
+                          !l.isShadow && (l as any).status_fixa !== "pausado",
+                      ).length > 0 &&
+                      selectedIds.length ===
+                        lancamentosFiltrados.filter(
+                          (l) =>
+                            !l.isShadow && (l as any).status_fixa !== "pausado",
+                        ).length
+                    }
+                    onCheckedChange={handleSelectAll}
+                    className="rounded-lg"
+                  />
+                  <Label
+                    htmlFor="select-all"
+                    className="cursor-pointer font-medium text-sm text-muted-foreground"
+                  >
+                    Selecionar Todos
+                  </Label>
+                </div>
+
+                {/* DIVISOR */}
+                <div className="w-px h-4 bg-border hidden sm:block" />
+
+                {/* NOSSO NOVO BOTÃO DE MOSTRAR OCULTOS */}
+                <div className="flex items-center gap-2">
+                  <Switch
+                    id="mostrar-ocultos"
+                    checked={mostrarOcultos}
+                    onCheckedChange={setMostrarOcultos}
+                    className="scale-75 origin-left"
+                  />
+                  <Label
+                    htmlFor="mostrar-ocultos"
+                    className="cursor-pointer font-medium text-sm text-muted-foreground select-none"
+                  >
+                    Mostrar pausadas
+                  </Label>
+                </div>
               </div>
 
               {selectedIds.length > 0 && (

@@ -165,7 +165,7 @@ export function MobileHeader({
     <section className={`md:hidden relative ${sora.className}`}>
       <header
         id="mobile-header-top"
-        className="relative overflow-hidden bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-24"
+        className="relative bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-24"
       >
         <div className="relative z-10 flex items-center gap-4 mb-2">
           <button
@@ -257,18 +257,6 @@ export function MobileHeader({
             </DropdownMenu>
           </div>
         </div>
-
-        <svg
-          className="absolute bottom-0 left-0 w-full h-16 block text-background"
-          viewBox="0 0 1440 120"
-          preserveAspectRatio="none"
-          aria-hidden="true"
-        >
-          <path
-            fill="currentColor"
-            d="M0,64 C180,120 360,120 540,80 C720,40 900,20 1080,40 C1260,60 1350,95 1440,110 L1440,120 L0,120 Z"
-          />
-        </svg>
       </header>
 
       {loadingTotals ? (

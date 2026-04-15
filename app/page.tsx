@@ -1,4 +1,3 @@
-// app/page.tsx
 "use client";
 
 import { useState } from "react";
@@ -11,6 +10,7 @@ import DespesasFixas from "@/components/features/fixed-expenses";
 import Receitas from "@/components/receitas";
 import GruposConfig from "@/components/groups";
 import Investimentos from "@/components/Investimentos";
+import Cartoes from "@/components/cartoes";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -21,8 +21,12 @@ export default function Home() {
 
       <main className="flex-1 w-full max-w-7xl mx-auto sm:px-6 lg:px-8 py-6 md:py-8 transition-all duration-300">
         {activeTab === "dashboard" && <Dashboard onNavigate={setActiveTab} />}
-        {activeTab === "lancamentos" && <Lancamentos />}
+        {activeTab === "lancamentos" && (
+          <Lancamentos onNavigate={setActiveTab} />
+        )}{" "}
+        {/* <-- ADICIONADO O ONNAVIGATE AQUI */}
         {activeTab === "receitas" && <Receitas />}
+        {activeTab === "cartoes" && <Cartoes />}
         {activeTab === "metas" && <Metas />}
         {activeTab === "configuracoes" && (
           <Configuracoes onNavigate={setActiveTab} />

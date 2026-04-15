@@ -18,6 +18,7 @@ import {
   FunnelIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
+  CreditCardIcon, // <-- IMPORTADO O ÍCONE DO CARTÃO
 } from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
 
@@ -47,10 +48,16 @@ const memoryCache = {
     { id: number; nome: string; regra_orcamento?: string }[]
   >,
   formasPagamento: null as { id: number; nome: string }[] | null,
-  cartoes: {} as Record<string, any[]>, // <-- ADICIONADO AQUI
+  cartoes: {} as Record<string, any[]>,
 };
 
-export default function Lancamentos() {
+// <-- NOVA INTERFACE DE PROPS
+interface LancamentosProps {
+  onNavigate?: (tab: string) => void;
+}
+
+export default function Lancamentos({ onNavigate }: LancamentosProps) {
+  // <-- RECEBENDO A PROP
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
@@ -76,7 +83,7 @@ export default function Lancamentos() {
   );
   const [cartoesDB, setCartoesDB] = useState<any[]>(
     memoryCache.cartoes[activeContext] || [],
-  ); // <-- ADICIONADO AQUI
+  );
   const [loading, setLoading] = useState(
     !memoryCache.lancamentosPorMes[cacheKey],
   );
@@ -153,7 +160,6 @@ export default function Lancamentos() {
       const ultimoDia = new Date(parseInt(ano), parseInt(mes), 0).getDate();
       const dataFim = `${filtroMes}-${ultimoDia}`;
 
-      // 1. BUSCAR LANÇAMENTOS DO MÊS
       let queryLancamentos = supabase
         .from("lancamentos")
         .select("*")
@@ -161,10 +167,8 @@ export default function Lancamentos() {
         .lte("data_vencimento", dataFim)
         .order("data_vencimento", { ascending: true });
 
-      // 2. BUSCAR CONTAS FIXAS
       let queryFixas = supabase.from("despesas_fixas").select("*");
 
-      // 3. BUSCAR CATEGORIAS E CARTÕES (Sempre pelo user_id)
       let queryCat = supabase
         .from("categorias")
         .select("*")
@@ -210,7 +214,6 @@ export default function Lancamentos() {
         const dadosLancamentos = resLancamentos.data as unknown as Lancamento[];
         const dadosFixas = resFixas.data || [];
 
-        // 3. A MÁGICA: CRIANDO AS SOMBRAS (Agora inclui as pausadas também)
         const contasFixasJaPagasNoMes = new Set(
           dadosLancamentos
             .filter((l) => l.conta_fixa_id != null)
@@ -220,7 +223,6 @@ export default function Lancamentos() {
         const sombras: Lancamento[] = [];
 
         dadosFixas.forEach((fixa) => {
-          // REMOVIDO O BLOQUEIO: if (fixa.status === "pausado") return;
           if (!contasFixasJaPagasNoMes.has(fixa.id)) {
             const diaSeguro = Math.min(fixa.dia_vencimento, ultimoDia);
             const diaStr = String(diaSeguro).padStart(2, "0");
@@ -238,12 +240,11 @@ export default function Lancamentos() {
               pago: false,
               conta_fixa_id: fixa.id,
               isShadow: true,
-              status_fixa: fixa.status, // <-- IMPORTANTE: ADICIONE ESTA LINHA
+              status_fixa: fixa.status,
             } as any);
           }
         });
 
-        // 4. FUSÃO (Lançamentos + Sombras) ordenados por data
         const todosOsDados = [...dadosLancamentos, ...sombras].sort(
           (a, b) =>
             new Date(a.data_vencimento).getTime() -
@@ -264,7 +265,6 @@ export default function Lancamentos() {
         setFormasPagamentoDB(resPay.data);
       }
 
-      // <-- ADICIONADO AQUI: Salvando os cartões no cache e no state
       if (resCartoes.data) {
         memoryCache.cartoes[activeContext] = resCartoes.data;
         setCartoesDB(resCartoes.data);
@@ -285,7 +285,6 @@ export default function Lancamentos() {
   }, [fetchAllData]);
 
   const lancamentosFiltrados = lancamentos.filter((l) => {
-    // SE FOR UMA CONTA PAUSADA E O BOTÃO TIVER DESLIGADO, ESCONDA:
     if ((l as any).status_fixa === "pausado" && !mostrarOcultos) return false;
 
     const matchSearch = l.descricao
@@ -293,7 +292,6 @@ export default function Lancamentos() {
       .includes(searchQuery.toLowerCase());
     const matchTipo = filtrosTipo.length === 0 || filtrosTipo.includes(l.tipo);
 
-    // MÁGICA AQUI: Limpando os textos antes de comparar para evitar bugs
     const categoriaLancamento = (l.categoria || "").trim().toLowerCase();
     const categoriasSelecionadas = filtrosCategoria.map((c) =>
       c.trim().toLowerCase(),
@@ -417,7 +415,6 @@ export default function Lancamentos() {
     try {
       const novoStatus = !lancamento.pago;
 
-      // 1. MATERIALIZAÇÃO DE SOMBRA
       if (lancamento.isShadow) {
         const { id, isShadow, ...dadosProBanco } = lancamento;
         const payloadInsert = { ...dadosProBanco, pago: true };
@@ -445,7 +442,6 @@ export default function Lancamentos() {
         return;
       }
 
-      // 2. TOGGLE NORMAL DE UM LANÇAMENTO REAL
       const updated = lancamentos.map((l) =>
         l.id === lancamento.id ? { ...l, pago: novoStatus } : l,
       );
@@ -502,12 +498,23 @@ export default function Lancamentos() {
             <div>
               <MonthSelector date={date} setDate={setDate} />
             </div>
+
             <Button
               onClick={handleNovoLancamento}
               size="icon"
               className="shrink-0 h-10 w-10 rounded-xl"
             >
               <PlusIcon className="h-5 w-5" />
+            </Button>
+
+            {/* NOVO BOTÃO DE CARTÕES (SÓ NO MOBILE) */}
+            <Button
+              onClick={() => onNavigate?.("cartoes")}
+              size="icon"
+              className="shrink-0 h-10 w-10 rounded-xl md:hidden"
+              title="Meus Cartões"
+            >
+              <CreditCardIcon className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -541,7 +548,6 @@ export default function Lancamentos() {
             />
 
             <div className="flex items-center justify-between pt-1">
-              {/* CHECKBOXES E TOGGLES DO MENU */}
               <div className="flex items-center gap-4 sm:gap-6 px-1">
                 <div className="flex items-center gap-2">
                   <Checkbox
@@ -568,10 +574,8 @@ export default function Lancamentos() {
                   </Label>
                 </div>
 
-                {/* DIVISOR */}
                 <div className="w-px h-4 bg-border hidden sm:block" />
 
-                {/* NOSSO NOVO BOTÃO DE MOSTRAR OCULTOS */}
                 <div className="flex items-center gap-2">
                   <Switch
                     id="mostrar-ocultos"
@@ -642,7 +646,6 @@ export default function Lancamentos() {
             ) : (
               <div className="flex flex-col gap-2">
                 {lancamentosFiltrados.map((lancamento) => {
-                  // MÁGICA: Acha a regra da categoria no cache (com a blindagem de texto limpo)
                   const nomeLimpo = (lancamento.categoria || "")
                     .trim()
                     .toLowerCase();
@@ -654,7 +657,7 @@ export default function Lancamentos() {
                     <LancamentoItem
                       key={lancamento.id}
                       lancamento={lancamento}
-                      categoriaRegra={regra} // ENVIANDO A REGRA PARA O ITEM
+                      categoriaRegra={regra}
                       isSelected={selectedIds.includes(lancamento.id)}
                       onSelect={() => {
                         if (lancamento.isShadow) return;

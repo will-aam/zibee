@@ -32,6 +32,8 @@ import {
   FireIcon as FireSolid,
   BriefcaseIcon as BriefcaseSolid,
 } from "@heroicons/react/24/solid";
+import { CreditCardIcon as CreditCardOutline } from "@heroicons/react/24/outline";
+import { CreditCardIcon as CreditCardSolid } from "@heroicons/react/24/solid";
 
 import { useTheme } from "next-themes";
 
@@ -107,6 +109,12 @@ export function DesktopHeader(props: DesktopHeaderProps) {
       IconActive: DocumentTextSolid,
     },
     {
+      id: "cartoes",
+      label: "Cartões",
+      Icon: CreditCardOutline,
+      IconActive: CreditCardSolid,
+    },
+    {
       id: "receitas",
       label: "Planejamento",
       Icon: CalculatorOutline,
@@ -124,6 +132,7 @@ export function DesktopHeader(props: DesktopHeaderProps) {
       Icon: UserGroupIcon,
       IconActive: UserGroupSolid,
     },
+
     { id: "metas", label: "Metas", Icon: FireIcon, IconActive: FireSolid },
     {
       id: "configuracoes",

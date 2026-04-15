@@ -21,7 +21,8 @@ export interface Lancamento {
   conta_fixa_id?: number | null; // ID da Despesa Fixa Master (se for gerado por ela)
   parcela_atual?: number | null; // Ex: 1
   total_parcelas?: number | null; // Ex: 10
-  isShadow?: boolean; // FLAG FRONT-END: Indica se é uma projeção virtual (não existe no BD ainda)
+  isShadow?: boolean;
+  cartao_id?: number | null;
 }
 
 export interface Meta {
@@ -94,5 +95,15 @@ export interface MembroGrupo {
   email_convite: string;
   role: "Admin" | "Membro";
   status: "Pendente" | "Aceito";
+  created_at?: string;
+}
+export interface CartaoCredito {
+  id: number;
+  user_id: string;
+  grupo_id?: number | null;
+  nome: string;
+  limite?: number | null;
+  dia_fechamento: number;
+  dia_vencimento: number;
   created_at?: string;
 }

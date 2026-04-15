@@ -42,8 +42,12 @@ import {
 // CACHE EM MEMÓRIA (Agora separa as categorias por contexto: Pessoal/Grupo)
 const memoryCache = {
   lancamentosPorMes: {} as Record<string, Lancamento[]>,
-  categorias: {} as Record<string, { id: number; nome: string }[]>,
+  categorias: {} as Record<
+    string,
+    { id: number; nome: string; regra_orcamento?: string }[]
+  >,
   formasPagamento: null as { id: number; nome: string }[] | null,
+  cartoes: {} as Record<string, any[]>, // <-- ADICIONADO AQUI
 };
 
 export default function Lancamentos() {
@@ -70,6 +74,9 @@ export default function Lancamentos() {
   const [formasPagamentoDB, setFormasPagamentoDB] = useState(
     memoryCache.formasPagamento || [],
   );
+  const [cartoesDB, setCartoesDB] = useState<any[]>(
+    memoryCache.cartoes[activeContext] || [],
+  ); // <-- ADICIONADO AQUI
   const [loading, setLoading] = useState(
     !memoryCache.lancamentosPorMes[cacheKey],
   );
@@ -154,12 +161,17 @@ export default function Lancamentos() {
         .lte("data_vencimento", dataFim)
         .order("data_vencimento", { ascending: true });
 
-      // 2. BUSCAR CONTAS FIXAS ATIVAS E PAUSADAS
+      // 2. BUSCAR CONTAS FIXAS
       let queryFixas = supabase.from("despesas_fixas").select("*");
 
-      // 3. BUSCAR AS CATEGORIAS (Sempre pelo user_id, pois a tabela não tem grupo_id)
+      // 3. BUSCAR CATEGORIAS E CARTÕES (Sempre pelo user_id)
       let queryCat = supabase
         .from("categorias")
+        .select("*")
+        .eq("user_id", userId)
+        .order("nome");
+      let queryCartoes = supabase
+        .from("cartoes_credito")
         .select("*")
         .eq("user_id", userId)
         .order("nome");
@@ -167,6 +179,11 @@ export default function Lancamentos() {
       if (activeContext === "grupo" && groupId) {
         queryLancamentos = queryLancamentos.eq("grupo_id", groupId);
         queryFixas = queryFixas.eq("grupo_id", groupId);
+        queryCartoes = supabase
+          .from("cartoes_credito")
+          .select("*")
+          .eq("grupo_id", groupId)
+          .order("nome");
       } else {
         queryLancamentos = queryLancamentos
           .eq("user_id", userId)
@@ -174,16 +191,20 @@ export default function Lancamentos() {
         queryFixas = queryFixas.eq("user_id", userId).is("grupo_id", null);
       }
 
-      const [resLancamentos, resFixas, resCat, resPay] = await Promise.all([
-        queryLancamentos,
-        queryFixas,
-        !memoryCache.categorias[activeContext]
-          ? queryCat
-          : Promise.resolve({ data: memoryCache.categorias[activeContext] }),
-        !memoryCache.formasPagamento
-          ? supabase.from("formas_pagamento").select("*").order("nome")
-          : Promise.resolve({ data: memoryCache.formasPagamento }),
-      ]);
+      const [resLancamentos, resFixas, resCat, resPay, resCartoes] =
+        await Promise.all([
+          queryLancamentos,
+          queryFixas,
+          !memoryCache.categorias[activeContext]
+            ? queryCat
+            : Promise.resolve({ data: memoryCache.categorias[activeContext] }),
+          !memoryCache.formasPagamento
+            ? supabase.from("formas_pagamento").select("*").order("nome")
+            : Promise.resolve({ data: memoryCache.formasPagamento }),
+          !memoryCache.cartoes[activeContext]
+            ? queryCartoes
+            : Promise.resolve({ data: memoryCache.cartoes[activeContext] }),
+        ]);
 
       if (resLancamentos.data) {
         const dadosLancamentos = resLancamentos.data as unknown as Lancamento[];
@@ -241,6 +262,12 @@ export default function Lancamentos() {
       if (resPay.data && !memoryCache.formasPagamento) {
         memoryCache.formasPagamento = resPay.data;
         setFormasPagamentoDB(resPay.data);
+      }
+
+      // <-- ADICIONADO AQUI: Salvando os cartões no cache e no state
+      if (resCartoes.data) {
+        memoryCache.cartoes[activeContext] = resCartoes.data;
+        setCartoesDB(resCartoes.data);
       }
     } catch (error: any) {
       toast({
@@ -659,6 +686,7 @@ export default function Lancamentos() {
         userId={userId}
         categoriasDB={categoriasDB}
         formasPagamentoDB={formasPagamentoDB}
+        cartoesDB={cartoesDB}
         activeContext={activeContext}
         groupId={currentGroupId}
       />

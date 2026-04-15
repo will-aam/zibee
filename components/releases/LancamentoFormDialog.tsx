@@ -1,4 +1,3 @@
-// components/releases/LancamentoFormDialog.tsx
 "use client";
 
 import type React from "react";
@@ -34,7 +33,8 @@ import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
 import {
   CalendarDaysIcon,
   InformationCircleIcon,
-} from "@heroicons/react/24/outline"; // <-- ATUALIZADO AQUI
+  CreditCardIcon, // <-- NOVA IMPORTAÇÃO DO CARTÃO
+} from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -51,6 +51,12 @@ interface LancamentoFormDialogProps {
   userId: string | undefined;
   categoriasDB: { id: number; nome: string }[];
   formasPagamentoDB: { id: number; nome: string }[];
+  cartoesDB: {
+    id: number;
+    nome: string;
+    dia_fechamento: number;
+    dia_vencimento: number;
+  }[]; // <-- NOVA PROP
   activeContext: string;
   groupId: string | null;
 }
@@ -63,6 +69,7 @@ export function LancamentoFormDialog({
   userId,
   categoriasDB,
   formasPagamentoDB,
+  cartoesDB, // <-- RECEBENDO A NOVA PROP
   activeContext,
   groupId,
 }: LancamentoFormDialogProps) {
@@ -86,6 +93,11 @@ export function LancamentoFormDialog({
     new Set(formasPagamentoDB.map((p) => p.nome.trim())),
   );
 
+  // <-- NOVA VARIÁVEL: Detecta se a forma de pagamento é Cartão
+  const isCartao =
+    formData.forma_pagamento?.toLowerCase().includes("cartão") ||
+    formData.forma_pagamento?.toLowerCase().includes("cartao");
+
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData({
@@ -108,6 +120,7 @@ export function LancamentoFormDialog({
         data_vencimento: new Date().toISOString().split("T")[0],
         pago: false,
         observacoes: "",
+        cartao_id: null, // <-- LIMPA O CARTÃO POR PADRÃO
       });
       setRepeatType("unica");
       setStatusFixa("ativo");
@@ -244,6 +257,7 @@ export function LancamentoFormDialog({
         ...formData,
         categoria: formData.categoria?.trim(),
         forma_pagamento: formData.forma_pagamento?.trim(),
+        cartao_id: isCartao ? formData.cartao_id : null, // <-- MANDA O CARTÃO SE FOR CARTÃO
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
       } as Omit<Lancamento, "id">;
@@ -283,6 +297,7 @@ export function LancamentoFormDialog({
             tipo: formData.tipo,
             valor: formData.valor,
             forma_pagamento: formData.forma_pagamento?.trim(),
+            cartao_id: isCartao ? formData.cartao_id : null, // <-- ATUALIZA O CARTÃO NA EDIÇÃO
             data_vencimento: formData.data_vencimento,
             pago: formData.pago,
             observacoes: formData.observacoes,
@@ -450,8 +465,13 @@ export function LancamentoFormDialog({
               </Label>
               <Select
                 value={formData.forma_pagamento}
-                onValueChange={(v) =>
-                  setFormData({ ...formData, forma_pagamento: v })
+                onValueChange={
+                  (v) =>
+                    setFormData({
+                      ...formData,
+                      forma_pagamento: v,
+                      cartao_id: null,
+                    }) // <-- LIMPA O CARTÃO AO TROCAR
                 }
               >
                 <SelectTrigger>
@@ -466,6 +486,45 @@ export function LancamentoFormDialog({
                 </SelectContent>
               </Select>
             </div>
+
+            {/* --- INÍCIO DO NOVO BLOCO DE CARTÃO --- */}
+            {isCartao && formData.tipo === "Despesa" && (
+              <div className="space-y-2 p-3 bg-muted/30 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
+                <Label className="flex items-center gap-1.5 text-primary">
+                  <CreditCardIcon className="h-4 w-4" />
+                  Qual Cartão de Crédito?
+                </Label>
+                {cartoesDB.length > 0 ? (
+                  <Select
+                    value={
+                      formData.cartao_id
+                        ? String(formData.cartao_id)
+                        : undefined
+                    }
+                    onValueChange={(v) =>
+                      setFormData({ ...formData, cartao_id: Number(v) })
+                    }
+                  >
+                    <SelectTrigger className="bg-background">
+                      <SelectValue placeholder="Selecione o cartão..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {cartoesDB.map((cartao) => (
+                        <SelectItem key={cartao.id} value={String(cartao.id)}>
+                          {cartao.nome}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <div className="text-xs text-muted-foreground pt-1 pb-1">
+                    Você ainda não cadastrou nenhum cartão. A despesa será salva
+                    sem vínculo.
+                  </div>
+                )}
+              </div>
+            )}
+            {/* --- FIM DO NOVO BLOCO DE CARTÃO --- */}
 
             <div className="space-y-2">
               <Label>
@@ -560,7 +619,7 @@ export function LancamentoFormDialog({
               {/* OPÇÕES DE REPETIÇÃO HUMANIZADAS (SÓ APARECE PARA DESPESAS NOVAS) */}
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
-                  {/* --- BLOCO NOVO COM POPOVER --- */}
+                  {/* --- BLOCO POPOVER DE INFORMAÇÃO (MANTIDO AQUI) --- */}
                   <div className="flex items-center gap-2">
                     <Label className="text-muted-foreground font-bold">
                       Como essa despesa se repete?
@@ -610,7 +669,7 @@ export function LancamentoFormDialog({
                       </PopoverContent>
                     </Popover>
                   </div>
-                  {/* ------------------------------ */}
+                  {/* ---------------------------------------------- */}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Button

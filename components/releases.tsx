@@ -239,6 +239,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               data_vencimento: `${filtroMes}-${diaStr}`,
               pago: false,
               conta_fixa_id: fixa.id,
+              cartao_id: fixa.cartao_id, // <-- ADICIONE ESTA LINHA AQUI
               isShadow: true,
               status_fixa: fixa.status,
             } as any);
@@ -414,10 +415,11 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   const togglePago = async (lancamento: Lancamento) => {
     try {
       const novoStatus = !lancamento.pago;
-
       if (lancamento.isShadow) {
-        const { id, isShadow, ...dadosProBanco } = lancamento;
-        const payloadInsert = { ...dadosProBanco, pago: true };
+        const { id, isShadow, status_fixa, cartao_id, ...resto } =
+          lancamento as any;
+
+        const payloadInsert = { ...resto, cartao_id, pago: true };
 
         const tempId = Date.now();
         const telaAtualizada = lancamentos.map((l) =>
@@ -433,6 +435,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
           .insert([payloadInsert])
           .select()
           .single();
+
         if (error) throw error;
 
         setLancamentos((prev) => prev.map((l) => (l.id === tempId ? data : l)));

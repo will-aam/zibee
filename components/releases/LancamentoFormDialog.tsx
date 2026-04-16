@@ -271,6 +271,7 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
+            cartao_id: isCartao ? formData.cartao_id : null, // <-- ADICIONE AQUI
             status: statusFixa,
           };
 
@@ -325,11 +326,11 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
+            cartao_id: isCartao ? formData.cartao_id : null, // <-- ADICIONE AQUI
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",
           };
-
           const { error: errFixa } = await supabase
             .from("despesas_fixas")
             .insert([payloadFixa]);

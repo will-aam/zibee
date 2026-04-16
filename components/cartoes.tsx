@@ -1,6 +1,12 @@
 "use client";
 
-import React, { useState, useEffect, useCallback, useMemo } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react"; // <-- ADICIONADO O useRef AQUI
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -8,47 +14,61 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { MonthSelector } from "./releases/MonthSelector";
+import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogFooter,
 } from "@/components/ui/dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  PlusIcon,
-  CreditCardIcon,
-  CalendarIcon,
-  ChevronDownIcon,
-} from "@heroicons/react/24/outline";
+  CreditCard,
+  Plus,
+  Calendar,
+  ChevronDown,
+  Pencil,
+  Trash2,
+  Info,
+  AlertCircle,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 
-// O Motor de Fatura: Calcula o ciclo com base no fechamento e data selecionada
+// Motor de Ciclo de Fatura
 function getCicloFatura(
   ano: number,
   mes: number,
   diaFechamento: number,
   diaVencimento: number,
 ) {
-  // O ciclo de uma fatura vai do dia seguinte ao fechamento do mês anterior
-  // até o dia do fechamento do mês atual.
-  const dataFechamentoAtual = new Date(ano, mes, diaFechamento);
-  const dataFechamentoAnterior = new Date(ano, mes - 1, diaFechamento);
-
-  const inicio = new Date(dataFechamentoAnterior);
-  inicio.setDate(inicio.getDate() + 1);
+  const fim = new Date(ano, mes, diaFechamento, 23, 59, 59);
+  const inicio = new Date(ano, mes - 1, diaFechamento + 1, 0, 0, 0);
 
   const vencimento = new Date(ano, mes, diaVencimento);
-  // Se o vencimento é antes do fechamento (ex: fecha dia 25, vence dia 05), o vencimento é no mês seguinte
   if (diaVencimento <= diaFechamento) {
     vencimento.setMonth(vencimento.getMonth() + 1);
   }
 
-  return {
-    inicio,
-    fim: dataFechamentoAtual,
-    vencimento,
-  };
+  return { inicio, fim, vencimento };
+}
+
+// Verifica o status da fatura com base na data de hoje
+function getStatusFatura(inicio: Date, fim: Date) {
+  const hoje = new Date();
+  if (hoje > fim) return "Fechada";
+  if (hoje >= inicio && hoje <= fim) return "Aberta";
+  return "Futura";
 }
 
 export default function Cartoes() {
@@ -60,92 +80,145 @@ export default function Cartoes() {
   const [date, setDate] = useState<Date>(new Date());
   const [cartoes, setCartoes] = useState<any[]>([]);
   const [lancamentos, setLancamentos] = useState<any[]>([]);
+  const [fixas, setFixas] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
-  // Estados do Modal de Novo Cartão
-  const [isAddModalOpen, setIsAddModalOpen] = useState(false);
-  const [novoCartao, setNovoCartao] = useState({
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [cartaoEditing, setCartaoEditing] = useState<any>(null);
+  const [deleteConfig, setDeleteConfig] = useState<{
+    isOpen: boolean;
+    id: number | null;
+  }>({ isOpen: false, id: null });
+
+  const [formData, setFormData] = useState({
     nome: "",
     limite: "",
     dia_fechamento: "",
     dia_vencimento: "",
   });
 
-  const [expandedCard, setExpandedCategory] = useState<number | null>(null);
+  const [expandedCard, setExpandedCard] = useState<number | null>(null);
 
-  const fetchCartoes = useCallback(async () => {
+  // --- PULO AUTOMÁTICO PARA A FATURA ABERTA ---
+  const hasAutoJumped = useRef(false);
+
+  useEffect(() => {
+    // Quando os cartões carregarem pela primeira vez...
+    if (cartoes.length > 0 && !hasAutoJumped.current) {
+      const cartaoPrincipal = cartoes[0];
+      const hoje = new Date();
+
+      // Se o dia de hoje já passou do dia de fechamento do cartão,
+      // o app "pula" o seletor lá de cima automaticamente para o mês que vem!
+      if (hoje.getDate() > cartaoPrincipal.dia_fechamento) {
+        const proximoMes = new Date();
+        proximoMes.setMonth(proximoMes.getMonth() + 1);
+        setDate(proximoMes);
+      }
+
+      hasAutoJumped.current = true;
+    }
+  }, [cartoes]);
+  // --------------------------------------------
+
+  const fetchData = useCallback(async () => {
     if (!userId) return;
     setLoading(true);
     try {
-      // 1. Busca os cartões
-      let queryCartoes = supabase.from("cartoes_credito").select("*");
-      if (activeContext === "grupo") {
-        // Lógica simplificada: pegamos os cartões atrelados a grupos onde sou membro
-        // (Em produção, você filtra pelo ID do grupo ativo igual fez em lançamentos)
-      } else {
-        queryCartoes = queryCartoes.eq("user_id", userId).is("grupo_id", null);
-      }
-      const { data: cartoesData } = await queryCartoes.order("nome");
+      const { data: cartoesData } = await supabase
+        .from("cartoes_credito")
+        .select("*")
+        .eq("user_id", userId)
+        .order("nome");
 
-      // 2. Busca TODOS os lançamentos atrelados a algum cartão (para o motor poder filtrar depois)
-      let queryLanc = supabase
+      const { data: lancData } = await supabase
         .from("lancamentos")
         .select("*")
+        .eq("user_id", userId)
         .not("cartao_id", "is", null);
-      if (activeContext !== "grupo") {
-        queryLanc = queryLanc.eq("user_id", userId).is("grupo_id", null);
-      }
-      const { data: lancData } = await queryLanc;
+
+      const { data: fixasData } = await supabase
+        .from("despesas_fixas")
+        .select("*")
+        .eq("user_id", userId)
+        .not("cartao_id", "is", null);
 
       setCartoes(cartoesData || []);
       setLancamentos(lancData || []);
+      setFixas(fixasData || []);
     } catch (error) {
       console.error(error);
     } finally {
       setLoading(false);
     }
-  }, [userId, activeContext]);
+  }, [userId]);
 
   useEffect(() => {
-    fetchCartoes();
-  }, [fetchCartoes]);
+    fetchData();
+  }, [fetchData]);
 
-  const handleSalvarCartao = async (e: React.FormEvent) => {
+  const handleOpenAdd = () => {
+    setCartaoEditing(null);
+    setFormData({
+      nome: "",
+      limite: "",
+      dia_fechamento: "",
+      dia_vencimento: "",
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleOpenEdit = (cartao: any) => {
+    setCartaoEditing(cartao);
+    setFormData({
+      nome: cartao.nome,
+      limite: cartao.limite?.toString() || "",
+      dia_fechamento: cartao.dia_fechamento.toString(),
+      dia_vencimento: cartao.dia_vencimento.toString(),
+    });
+    setIsModalOpen(true);
+  };
+
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const payload = {
+      user_id: userId,
+      nome: formData.nome,
+      limite: formData.limite ? Number(formData.limite) : null,
+      dia_fechamento: Number(formData.dia_fechamento),
+      dia_vencimento: Number(formData.dia_vencimento),
+    };
+
     try {
-      const payload = {
-        user_id: userId,
-        grupo_id: null, // Ajuste se for salvar para o grupo
-        nome: novoCartao.nome,
-        limite: novoCartao.limite ? Number(novoCartao.limite) : null,
-        dia_fechamento: Number(novoCartao.dia_fechamento),
-        dia_vencimento: Number(novoCartao.dia_vencimento),
-      };
-
-      const { error } = await supabase
-        .from("cartoes_credito")
-        .insert([payload]);
-      if (error) throw error;
-
-      toast({ title: "Cartão adicionado com sucesso!" });
-      setIsAddModalOpen(false);
-      setNovoCartao({
-        nome: "",
-        limite: "",
-        dia_fechamento: "",
-        dia_vencimento: "",
-      });
-      fetchCartoes();
+      if (cartaoEditing) {
+        await supabase
+          .from("cartoes_credito")
+          .update(payload)
+          .eq("id", cartaoEditing.id);
+        toast({ title: "Cartão atualizado!" });
+      } else {
+        await supabase.from("cartoes_credito").insert([payload]);
+        toast({ title: "Cartão criado!" });
+      }
+      setIsModalOpen(false);
+      fetchData();
     } catch (error: any) {
-      toast({
-        title: "Erro ao salvar",
-        description: error.message,
-        variant: "destructive",
-      });
+      toast({ title: "Erro ao salvar", variant: "destructive" });
     }
   };
 
-  // Processa as faturas baseadas no mês selecionado
+  const confirmDelete = async () => {
+    if (!deleteConfig.id) return;
+    try {
+      await supabase.from("cartoes_credito").delete().eq("id", deleteConfig.id);
+      toast({ title: "Cartão removido." });
+      setDeleteConfig({ isOpen: false, id: null });
+      fetchData();
+    } catch (error) {
+      toast({ title: "Erro ao excluir", variant: "destructive" });
+    }
+  };
+
   const faturas = useMemo(() => {
     const ano = date.getFullYear();
     const mes = date.getMonth();
@@ -157,232 +230,373 @@ export default function Cartoes() {
         cartao.dia_fechamento,
         cartao.dia_vencimento,
       );
+      const statusFatura = getStatusFatura(ciclo.inicio, ciclo.fim);
 
-      const despesas = lancamentos.filter((l) => {
+      const despesasFatura = lancamentos.filter((l) => {
         if (l.cartao_id !== cartao.id) return false;
-        // Normaliza a data da compra
-        const dataCompra = new Date(l.data_vencimento + "T12:00:00");
-        return dataCompra >= ciclo.inicio && dataCompra <= ciclo.fim;
+        const d = new Date(l.data_vencimento + "T00:00:00");
+        return d >= ciclo.inicio && d <= ciclo.fim;
       });
 
-      const total = despesas.reduce((acc, curr) => acc + Number(curr.valor), 0);
+      const sombrasFixas = fixas
+        .filter((f) => f.cartao_id === cartao.id)
+        .map((f) => ({
+          id: `shadow-${f.id}`,
+          descricao: f.nome,
+          valor: f.valor,
+          data_vencimento: `${ano}-${String(mes + 1).padStart(2, "0")}-${String(f.dia_vencimento).padStart(2, "0")}`,
+          isShadow: true,
+        }))
+        .filter((s) => {
+          const d = new Date(s.data_vencimento + "T00:00:00");
+          return d >= ciclo.inicio && d <= ciclo.fim;
+        });
+
+      const todasDespesasMês = [...despesasFatura, ...sombrasFixas].sort(
+        (a, b) =>
+          new Date(a.data_vencimento + "T00:00:00").getTime() -
+          new Date(b.data_vencimento + "T00:00:00").getTime(),
+      );
+
+      const totalFaturaMes = todasDespesasMês.reduce(
+        (acc, curr) => acc + Number(curr.valor),
+        0,
+      );
+
+      // CÁLCULO DO LIMITE (Idêntico ao banco)
+      const utilizado = lancamentos
+        .filter((l) => l.cartao_id === cartao.id)
+        .reduce((acc, curr) => acc + Number(curr.valor), 0);
+
+      const disponivel = cartao.limite
+        ? Math.max(0, cartao.limite - utilizado)
+        : 0;
+      const porcentagemUso =
+        cartao.limite > 0 ? (utilizado / cartao.limite) * 100 : 0;
 
       return {
         ...cartao,
         ciclo,
-        despesas: despesas.sort(
-          (a, b) =>
-            new Date(a.data_vencimento).getTime() -
-            new Date(b.data_vencimento).getTime(),
-        ),
-        total,
+        statusFatura,
+        despesas: todasDespesasMês,
+        totalFaturaMes,
+        utilizado,
+        disponivel,
+        porcentagemUso,
       };
     });
-  }, [cartoes, lancamentos, date]);
+  }, [cartoes, lancamentos, fixas, date]);
 
   const formatMoney = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 
   return (
     <div className="w-full px-4 pt-6 pb-24 max-w-5xl mx-auto animate-in fade-in slide-in-from-bottom-4">
-      {/* CABEÇALHO */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <CreditCardIcon className="h-8 w-8 text-primary" /> Meus Cartões
+            <CreditCard className="h-8 w-8 text-primary" /> Meus Cartões
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
-            Gerencie suas faturas e veja suas parcelas futuras.
+            Controle de faturas e limites.
           </p>
         </div>
-
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex items-center gap-2">
           <MonthSelector date={date} setDate={setDate} />
-          <Button
-            onClick={() => setIsAddModalOpen(true)}
-            className="rounded-xl h-10 px-4"
-          >
-            <PlusIcon className="h-5 w-5 mr-1" /> Novo Cartão
+          <Button onClick={handleOpenAdd} className="rounded-xl h-10 px-4">
+            <Plus className="h-5 w-5 mr-1" /> Novo
           </Button>
         </div>
       </div>
 
-      {/* LISTA DE FATURAS (MOTOR EM AÇÃO) */}
-      <div className="space-y-4">
-        {faturas.length === 0 && !loading && (
-          <div className="text-center py-12 border border-dashed rounded-2xl bg-accent/20 text-muted-foreground">
-            Você ainda não tem nenhum cartão cadastrado.
-          </div>
-        )}
-
-        {faturas.map((fatura) => {
-          const isExpanded = expandedCard === fatura.id;
-
-          return (
-            <div
-              key={fatura.id}
-              className="bg-card border border-border/50 rounded-3xl overflow-hidden shadow-sm hover:shadow transition-all"
-            >
-              {/* RESUMO DO CARTÃO */}
+      {loading ? (
+        <div className="flex justify-center py-12 text-muted-foreground">
+          Carregando faturas...
+        </div>
+      ) : cartoes.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
+          <CreditCard className="h-12 w-12 text-muted-foreground/30 mb-4" />
+          <p className="text-muted-foreground font-medium">
+            Nenhum cartão cadastrado.
+          </p>
+          <Button onClick={handleOpenAdd} className="rounded-xl mt-4">
+            <Plus className="h-4 w-4 mr-2" /> Cadastrar Cartão
+          </Button>
+        </div>
+      ) : (
+        <div className="grid gap-6">
+          {faturas.map((fatura) => {
+            const isExpanded = expandedCard === fatura.id;
+            return (
               <div
-                className="p-5 cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-4"
-                onClick={() =>
-                  setExpandedCategory(isExpanded ? null : fatura.id)
-                }
+                key={fatura.id}
+                className="bg-card border border-border/50 rounded-4xl overflow-hidden shadow-sm transition-all"
               >
-                <div className="flex items-center gap-4">
-                  <div className="h-12 w-12 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                    <CreditCardIcon className="h-6 w-6" />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg">{fatura.nome}</h3>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
-                      <span>
-                        Vence:{" "}
-                        {fatura.ciclo.vencimento.toLocaleDateString("pt-BR")}
-                      </span>
-                      <span>•</span>
-                      <span>Fecha: dia {fatura.dia_fechamento}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto pl-16 sm:pl-0">
-                  <div className="text-right">
-                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-wider mb-0.5">
-                      Total da Fatura
-                    </p>
-                    <p className="font-bold text-xl">
-                      {formatMoney(fatura.total)}
-                    </p>
-                  </div>
-                  <ChevronDownIcon
-                    className={cn(
-                      "h-5 w-5 text-muted-foreground transition-transform duration-300",
-                      isExpanded && "rotate-180",
-                    )}
-                  />
-                </div>
-              </div>
-
-              {/* DETALHES DA FATURA (DESPESAS) */}
-              {isExpanded && (
-                <div className="bg-muted/10 border-t border-border/50 p-5 animate-in slide-in-from-top-2">
-                  <p className="text-xs font-semibold text-muted-foreground mb-4 uppercase tracking-wider">
-                    Compras neste ciclo (
-                    {fatura.ciclo.inicio.toLocaleDateString("pt-BR")} -{" "}
-                    {fatura.ciclo.fim.toLocaleDateString("pt-BR")})
-                  </p>
-
-                  {fatura.despesas.length > 0 ? (
-                    <div className="space-y-3">
-                      {fatura.despesas.map((d: any) => (
-                        <div
-                          key={d.id}
-                          className="flex items-center justify-between py-2 border-b border-border/30 last:border-0"
-                        >
-                          <div>
-                            <p className="font-semibold text-sm">
-                              {d.descricao}
-                            </p>
-                            <p className="text-[11px] text-muted-foreground flex items-center gap-1 mt-0.5">
-                              <CalendarIcon className="h-3 w-3" />{" "}
-                              {new Date(
-                                d.data_vencimento + "T12:00:00",
-                              ).toLocaleDateString("pt-BR")}
-                              {d.total_parcelas && (
-                                <span className="ml-2 bg-orange-500/10 text-orange-500 px-1.5 py-0.5 rounded-sm font-bold">
-                                  Parcela {d.parcela_atual}/{d.total_parcelas}
-                                </span>
-                              )}
-                            </p>
-                          </div>
-                          <span className="font-semibold">
-                            {formatMoney(Number(d.valor))}
+                <div
+                  className="p-6 cursor-pointer"
+                  onClick={() => setExpandedCard(isExpanded ? null : fatura.id)}
+                >
+                  {/* CABEÇALHO DO CARTÃO */}
+                  <div className="flex flex-col sm:flex-row justify-between gap-6">
+                    <div className="flex items-center gap-4">
+                      <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
+                        <CreditCard className="h-7 w-7" />
+                      </div>
+                      <div>
+                        <h3 className="font-bold text-xl flex items-center gap-2">
+                          {fatura.nome}
+                        </h3>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span
+                            className={cn(
+                              "text-[10px] uppercase font-bold px-2 py-0.5 rounded-full tracking-wider",
+                              fatura.statusFatura === "Aberta"
+                                ? "bg-green-500/15 text-green-600"
+                                : fatura.statusFatura === "Fechada"
+                                  ? "bg-red-500/15 text-red-600"
+                                  : "bg-muted text-muted-foreground",
+                            )}
+                          >
+                            {fatura.statusFatura}
+                          </span>
+                          <span className="text-xs text-muted-foreground">
+                            Vence dia {fatura.dia_vencimento}
                           </span>
                         </div>
-                      ))}
+                      </div>
                     </div>
-                  ) : (
-                    <p className="text-sm text-muted-foreground text-center py-4">
-                      Nenhuma compra caiu nesta fatura.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          );
-        })}
-      </div>
 
-      {/* MODAL DE ADICIONAR CARTÃO */}
-      <Dialog open={isAddModalOpen} onOpenChange={setIsAddModalOpen}>
-        <DialogContent className="sm:max-w-md rounded-3xl">
+                    {/* BARRA DE LIMITE (ESTILO BANCO) */}
+                    <div className="flex-1 max-w-sm space-y-2 mt-2 sm:mt-0">
+                      <div className="flex justify-between text-xs font-medium">
+                        <span className="text-muted-foreground">
+                          Utilizado:{" "}
+                          <strong className="text-foreground">
+                            {formatMoney(fatura.utilizado)}
+                          </strong>
+                        </span>
+                        <span className="text-muted-foreground">
+                          Disponível:{" "}
+                          <strong className="text-green-600">
+                            {formatMoney(fatura.disponivel)}
+                          </strong>
+                        </span>
+                      </div>
+                      <Progress
+                        value={Math.min(fatura.porcentagemUso, 100)}
+                        className="h-2"
+                      />
+                      {fatura.limite && (
+                        <p className="text-[10px] text-muted-foreground text-right">
+                          Limite Total: {formatMoney(fatura.limite)}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* VALOR DA FATURA */}
+                    <div className="flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-border/40 pt-4 sm:pt-0 sm:pl-6">
+                      <div className="text-right flex-1 sm:flex-none">
+                        <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
+                          Fatura do Mês
+                        </p>
+                        <p className="font-bold text-2xl tracking-tighter">
+                          {formatMoney(fatura.totalFaturaMes)}
+                        </p>
+                      </div>
+                      <ChevronDown
+                        className={cn(
+                          "h-5 w-5 text-muted-foreground transition-transform shrink-0",
+                          isExpanded && "rotate-180",
+                        )}
+                      />
+                    </div>
+                  </div>
+                </div>
+
+                {/* ITENS DA FATURA */}
+                {isExpanded && (
+                  <div className="bg-muted/10 border-t border-border/40 p-6 animate-in slide-in-from-top-2">
+                    <div className="flex items-center justify-between mb-6">
+                      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                        <Info className="h-3 w-3" /> Itens desta Fatura
+                      </div>
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleOpenEdit(fatura);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 rounded-full text-destructive"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setDeleteConfig({ isOpen: true, id: fatura.id });
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-4">
+                      {fatura.despesas.length > 0 ? (
+                        fatura.despesas.map((d: any) => (
+                          <div
+                            key={d.id}
+                            className="flex items-center justify-between group"
+                          >
+                            <div className="flex items-center gap-3">
+                              <div
+                                className={cn(
+                                  "h-2 w-2 rounded-full",
+                                  d.isShadow ? "bg-blue-400" : "bg-primary",
+                                )}
+                              />
+                              <div>
+                                <p className="text-sm font-semibold">
+                                  {d.descricao}
+                                </p>
+                                <p className="text-[10px] text-muted-foreground flex items-center gap-1">
+                                  <Calendar className="h-3 w-3" />{" "}
+                                  {new Date(
+                                    d.data_vencimento + "T00:00:00",
+                                  ).toLocaleDateString("pt-BR")}
+                                  {d.isShadow && (
+                                    <span className="ml-2 text-blue-500 font-bold uppercase text-[9px]">
+                                      Fixa
+                                    </span>
+                                  )}
+                                  {d.total_parcelas && (
+                                    <span className="ml-2 text-orange-500 font-bold tracking-tighter">
+                                      ({d.parcela_atual}/{d.total_parcelas})
+                                    </span>
+                                  )}
+                                </p>
+                              </div>
+                            </div>
+                            <span className="font-bold text-sm">
+                              {formatMoney(Number(d.valor))}
+                            </span>
+                          </div>
+                        ))
+                      ) : (
+                        <div className="text-center py-6 text-sm text-muted-foreground">
+                          Nenhum lançamento nesta fatura.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {/* MODAL EDITAR/CRIAR E ALERTAS */}
+      <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
+        <DialogContent className="sm:max-w-md rounded-4xl">
           <DialogHeader>
-            <DialogTitle>Cadastrar Novo Cartão</DialogTitle>
+            <DialogTitle>
+              {cartaoEditing ? "Editar Cartão" : "Novo Cartão"}
+            </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSalvarCartao} className="space-y-4 mt-4">
+          <form onSubmit={handleSave} className="space-y-4 pt-4">
             <div className="space-y-2">
-              <Label>Nome do Cartão (Ex: Nubank, Itaú)</Label>
+              <Label>Nome do Cartão</Label>
               <Input
                 required
-                value={novoCartao.nome}
+                value={formData.nome}
                 onChange={(e) =>
-                  setNovoCartao({ ...novoCartao, nome: e.target.value })
+                  setFormData({ ...formData, nome: e.target.value })
                 }
               />
             </div>
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Dia do Fechamento</Label>
+                <Label>Fechamento</Label>
                 <Input
                   type="number"
                   min="1"
                   max="31"
                   required
-                  value={novoCartao.dia_fechamento}
+                  value={formData.dia_fechamento}
                   onChange={(e) =>
-                    setNovoCartao({
-                      ...novoCartao,
-                      dia_fechamento: e.target.value,
-                    })
+                    setFormData({ ...formData, dia_fechamento: e.target.value })
                   }
                 />
               </div>
               <div className="space-y-2">
-                <Label>Dia do Vencimento</Label>
+                <Label>Vencimento</Label>
                 <Input
                   type="number"
                   min="1"
                   max="31"
                   required
-                  value={novoCartao.dia_vencimento}
+                  value={formData.dia_vencimento}
                   onChange={(e) =>
-                    setNovoCartao({
-                      ...novoCartao,
-                      dia_vencimento: e.target.value,
-                    })
+                    setFormData({ ...formData, dia_vencimento: e.target.value })
                   }
                 />
               </div>
             </div>
             <div className="space-y-2">
-              <Label>Limite Total (Opcional)</Label>
+              <Label>Limite Total</Label>
               <Input
                 type="number"
                 step="0.01"
-                value={novoCartao.limite}
+                required
+                value={formData.limite}
                 onChange={(e) =>
-                  setNovoCartao({ ...novoCartao, limite: e.target.value })
+                  setFormData({ ...formData, limite: e.target.value })
                 }
               />
             </div>
-            <Button type="submit" className="w-full h-12 rounded-xl mt-4">
-              Salvar Cartão
-            </Button>
+            <DialogFooter>
+              <Button type="submit" className="w-full h-12 rounded-xl">
+                Salvar
+              </Button>
+            </DialogFooter>
           </form>
         </DialogContent>
       </Dialog>
+      <AlertDialog
+        open={deleteConfig.isOpen}
+        onOpenChange={(open) =>
+          setDeleteConfig({ ...deleteConfig, isOpen: open })
+        }
+      >
+        <AlertDialogContent className="rounded-4xl">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-destructive" /> Excluir
+              Cartão?
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Os lançamentos perderão a conexão com a fatura.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="rounded-xl">
+              Cancelar
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 rounded-xl"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

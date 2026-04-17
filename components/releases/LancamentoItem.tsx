@@ -1,15 +1,18 @@
 "use client";
 
+import { useEffect, useRef } from "react";
 import { Button } from "@/components/ui/button";
 import {
   PencilIcon,
   TrashIcon,
   CalendarIcon,
-  CheckCircleIcon,
   ArrowUpRightIcon,
   ArrowDownRightIcon,
-  EyeSlashIcon, // <-- Importado para o ícone de Oculto
+  EyeSlashIcon,
 } from "@heroicons/react/24/solid";
+// IMPORTANTE: Remova o CheckCircleIcon do @heroicons/react/24/solid
+// E importe o seu novo componente animado (ajuste o caminho se necessário):
+import { CheckCircleIcon } from "@/components/ui/check-circle";
 import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { Lancamento } from "@/types";
@@ -37,7 +40,6 @@ export function LancamentoItem({
   const isFixa = !!lancamento.conta_fixa_id || !!lancamento.isShadow;
   const isParcelada = !!lancamento.total_parcelas;
 
-  // Verifica se é uma conta fixa que está pausada
   const isPausada = (lancamento as any).status_fixa === "pausado";
 
   return (
@@ -47,16 +49,15 @@ export function LancamentoItem({
         isSelected
           ? "bg-primary/5 border-primary/30"
           : isPausada
-            ? "bg-muted/30 border-dashed border-border/50 opacity-60" // Estilo fantasma para pausadas
+            ? "bg-muted/30 border-dashed border-border/50 opacity-60"
             : lancamento.isShadow
               ? "bg-accent/10 border-border/80 border-dashed hover:border-border hover:shadow-sm"
               : "bg-card border-border/50 hover:border-border hover:shadow-sm",
       )}
     >
-      {/* ESQUERDA: Checkbox, Status e Info */}
       <div className="flex items-start sm:items-center gap-3 sm:gap-4">
         <button
-          onClick={isPausada ? undefined : onTogglePago} // Desativa o clique se estiver pausada
+          onClick={isPausada ? undefined : onTogglePago}
           disabled={isPausada}
           title={
             isPausada
@@ -66,30 +67,27 @@ export function LancamentoItem({
                 : "Marcar como pago"
           }
           className={cn(
-            "pt-0.5 sm:pt-0 shrink-0 transition-transform",
+            "pt-0.5 sm:pt-0 shrink-0 transition-transform flex items-center justify-center h-7 w-7 rounded-full",
             !isPausada && "active:scale-90",
             isPausada && "cursor-not-allowed",
+            // Mantemos o fundinho de cor suave quando for sombra
+            !lancamento.pago && lancamento.isShadow && "bg-blue-500/5",
           )}
         >
-          {lancamento.pago ? (
-            <CheckCircleIcon
-              className={cn(
-                "h-6 w-6",
-                isPausada ? "text-muted-foreground" : "text-green-500",
-              )}
-            />
-          ) : (
-            <div
-              className={cn(
-                "h-6 w-6 rounded-full border-2 transition-colors",
-                isPausada
-                  ? "border-muted-foreground/30 bg-muted/20"
+          <CheckCircleIcon
+            checked={lancamento.pago}
+            size={28}
+            className={cn(
+              "transition-colors duration-300",
+              isPausada
+                ? "text-muted-foreground/30"
+                : lancamento.pago
+                  ? "text-green-500" // Cor quando pago
                   : lancamento.isShadow
-                    ? "border-blue-500/40 hover:border-blue-500/80 bg-blue-500/5"
-                    : "border-muted-foreground/30 hover:border-muted-foreground/60",
-              )}
-            />
-          )}
+                    ? "text-blue-500/50 hover:text-blue-500/80" // Cor da borda quando Sombra
+                    : "text-muted-foreground/30 hover:text-muted-foreground/60", // Cor da borda normal
+            )}
+          />
         </button>
 
         <div className="flex flex-col min-w-0">
@@ -106,7 +104,6 @@ export function LancamentoItem({
               {lancamento.descricao}
             </h3>
 
-            {/* TAGS DE CONTA FIXA E PARCELA */}
             <div className="flex items-center gap-1.5">
               {isFixa && (
                 <span
@@ -166,7 +163,6 @@ export function LancamentoItem({
         </div>
       </div>
 
-      {/* DIREITA: Valor e Ações */}
       <div className="flex items-center justify-between sm:justify-end gap-4 mt-3 sm:mt-0 pl-10 sm:pl-0 w-full sm:w-auto">
         <div
           className={cn(

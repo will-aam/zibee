@@ -89,12 +89,11 @@ export function DesktopHeader(props: DesktopHeaderProps) {
   }, []);
 
   const navButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] ${
+    `flex items-center justify-center rounded-2xl transition-transform transition-opacity duration-300 ease-in-out active:scale-[0.96] ${
       isActive
         ? "bg-primary/10 text-primary px-5 py-3"
         : "text-muted-foreground hover:bg-muted/50 hover:text-foreground px-4 py-3"
     }`;
-
   const navItems = [
     {
       id: "dashboard",

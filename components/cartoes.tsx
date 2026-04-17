@@ -6,7 +6,7 @@ import React, {
   useCallback,
   useMemo,
   useRef,
-} from "react"; // <-- ADICIONADO O useRef AQUI
+} from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -34,15 +34,15 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useToast } from "@/hooks/use-toast";
 import {
-  CreditCard,
-  Plus,
-  Calendar,
-  ChevronDown,
-  Pencil,
-  Trash2,
-  Info,
-  AlertCircle,
-} from "lucide-react";
+  CreditCardIcon,
+  PlusIcon,
+  CalendarIcon,
+  ChevronDownIcon,
+  PencilIcon,
+  TrashIcon,
+  InformationCircleIcon,
+  ExclamationCircleIcon,
+} from "@heroicons/react/24/outline"; // <-- IMPORTAÇÃO ATUALIZADA
 import { cn } from "@/lib/utils";
 
 // Motor de Ciclo de Fatura
@@ -295,7 +295,7 @@ export default function Cartoes() {
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-8">
         <div>
           <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
-            <CreditCard className="h-8 w-8 text-primary" /> Meus Cartões
+            <CreditCardIcon className="h-8 w-8 text-primary" /> Meus Cartões
           </h1>
           <p className="text-muted-foreground text-sm mt-1">
             Controle de faturas e limites.
@@ -304,7 +304,7 @@ export default function Cartoes() {
         <div className="flex items-center gap-2">
           <MonthSelector date={date} setDate={setDate} />
           <Button onClick={handleOpenAdd} className="rounded-xl h-10 px-4">
-            <Plus className="h-5 w-5 mr-1" /> Novo
+            <PlusIcon className="h-5 w-5 mr-1" /> Novo
           </Button>
         </div>
       </div>
@@ -315,12 +315,12 @@ export default function Cartoes() {
         </div>
       ) : cartoes.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
-          <CreditCard className="h-12 w-12 text-muted-foreground/30 mb-4" />
+          <CreditCardIcon className="h-12 w-12 text-muted-foreground/30 mb-4" />
           <p className="text-muted-foreground font-medium">
             Nenhum cartão cadastrado.
           </p>
           <Button onClick={handleOpenAdd} className="rounded-xl mt-4">
-            <Plus className="h-4 w-4 mr-2" /> Cadastrar Cartão
+            <PlusIcon className="h-4 w-4 mr-2" /> Cadastrar Cartão
           </Button>
         </div>
       ) : (
@@ -340,7 +340,7 @@ export default function Cartoes() {
                   <div className="flex flex-col sm:flex-row justify-between gap-6">
                     <div className="flex items-center gap-4">
                       <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                        <CreditCard className="h-7 w-7" />
+                        <CreditCardIcon className="h-7 w-7" />
                       </div>
                       <div>
                         <h3 className="font-bold text-xl flex items-center gap-2">
@@ -403,7 +403,7 @@ export default function Cartoes() {
                           {formatMoney(fatura.totalFaturaMes)}
                         </p>
                       </div>
-                      <ChevronDown
+                      <ChevronDownIcon
                         className={cn(
                           "h-5 w-5 text-muted-foreground transition-transform shrink-0",
                           isExpanded && "rotate-180",
@@ -418,7 +418,8 @@ export default function Cartoes() {
                   <div className="bg-muted/10 border-t border-border/40 p-6 animate-in slide-in-from-top-2">
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                        <Info className="h-3 w-3" /> Itens desta Fatura
+                        <InformationCircleIcon className="h-3 w-3" /> Itens
+                        desta Fatura
                       </div>
                       <div className="flex items-center gap-1">
                         <Button
@@ -430,7 +431,7 @@ export default function Cartoes() {
                             handleOpenEdit(fatura);
                           }}
                         >
-                          <Pencil className="h-4 w-4" />
+                          <PencilIcon className="h-4 w-4" />
                         </Button>
                         <Button
                           variant="ghost"
@@ -441,7 +442,7 @@ export default function Cartoes() {
                             setDeleteConfig({ isOpen: true, id: fatura.id });
                           }}
                         >
-                          <Trash2 className="h-4 w-4" />
+                          <TrashIcon className="h-4 w-4" />
                         </Button>
                       </div>
                     </div>
@@ -465,7 +466,7 @@ export default function Cartoes() {
                                   {d.descricao}
                                 </p>
                                 <p className="text-[10px] text-muted-foreground flex items-center gap-1">
-                                  <Calendar className="h-3 w-3" />{" "}
+                                  <CalendarIcon className="h-3 w-3" />{" "}
                                   {new Date(
                                     d.data_vencimento + "T00:00:00",
                                   ).toLocaleDateString("pt-BR")}
@@ -577,8 +578,8 @@ export default function Cartoes() {
         <AlertDialogContent className="rounded-4xl">
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-destructive" /> Excluir
-              Cartão?
+              <ExclamationCircleIcon className="h-5 w-5 text-destructive" />{" "}
+              Excluir Cartão?
             </AlertDialogTitle>
             <AlertDialogDescription>
               Os lançamentos perderão a conexão com a fatura.

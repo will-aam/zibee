@@ -5,7 +5,6 @@ import { useState } from "react";
 import { authClient } from "@/lib/auth-client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { RainbowButton } from "@/components/ui/rainbow-button";
 import { Label } from "@/components/ui/label";
 import {
   Card,
@@ -120,8 +119,8 @@ export default function LoginPage() {
         </CardHeader>
 
         <CardContent className="space-y-4">
-          {/* 👇 BOTÃO DO GOOGLE ATUALIZADO COM RAINBOW E ÍCONE OFICIAL */}
-          <RainbowButton
+          {/* 👇 BOTÃO DO GOOGLE (Substituído para o Button padrão) */}
+          <Button
             variant="outline"
             className="w-full py-6 sm:py-5 text-base sm:text-sm"
             onClick={handleGoogleLogin}
@@ -155,7 +154,7 @@ export default function LoginPage() {
               </svg>
             )}
             Continuar com Google
-          </RainbowButton>
+          </Button>
 
           <div className="relative py-2">
             <div className="absolute inset-0 flex items-center">
@@ -245,7 +244,7 @@ export default function LoginPage() {
             type="button"
             onClick={() => {
               setIsLogin(!isLogin);
-              setShowPassword(false); // Reseta o olhinho ao trocar de aba
+              setShowPassword(false);
             }}
             className="text-muted-foreground text-base sm:text-sm"
           >

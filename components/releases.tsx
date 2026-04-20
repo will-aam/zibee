@@ -18,17 +18,15 @@ import {
   FunnelIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
-  CreditCardIcon, // <-- IMPORTADO O ÍCONE DO CARTÃO
+  CreditCardIcon,
 } from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
 
-// COMPONENTES
 import { MonthSelector } from "./releases/MonthSelector";
 import { LancamentoItem } from "./releases/LancamentoItem";
 import { LancamentosFilters } from "./releases/LancamentosFilters";
 import { LancamentoFormDialog } from "./releases/LancamentoFormDialog";
 
-// IMPORTAÇÃO DO ALERT DIALOG DA NOSSA UI
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,7 +38,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-// CACHE EM MEMÓRIA (Agora separa as categorias por contexto: Pessoal/Grupo)
 const memoryCache = {
   lancamentosPorMes: {} as Record<string, Lancamento[]>,
   categorias: {} as Record<
@@ -51,13 +48,11 @@ const memoryCache = {
   cartoes: {} as Record<string, any[]>,
 };
 
-// <-- NOVA INTERFACE DE PROPS
 interface LancamentosProps {
   onNavigate?: (tab: string) => void;
 }
 
 export default function Lancamentos({ onNavigate }: LancamentosProps) {
-  // <-- RECEBENDO A PROP
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
@@ -95,7 +90,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
 
-  // --- FILTROS ---
   const [filtrosTipo, setFiltrosTipo] = useState<string[]>([]);
   const [filtrosCategoria, setFiltrosCategoria] = useState<string[]>([]);
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
@@ -239,7 +233,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               data_vencimento: `${filtroMes}-${diaStr}`,
               pago: false,
               conta_fixa_id: fixa.id,
-              cartao_id: fixa.cartao_id, // <-- ADICIONE ESTA LINHA AQUI
+              cartao_id: fixa.cartao_id,
               isShadow: true,
               status_fixa: fixa.status,
             } as any);
@@ -483,7 +477,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   return (
     <>
       <div className="w-full px-4 pt-6 pb-24">
-        {/* CABEÇALHO SUPERIOR */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">
@@ -510,7 +503,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               <PlusIcon className="h-5 w-5" />
             </Button>
 
-            {/* NOVO BOTÃO DE CARTÕES (SÓ NO MOBILE) */}
             <Button
               onClick={() => onNavigate?.("cartoes")}
               size="icon"
@@ -522,7 +514,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
           </div>
         </div>
 
-        {/* CONTEÚDO PRINCIPAL CHAPADO NA TELA */}
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4">
             <div className="relative group">
@@ -609,7 +600,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             </div>
           </div>
 
-          {/* LISTA DE ITENS */}
           <div className="space-y-3">
             {loading ? (
               <div className="flex justify-center py-12">
@@ -656,11 +646,46 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
                     (c: any) => c.nome.trim().toLowerCase() === nomeLimpo,
                   )?.regra_orcamento;
 
+                  let infoFatura:
+                    | { mesFormatado: string; ano: number }
+                    | undefined;
+
+                  if (lancamento.cartao_id) {
+                    const cartao = cartoesDB.find(
+                      (c) => c.id === lancamento.cartao_id,
+                    );
+                    if (cartao) {
+                      const dataCompra = new Date(
+                        lancamento.data_vencimento + "T12:00:00",
+                      );
+                      const mesCompra = dataCompra.getMonth();
+                      const anoCompra = dataCompra.getFullYear();
+                      const diaCompra = dataCompra.getDate();
+
+                      let dataFaturaReal = new Date(anoCompra, mesCompra, 1);
+                      if (diaCompra > cartao.dia_fechamento) {
+                        dataFaturaReal.setMonth(dataFaturaReal.getMonth() + 1);
+                      }
+
+                      const nomeMes = dataFaturaReal.toLocaleString("pt-BR", {
+                        month: "long",
+                      });
+                      const nomeMesCapitalizado =
+                        nomeMes.charAt(0).toUpperCase() + nomeMes.slice(1);
+
+                      infoFatura = {
+                        mesFormatado: nomeMesCapitalizado,
+                        ano: dataFaturaReal.getFullYear(),
+                      };
+                    }
+                  }
+
                   return (
                     <LancamentoItem
                       key={lancamento.id}
                       lancamento={lancamento}
                       categoriaRegra={regra}
+                      infoFatura={infoFatura}
                       isSelected={selectedIds.includes(lancamento.id)}
                       onSelect={() => {
                         if (lancamento.isShadow) return;

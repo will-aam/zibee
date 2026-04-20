@@ -10,8 +10,6 @@ import {
   ArrowDownRightIcon,
   EyeSlashIcon,
 } from "@heroicons/react/24/solid";
-// IMPORTANTE: Remova o CheckCircleIcon do @heroicons/react/24/solid
-// E importe o seu novo componente animado (ajuste o caminho se necessário):
 import { CheckCircleIcon } from "@/components/ui/check-circle";
 import { Pin } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -21,6 +19,7 @@ interface LancamentoItemProps {
   lancamento: Lancamento;
   isSelected: boolean;
   categoriaRegra?: string;
+  infoFatura?: { mesFormatado: string; ano: number };
   onSelect: () => void;
   onTogglePago: () => void;
   onEdit: () => void;
@@ -31,6 +30,7 @@ export function LancamentoItem({
   lancamento,
   isSelected,
   categoriaRegra,
+  infoFatura,
   onSelect,
   onTogglePago,
   onEdit,
@@ -39,6 +39,7 @@ export function LancamentoItem({
   const isReceita = lancamento.tipo === "Receita";
   const isFixa = !!lancamento.conta_fixa_id || !!lancamento.isShadow;
   const isParcelada = !!lancamento.total_parcelas;
+  const isCartaoCredito = !!lancamento.cartao_id;
 
   const isPausada = (lancamento as any).status_fixa === "pausado";
 
@@ -56,39 +57,52 @@ export function LancamentoItem({
       )}
     >
       <div className="flex items-start sm:items-center gap-3 sm:gap-4">
-        <button
-          onClick={isPausada ? undefined : onTogglePago}
-          disabled={isPausada}
-          title={
-            isPausada
-              ? "Conta oculta (Reative para pagar)"
-              : lancamento.pago
-                ? "Marcar como pendente"
-                : "Marcar como pago"
-          }
-          className={cn(
-            "pt-0.5 sm:pt-0 shrink-0 transition-transform flex items-center justify-center h-7 w-7 rounded-full",
-            !isPausada && "active:scale-90",
-            isPausada && "cursor-not-allowed",
-            // Mantemos o fundinho de cor suave quando for sombra
-            !lancamento.pago && lancamento.isShadow && "bg-blue-500/5",
-          )}
-        >
-          <CheckCircleIcon
-            checked={lancamento.pago}
-            size={28}
-            className={cn(
-              "transition-colors duration-300",
+        {!isCartaoCredito ? (
+          <button
+            onClick={isPausada ? undefined : onTogglePago}
+            disabled={isPausada}
+            title={
               isPausada
-                ? "text-muted-foreground/30"
+                ? "Conta oculta (Reative para pagar)"
                 : lancamento.pago
-                  ? "text-green-500" // Cor quando pago
-                  : lancamento.isShadow
-                    ? "text-blue-500/50 hover:text-blue-500/80" // Cor da borda quando Sombra
-                    : "text-muted-foreground/30 hover:text-muted-foreground/60", // Cor da borda normal
+                  ? "Marcar como pendente"
+                  : "Marcar como pago"
+            }
+            className={cn(
+              "pt-0.5 sm:pt-0 shrink-0 transition-transform flex items-center justify-center h-7 w-7 rounded-full",
+              !isPausada && "active:scale-90",
+              isPausada && "cursor-not-allowed",
+              !lancamento.pago && lancamento.isShadow && "bg-blue-500/5",
             )}
-          />
-        </button>
+          >
+            <CheckCircleIcon
+              checked={lancamento.pago}
+              size={28}
+              className={cn(
+                "transition-colors duration-300",
+                isPausada
+                  ? "text-muted-foreground/30"
+                  : lancamento.pago
+                    ? "text-green-500"
+                    : lancamento.isShadow
+                      ? "text-blue-500/50 hover:text-blue-500/80"
+                      : "text-muted-foreground/30 hover:text-muted-foreground/60",
+              )}
+            />
+          </button>
+        ) : (
+          <div className="pt-0.5 sm:pt-0 shrink-0 flex items-center justify-center h-7 w-7 rounded-full bg-primary/10">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="currentColor"
+              className="w-4 h-4 text-primary"
+            >
+              <path d="M2.25 10.5h19.5V15a2.25 2.25 0 0 1-2.25 2.25H4.5A2.25 2.25 0 0 1 2.25 15v-4.5Z" />
+              <path d="M4.5 6A2.25 2.25 0 0 0 2.25 8.25v.75h19.5v-.75A2.25 2.25 0 0 0 19.5 6H4.5Z" />
+            </svg>
+          </div>
+        )}
 
         <div className="flex flex-col min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
@@ -159,6 +173,15 @@ export function LancamentoItem({
                 { timeZone: "UTC" },
               )}
             </span>
+
+            {isCartaoCredito && infoFatura && (
+              <>
+                <span className="opacity-50">•</span>
+                <span className="flex items-center gap-1 font-bold text-primary/80 bg-primary/10 px-1.5 py-0.5 rounded-md text-[9px] uppercase tracking-widest">
+                  Fatura de {infoFatura.mesFormatado}
+                </span>
+              </>
+            )}
           </div>
         </div>
       </div>

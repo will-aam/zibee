@@ -20,6 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
+  DialogDescription, // <-- ADICIONADO AQUI
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -42,7 +43,8 @@ import {
   TrashIcon,
   InformationCircleIcon,
   ExclamationCircleIcon,
-} from "@heroicons/react/24/outline"; // <-- IMPORTAÇÃO ATUALIZADA
+  CheckCircleIcon, // <-- ADICIONADO AQUI
+} from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 
 // Motor de Ciclo de Fatura
@@ -90,6 +92,14 @@ export default function Cartoes() {
     id: number | null;
   }>({ isOpen: false, id: null });
 
+  // --- NOVOS ESTADOS DO MODAL DE PAGAMENTO ---
+  const [payFaturaConfig, setPayFaturaConfig] = useState<{
+    isOpen: boolean;
+    fatura: any | null;
+  }>({ isOpen: false, fatura: null });
+  const [isPaying, setIsPaying] = useState(false);
+  // -------------------------------------------
+
   const [formData, setFormData] = useState({
     nome: "",
     limite: "",
@@ -103,13 +113,10 @@ export default function Cartoes() {
   const hasAutoJumped = useRef(false);
 
   useEffect(() => {
-    // Quando os cartões carregarem pela primeira vez...
     if (cartoes.length > 0 && !hasAutoJumped.current) {
       const cartaoPrincipal = cartoes[0];
       const hoje = new Date();
 
-      // Se o dia de hoje já passou do dia de fechamento do cartão,
-      // o app "pula" o seletor lá de cima automaticamente para o mês que vem!
       if (hoje.getDate() > cartaoPrincipal.dia_fechamento) {
         const proximoMes = new Date();
         proximoMes.setMonth(proximoMes.getMonth() + 1);
@@ -238,6 +245,7 @@ export default function Cartoes() {
         return d >= ciclo.inicio && d <= ciclo.fim;
       });
 
+      // --- SOMBRAS APRIMORADAS PASSO 2 ---
       const sombrasFixas = fixas
         .filter((f) => f.cartao_id === cartao.id)
         .map((f) => ({
@@ -246,11 +254,17 @@ export default function Cartoes() {
           valor: f.valor,
           data_vencimento: `${ano}-${String(mes + 1).padStart(2, "0")}-${String(f.dia_vencimento).padStart(2, "0")}`,
           isShadow: true,
+          // --- NOVOS CAMPOS PARA SALVAR NO BANCO ---
+          conta_fixa_id: f.id,
+          categoria: f.categoria || "Sem categoria",
+          user_id: userId,
+          pago: false, // Sombra sempre nasce não paga
         }))
         .filter((s) => {
           const d = new Date(s.data_vencimento + "T00:00:00");
           return d >= ciclo.inicio && d <= ciclo.fim;
         });
+      // ------------------------------------
 
       const todasDespesasMês = [...despesasFatura, ...sombrasFixas].sort(
         (a, b) =>
@@ -285,7 +299,59 @@ export default function Cartoes() {
         porcentagemUso,
       };
     });
-  }, [cartoes, lancamentos, fixas, date]);
+  }, [cartoes, lancamentos, fixas, date, userId]);
+
+  // --- FUNÇÃO MÁGICA DE PAGAR (PASSO 3) ---
+  const handlePayFatura = async () => {
+    if (!payFaturaConfig.fatura || !userId) return;
+    setIsPaying(true);
+
+    try {
+      const { fatura } = payFaturaConfig;
+      // 1. Filtramos apenas o que ainda não foi pago
+      const unpaidItems = fatura.despesas.filter((d: any) => !d.pago);
+
+      // 2. Separamos os Lançamentos Reais e as Sombras (Fixas)
+      const realIdsToUpdate = unpaidItems
+        .filter((d: any) => !d.isShadow)
+        .map((d: any) => d.id);
+      const shadowsToInsert = unpaidItems
+        .filter((d: any) => d.isShadow)
+        .map((s: any) => ({
+          user_id: userId,
+          descricao: s.descricao,
+          valor: s.valor,
+          data_vencimento: s.data_vencimento,
+          tipo: "Despesa",
+          categoria: s.categoria,
+          forma_pagamento: "Cartão de Crédito",
+          conta_fixa_id: s.conta_fixa_id,
+          cartao_id: fatura.id,
+          pago: true,
+        }));
+
+      // 3. Executamos no banco de dados!
+      if (realIdsToUpdate.length > 0) {
+        await supabase
+          .from("lancamentos")
+          .update({ pago: true })
+          .in("id", realIdsToUpdate);
+      }
+      if (shadowsToInsert.length > 0) {
+        await supabase.from("lancamentos").insert(shadowsToInsert);
+      }
+
+      toast({ title: "Fatura paga com sucesso!" });
+      setPayFaturaConfig({ isOpen: false, fatura: null });
+      fetchData(); // Atualiza a tela
+      window.dispatchEvent(new Event("zibee:transaction-changed")); // Atualiza o Dashboard
+    } catch (error) {
+      toast({ title: "Erro ao pagar fatura", variant: "destructive" });
+    } finally {
+      setIsPaying(false);
+    }
+  };
+  // -----------------------------------------
 
   const formatMoney = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -416,10 +482,29 @@ export default function Cartoes() {
                 {/* ITENS DA FATURA */}
                 {isExpanded && (
                   <div className="bg-muted/10 border-t border-border/40 p-6 animate-in slide-in-from-top-2">
+                    {/* --- PASSO 4A: TÍTULO + BOTÃO PAGAR --- */}
                     <div className="flex items-center justify-between mb-6">
-                      <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
-                        <InformationCircleIcon className="h-3 w-3" /> Itens
-                        desta Fatura
+                      <div className="flex items-center gap-3">
+                        <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
+                          <InformationCircleIcon className="h-3 w-3" /> Itens
+                          desta Fatura
+                        </div>
+
+                        {/* SE A FATURA TIVER VALOR E ITENS PENDENTES, MOSTRA O BOTÃO */}
+                        {fatura.totalFaturaMes > 0 &&
+                          fatura.despesas.some((d: any) => !d.pago) && (
+                            <Button
+                              size="sm"
+                              className="h-7 rounded-full bg-green-600 hover:bg-green-700 text-white text-xs"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setPayFaturaConfig({ isOpen: true, fatura });
+                              }}
+                            >
+                              <CheckCircleIcon className="h-3.5 w-3.5 mr-1" />{" "}
+                              Pagar Fatura
+                            </Button>
+                          )}
                       </div>
                       <div className="flex items-center gap-1">
                         <Button
@@ -446,6 +531,7 @@ export default function Cartoes() {
                         </Button>
                       </div>
                     </div>
+                    {/* -------------------------------------- */}
 
                     <div className="space-y-4">
                       {fatura.despesas.length > 0 ? (
@@ -569,6 +655,7 @@ export default function Cartoes() {
           </form>
         </DialogContent>
       </Dialog>
+
       <AlertDialog
         open={deleteConfig.isOpen}
         onOpenChange={(open) =>
@@ -598,6 +685,56 @@ export default function Cartoes() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* --- PASSO 4B: MODAL DE PAGAR FATURA --- */}
+      <Dialog
+        open={payFaturaConfig.isOpen}
+        onOpenChange={(open) =>
+          !isPaying && setPayFaturaConfig({ isOpen: open, fatura: null })
+        }
+      >
+        <DialogContent className="sm:max-w-md rounded-4xl">
+          <DialogHeader>
+            <DialogTitle>Confirmar Pagamento</DialogTitle>
+            <DialogDescription>
+              Isso marcará todos os lançamentos desta fatura como pagos e
+              debitará o valor do seu saldo geral.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-6 flex flex-col items-center justify-center bg-muted/20 rounded-2xl border border-border/50">
+            <p className="text-sm text-muted-foreground uppercase font-bold tracking-widest mb-1">
+              Valor Total
+            </p>
+            <p className="text-4xl font-bold text-foreground">
+              {payFaturaConfig.fatura
+                ? formatMoney(payFaturaConfig.fatura.totalFaturaMes)
+                : "R$ 0,00"}
+            </p>
+          </div>
+
+          <DialogFooter className="gap-2 sm:gap-0">
+            <Button
+              variant="outline"
+              className="rounded-xl h-11"
+              onClick={() =>
+                setPayFaturaConfig({ isOpen: false, fatura: null })
+              }
+              disabled={isPaying}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handlePayFatura}
+              className="rounded-xl h-11 bg-green-600 hover:bg-green-700 text-white"
+              disabled={isPaying}
+            >
+              {isPaying ? "Processando..." : "Confirmar Pagamento"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+      {/* ---------------------------------------- */}
     </div>
   );
 }

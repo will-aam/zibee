@@ -326,6 +326,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .select("*")
         .eq("pago", false)
         .eq("tipo", "Despesa")
+        .is("cartao_id", null) // <-- MÁGICA 1: Esconde as comprinhas de cartão dos vencimentos
         .order("data_vencimento", { ascending: true })
         .limit(5);
 
@@ -335,11 +336,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .eq("status", "ativo")
         .order("dia_vencimento", { ascending: true });
 
+      let queryCartoes = supabase // <-- Busca os cartões
+        .from("cartoes_credito")
+        .select("*");
+
       if (activeContext === "grupo" && groupId) {
         queryDespesasVariaveis = queryDespesasVariaveis.eq("grupo_id", groupId);
         queryReceitas = queryReceitas.eq("grupo_id", groupId);
         queryVencimentos = queryVencimentos.eq("grupo_id", groupId);
         queryFixasDashboard = queryFixasDashboard.eq("grupo_id", groupId);
+        queryCartoes = queryCartoes.eq("grupo_id", groupId); // <-- Aqui
       } else {
         queryDespesasVariaveis = queryDespesasVariaveis
           .eq("user_id", userId)
@@ -353,6 +359,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         queryFixasDashboard = queryFixasDashboard
           .eq("user_id", userId)
           .is("grupo_id", null);
+        queryCartoes = queryCartoes.eq("user_id", userId).is("grupo_id", null); // <-- E Aqui
       }
 
       if (from) {
@@ -378,6 +385,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         { data: vencimentosData },
         { data: fixasData },
         { data: metaData },
+        { data: cartoesData }, // <-- RECEBE AQUI
       ] = await Promise.all([
         queryDespesasVariaveis,
         queryReceitas,
@@ -392,6 +400,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               .eq("fixada", true)
               .maybeSingle()
           : Promise.resolve({ data: null }),
+        queryCartoes, // <-- CHAMA AQUI
       ]);
 
       const fetchedDespesasBrutas = variaveisData || [];
@@ -440,7 +449,102 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .sort((a, b) => b.value - a.value)
         .slice(0, 6); // Mostra até as 6 maiores categorias
 
-      const fetchedVencimentos = vencimentosData || [];
+      // --- 3. A MÁGICA DOS VENCIMENTOS DE CARTÃO ---
+      let fetchedVencimentos = vencimentosData || [];
+
+      // Calcular faturas dinâmicas e injetar na lista de Vencimentos
+      if (cartoesData && cartoesData.length > 0) {
+        const faturasInjetaveis: any[] = [];
+
+        cartoesData.forEach((cartao) => {
+          // Busca todas as despesas deste cartão que AINDA NÃO FORAM PAGAS
+          const comprasPendentesCartao = todosOsGastos.filter(
+            (d) => d.cartao_id === cartao.id && !d.pago,
+          );
+
+          if (comprasPendentesCartao.length > 0) {
+            // Vamos agrupar as compras pelas suas datas REAIS de vencimento de fatura
+            const faturasAgrupadas: Record<string, number> = {};
+
+            comprasPendentesCartao.forEach((compra) => {
+              // SEGURANÇA NA DATA: Garante que temos uma string válida de data
+              let dataBaseStr = compra.data_vencimento;
+              if (!dataBaseStr) {
+                // Se for uma conta fixa que veio sem data completa, montamos uma
+                const [anoF, mesF] = (
+                  readRange().from || getCurrentYearMonth() + "-01"
+                ).split("-");
+                dataBaseStr = `${anoF}-${mesF}-${String(compra.dia_vencimento).padStart(2, "0")}`;
+              }
+
+              const dataCompra = new Date(dataBaseStr + "T12:00:00");
+
+              // Se a data ainda for inválida, aborta para não quebrar a tela
+              if (isNaN(dataCompra.getTime())) return;
+
+              let mesFatura = dataCompra.getMonth();
+              let anoFatura = dataCompra.getFullYear();
+
+              // REGRA 1: Se comprou DEPOIS do fechamento, a fatura pula pro mês seguinte
+              if (dataCompra.getDate() > cartao.dia_fechamento) {
+                mesFatura++;
+              }
+
+              // REGRA 2: Se o dia de Vencimento for menor ou igual ao de Fechamento
+              if (cartao.dia_vencimento <= cartao.dia_fechamento) {
+                mesFatura++;
+              }
+
+              // Ajusta o ano se o mês passar de Dezembro (mês 11)
+              if (mesFatura > 11) {
+                mesFatura = 0;
+                anoFatura++;
+              }
+
+              // Descobrimos o dia exato em que a fatura dessa compra vai vencer
+              const dataVencimentoReal = new Date(
+                anoFatura,
+                mesFatura,
+                cartao.dia_vencimento,
+                12, // Forçamos meio-dia para garantir estabilidade no ISO
+                0,
+                0,
+              );
+
+              const chaveIso = dataVencimentoReal.toISOString();
+
+              // Somamos o valor da compra dentro da sua respectiva fatura (gaveta)
+              if (!faturasAgrupadas[chaveIso]) {
+                faturasAgrupadas[chaveIso] = 0;
+              }
+              faturasAgrupadas[chaveIso] += Number(compra.valor);
+            });
+
+            // Transforma os grupos em itens visuais para o Dashboard
+            Object.entries(faturasAgrupadas).forEach(
+              ([dataIso, totalValor]) => {
+                faturasInjetaveis.push({
+                  id: `fatura-${cartao.id}-${dataIso}`,
+                  descricao: `Fatura ${cartao.nome}`,
+                  valor: totalValor,
+                  data_vencimento: dataIso,
+                  pago: false,
+                  isFatura: true, // Flag para não exibir checkbox de pagar
+                });
+              },
+            );
+          }
+        });
+
+        // Junta as faturas com as contas normais e ordena quem vence primeiro
+        fetchedVencimentos = [...fetchedVencimentos, ...faturasInjetaveis]
+          .sort(
+            (a, b) =>
+              new Date(a.data_vencimento).getTime() -
+              new Date(b.data_vencimento).getTime(),
+          )
+          .slice(0, 5);
+      }
 
       setDespesasBrutas(fetchedDespesasBrutas);
       setTotalDespesas(fetchedTotalVariaveis);
@@ -764,8 +868,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                               className="flex items-center justify-between text-xs border-b border-border/40 last:border-0 pb-2 last:pb-0"
                             >
                               <div className="flex items-center gap-3">
-                                {/* Exibe Checkbox para variáveis e ícone de carteira para fixas */}
-                                {!isFixedTemplate ? (
+                                {/* Exibe Checkbox se NÃO for fixa e NÃO for do cartão */}
+                                {!isFixedTemplate && !despesa.cartao_id ? (
                                   <Checkbox
                                     checked={isPago}
                                     onCheckedChange={() =>
@@ -776,7 +880,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                                 ) : (
                                   <WalletIcon
                                     className="h-4 w-4 text-blue-500/60"
-                                    title="Conta Fixa (Controle na aba Lançamentos)"
+                                    title={
+                                      despesa.cartao_id
+                                        ? "Compra no Cartão"
+                                        : "Conta Fixa"
+                                    }
                                   />
                                 )}
                                 <div className="flex flex-col">
@@ -857,9 +965,14 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                       <span className="font-bold block text-sm text-foreground">
                         {formatMoney(item.valor)}
                       </span>
-                      {isAtrasado && (
+                      {isAtrasado && !item.isFatura && (
                         <span className="text-[10px] text-destructive uppercase font-bold tracking-wider">
                           Vencido
+                        </span>
+                      )}
+                      {item.isFatura && (
+                        <span className="text-[10px] text-primary uppercase font-bold tracking-wider">
+                          Fatura
                         </span>
                       )}
                     </div>

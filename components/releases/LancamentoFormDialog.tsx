@@ -33,7 +33,7 @@ import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
 import {
   CalendarDaysIcon,
   InformationCircleIcon,
-  CreditCardIcon, // <-- NOVA IMPORTAÇÃO DO CARTÃO
+  CreditCardIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { format } from "date-fns";
@@ -56,7 +56,7 @@ interface LancamentoFormDialogProps {
     nome: string;
     dia_fechamento: number;
     dia_vencimento: number;
-  }[]; // <-- NOVA PROP
+  }[];
   activeContext: string;
   groupId: string | null;
 }
@@ -69,7 +69,7 @@ export function LancamentoFormDialog({
   userId,
   categoriasDB,
   formasPagamentoDB,
-  cartoesDB, // <-- RECEBENDO A NOVA PROP
+  cartoesDB,
   activeContext,
   groupId,
 }: LancamentoFormDialogProps) {
@@ -85,7 +85,6 @@ export function LancamentoFormDialog({
 
   const [statusFixa, setStatusFixa] = useState<"ativo" | "pausado">("ativo");
 
-  // BLINDAGEM: Limpa as opções para evitar itens duplicados por causa de espaços
   const categoriasUnicas = Array.from(
     new Set(categoriasDB.map((c) => c.nome.trim())),
   );
@@ -93,7 +92,6 @@ export function LancamentoFormDialog({
     new Set(formasPagamentoDB.map((p) => p.nome.trim())),
   );
 
-  // <-- NOVA VARIÁVEL: Detecta se a forma de pagamento é Cartão
   const isCartao =
     formData.forma_pagamento?.toLowerCase().includes("cartão") ||
     formData.forma_pagamento?.toLowerCase().includes("cartao");
@@ -120,7 +118,7 @@ export function LancamentoFormDialog({
         data_vencimento: new Date().toISOString().split("T")[0],
         pago: false,
         observacoes: "",
-        cartao_id: null, // <-- LIMPA O CARTÃO POR PADRÃO
+        cartao_id: null,
       });
       setRepeatType("unica");
       setStatusFixa("ativo");
@@ -257,7 +255,7 @@ export function LancamentoFormDialog({
         ...formData,
         categoria: formData.categoria?.trim(),
         forma_pagamento: formData.forma_pagamento?.trim(),
-        cartao_id: isCartao ? formData.cartao_id : null, // <-- MANDA O CARTÃO SE FOR CARTÃO
+        cartao_id: isCartao ? formData.cartao_id : null,
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
       } as Omit<Lancamento, "id">;
@@ -271,7 +269,7 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: isCartao ? formData.cartao_id : null, // <-- ADICIONE AQUI
+            cartao_id: isCartao ? formData.cartao_id : null,
             status: statusFixa,
           };
 
@@ -298,7 +296,7 @@ export function LancamentoFormDialog({
             tipo: formData.tipo,
             valor: formData.valor,
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: isCartao ? formData.cartao_id : null, // <-- ATUALIZA O CARTÃO NA EDIÇÃO
+            cartao_id: isCartao ? formData.cartao_id : null,
             data_vencimento: formData.data_vencimento,
             pago: formData.pago,
             observacoes: formData.observacoes,
@@ -326,11 +324,12 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: isCartao ? formData.cartao_id : null, // <-- ADICIONE AQUI
+            cartao_id: isCartao ? formData.cartao_id : null,
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",
           };
+
           const { error: errFixa } = await supabase
             .from("despesas_fixas")
             .insert([payloadFixa]);
@@ -466,13 +465,12 @@ export function LancamentoFormDialog({
               </Label>
               <Select
                 value={formData.forma_pagamento}
-                onValueChange={
-                  (v) =>
-                    setFormData({
-                      ...formData,
-                      forma_pagamento: v,
-                      cartao_id: null,
-                    }) // <-- LIMPA O CARTÃO AO TROCAR
+                onValueChange={(v) =>
+                  setFormData({
+                    ...formData,
+                    forma_pagamento: v,
+                    cartao_id: null,
+                  })
                 }
               >
                 <SelectTrigger>
@@ -488,7 +486,6 @@ export function LancamentoFormDialog({
               </Select>
             </div>
 
-            {/* --- INÍCIO DO NOVO BLOCO DE CARTÃO --- */}
             {isCartao && formData.tipo === "Despesa" && (
               <div className="space-y-2 p-3 bg-muted/30 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
                 <Label className="flex items-center gap-1.5 text-primary">
@@ -525,7 +522,6 @@ export function LancamentoFormDialog({
                 )}
               </div>
             )}
-            {/* --- FIM DO NOVO BLOCO DE CARTÃO --- */}
 
             <div className="space-y-2">
               <Label>
@@ -576,7 +572,6 @@ export function LancamentoFormDialog({
               </Popover>
             </div>
 
-            {/* SEÇÃO INOVADORA DE PAUSA (Só aparece ao editar uma sombra) */}
             {lancamentoToEdit?.isShadow && (
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
                 <div className="space-y-0.5">
@@ -594,33 +589,31 @@ export function LancamentoFormDialog({
               </div>
             )}
 
-            {/* SEÇÃO DE PAGAMENTO E REPETIÇÃO */}
             <div className="flex flex-col gap-2 mt-2">
-              {/* CHECKBOX DE PAGO (SÓ APARECE SE NÃO FOR CONTA FIXA) */}
-              {repeatType !== "fixa" && !lancamentoToEdit?.isShadow && (
-                <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
-                  <Checkbox
-                    id="pago"
-                    checked={formData.pago}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, pago: checked === true })
-                    }
-                  />
-                  <Label
-                    htmlFor="pago"
-                    className="cursor-pointer flex-1 font-medium"
-                  >
-                    {formData.tipo === "Receita"
-                      ? "Já foi recebido?"
-                      : "Já foi pago?"}
-                  </Label>
-                </div>
-              )}
+              {repeatType !== "fixa" &&
+                !lancamentoToEdit?.isShadow &&
+                !isCartao && (
+                  <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
+                    <Checkbox
+                      id="pago"
+                      checked={formData.pago}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, pago: checked === true })
+                      }
+                    />
+                    <Label
+                      htmlFor="pago"
+                      className="cursor-pointer flex-1 font-medium"
+                    >
+                      {formData.tipo === "Receita"
+                        ? "Já foi recebido?"
+                        : "Já foi pago?"}
+                    </Label>
+                  </div>
+                )}
 
-              {/* OPÇÕES DE REPETIÇÃO HUMANIZADAS (SÓ APARECE PARA DESPESAS NOVAS) */}
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
-                  {/* --- BLOCO POPOVER DE INFORMAÇÃO (MANTIDO AQUI) --- */}
                   <div className="flex items-center gap-2">
                     <Label className="text-muted-foreground font-bold">
                       Como essa despesa se repete?
@@ -670,7 +663,6 @@ export function LancamentoFormDialog({
                       </PopoverContent>
                     </Popover>
                   </div>
-                  {/* ---------------------------------------------- */}
 
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                     <Button
@@ -710,7 +702,6 @@ export function LancamentoFormDialog({
                     </Button>
                   </div>
 
-                  {/* CAIXA EXPANSÍVEL DO PARCELAMENTO */}
                   {repeatType === "parcelada" && (
                     <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2 mt-2">
                       <div className="space-y-2">

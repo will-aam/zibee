@@ -29,9 +29,11 @@ export async function middleware(request: NextRequest) {
 
 // middleware.ts (atualize apenas o config final)
 
+// middleware.ts (atualize apenas o config final)
+
 export const config = {
-  // Adicionamos o "swe-worker-.*" para o Next.js parar de bloquear o Service Worker
   matcher: [
-    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|sw\\.js|swe-worker-.*|manifest\\.json|workbox-.*|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",
+    // Adicionamos "worker-.*" para liberar o arquivo que estava sendo bloqueado
+    "/((?!api|_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|sw\\.js|worker-.*|swe-worker-.*|manifest\\.json|workbox-.*|.*\\.png|.*\\.jpg|.*\\.svg|.*\\.ico).*)",
   ],
 };

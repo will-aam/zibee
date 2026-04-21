@@ -97,15 +97,13 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
 
-  // PASSO 1: ESTADO DO MODAL ATUALIZADO
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
     type: "single" | "bulk" | null;
     id?: number;
-    grupoParcelaId?: string | null; // <-- NOVO: Guardar o fio invisível
+    grupoParcelaId?: string | null;
   }>({ isOpen: false, type: null });
 
-  // <-- NOVO: Estado para rastrear a escolha do usuário no Modal (excluir só 1 ou todas)
   const [excluirTodasParcelas, setExcluirTodasParcelas] = useState(false);
 
   const [isDeleting, setIsDeleting] = useState(false);
@@ -346,19 +344,15 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
     setDeleteConfig({ isOpen: true, type: "bulk" });
   };
 
-  // PASSO 2: LÓGICA DE EXCLUSÃO INTERCEPTANDO O FILO INVISÍVEL
   const handleDeleteClick = (id: number) => {
-    // Procurar o lançamento na memória para ver se tem o grupo
     const lancamentoParaExcluir = lancamentos.find((l) => l.id === id);
-
-    // Resetar o switch para false toda vez que abrir o modal
     setExcluirTodasParcelas(false);
 
     setDeleteConfig({
       isOpen: true,
       type: "single",
       id,
-      grupoParcelaId: (lancamentoParaExcluir as any)?.grupo_parcela_id || null, // Pega o fio invisível se existir
+      grupoParcelaId: (lancamentoParaExcluir as any)?.grupo_parcela_id || null,
     });
   };
 
@@ -389,15 +383,12 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
         await query;
         toast({ title: `${idsToDelete.length} excluídos.` });
         window.dispatchEvent(new Event("zibee:transaction-changed"));
-
-        // PASSO 3: NOVA LÓGICA DE EXCLUSÃO NO BANCO
       } else if (deleteConfig.type === "single" && deleteConfig.id) {
         const isShadow = deleteConfig.id < 0;
         const realId = isShadow ? -deleteConfig.id : deleteConfig.id;
 
         let query;
 
-        // Se for uma conta fixa (sombra), apagamos da tabela de matrizes
         if (isShadow) {
           const remaining = lancamentos.filter((l) => l.id !== deleteConfig.id);
           setLancamentos(remaining);
@@ -412,10 +403,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
           await query;
           toast({ title: "Conta Fixa cancelada!" });
         } else {
-          // Lançamento normal. Pode ser parcela ou não.
-          // Se ele marcou para apagar TODAS as parcelas e temos um grupo_parcela_id
           if (excluirTodasParcelas && deleteConfig.grupoParcelaId) {
-            // Tira da tela tudo que for desse grupo (apenas o que estiver no mês visível sumirá agora)
             const remaining = lancamentos.filter(
               (l: any) => l.grupo_parcela_id !== deleteConfig.grupoParcelaId,
             );
@@ -423,7 +411,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
               remaining;
 
-            // Manda o banco apagar tudo ligado àquele código
             query = supabase
               .from("lancamentos")
               .delete()
@@ -436,7 +423,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             await query;
             toast({ title: "Todas as parcelas foram excluídas!" });
           } else {
-            // Fluxo Padrão: Apaga só o item que ele clicou
             const remaining = lancamentos.filter(
               (l) => l.id !== deleteConfig.id,
             );
@@ -550,10 +536,19 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             </p>
           </div>
 
-          <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="flex items-center gap-2 w-full sm:w-auto flex-wrap">
             <div>
               <MonthSelector date={date} setDate={setDate} />
             </div>
+
+            <Button
+              onClick={() => onNavigate?.("cartoes")}
+              variant="outline"
+              className="shrink-0 h-10 rounded-xl gap-2 text-sm md:hidden"
+            >
+              <CreditCardIcon className="h-4 w-4" />
+              <span>Cartões</span>
+            </Button>
 
             <Button
               onClick={handleNovoLancamento}
@@ -561,15 +556,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               className="shrink-0 h-10 w-10 rounded-xl"
             >
               <PlusIcon className="h-5 w-5" />
-            </Button>
-
-            <Button
-              onClick={() => onNavigate?.("cartoes")}
-              size="icon"
-              className="shrink-0 h-10 w-10 rounded-xl md:hidden"
-              title="Meus Cartões"
-            >
-              <CreditCardIcon className="h-5 w-5" />
             </Button>
           </div>
         </div>
@@ -790,7 +776,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             : closeDeleteDialog()
         }
       >
-        {/* PASSO 4: MODAL VISUAL ATUALIZADO COM O SWITCH DE EXCLUSÃO EM CASCATA */}
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -810,7 +795,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             </AlertDialogDescription>
           </AlertDialogHeader>
 
-          {/* NOVA SEÇÃO: O Switch aparece só se for uma despesa parcelada do novo modelo */}
           {deleteConfig.type === "single" &&
             deleteConfig.grupoParcelaId &&
             !isShadowDeleting && (

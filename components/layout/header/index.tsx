@@ -8,6 +8,7 @@ import { authClient } from "@/lib/auth-client";
 import { DesktopHeader } from "./DesktopHeader";
 import { MobileHeader } from "./MobileHeader";
 import { MobileNav } from "./MobileNav";
+import { UpdatesModal } from "../UpdatesModal"; // Ajuste o caminho se necessário
 import ProfileAvatarModal, {
   type AvatarSelection,
 } from "@/components/profile/ProfileAvatarModal";
@@ -293,6 +294,7 @@ export default function Header({
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
       />
+      <UpdatesModal />
     </>
   );
 }

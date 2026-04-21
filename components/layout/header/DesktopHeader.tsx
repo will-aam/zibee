@@ -21,6 +21,7 @@ import {
   BriefcaseIcon,
   MoonIcon,
   SunIcon,
+  BellIcon, // <-- ADICIONADO
 } from "@heroicons/react/24/outline";
 
 import {
@@ -36,6 +37,8 @@ import { CreditCardIcon as CreditCardOutline } from "@heroicons/react/24/outline
 import { CreditCardIcon as CreditCardSolid } from "@heroicons/react/24/solid";
 
 import { useTheme } from "next-themes";
+// Importe o changelog que criamos:
+import { appUpdates } from "@/lib/changelog";
 
 const CalculatorOutline = ({ className }: { className?: string }) => (
   // @ts-expect-error Tag customizada do Ionicons
@@ -84,6 +87,30 @@ export function DesktopHeader(props: DesktopHeaderProps) {
   React.useEffect(() => {
     setMounted(true);
   }, []);
+
+  // LOGICA DO SINO DE NOVIDADES
+  const [hasNewUpdates, setHasNewUpdates] = React.useState(false);
+
+  React.useEffect(() => {
+    if (appUpdates.length > 0) {
+      const latestUpdateId = appUpdates[0].id; // Pega o ID da novidade mais recente
+      const lastSeenId = localStorage.getItem("zibee_last_seen_update");
+
+      // Se não houver nada salvo, ou se o ID salvo for diferente do mais recente, brilha!
+      if (lastSeenId !== latestUpdateId) {
+        setHasNewUpdates(true);
+      }
+    }
+  }, []);
+
+  const handleOpenUpdates = () => {
+    // Quando clicado, tira a bolinha vermelha e avisa aos outros componentes
+    if (appUpdates.length > 0) {
+      localStorage.setItem("zibee_last_seen_update", appUpdates[0].id);
+      setHasNewUpdates(false);
+      window.dispatchEvent(new Event("zibee:open-updates")); // Aviso global para abrir o Modal
+    }
+  };
 
   const navButtonClass = (isActive: boolean) =>
     `flex items-center justify-center rounded-2xl transition-transform transition-opacity duration-300 ease-in-out active:scale-[0.96] ${
@@ -200,6 +227,24 @@ export function DesktopHeader(props: DesktopHeaderProps) {
             <span className="text-base font-medium">Filtrar</span>
           </Button>
         )}
+
+        {/* --- NOVO: BOTÃO DE NOTIFICAÇÕES (SINO) --- */}
+        <Button
+          variant="ghost"
+          size="icon"
+          className="relative rounded-2xl h-11 w-11 hover:bg-muted/50"
+          onClick={handleOpenUpdates}
+          title="Novidades"
+        >
+          <BellIcon className="h-5 w-5 text-muted-foreground" />
+          {hasNewUpdates && (
+            <span className="absolute top-2.5 right-2.5 flex h-2.5 w-2.5">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border-2 border-background"></span>
+            </span>
+          )}
+        </Button>
+        {/* ------------------------------------------ */}
 
         {/* BOTÃO DE ALTERNAR TEMA */}
         <Button

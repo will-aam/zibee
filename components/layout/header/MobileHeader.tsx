@@ -13,6 +13,9 @@ import {
   EllipsisVerticalIcon,
   SparklesIcon,
 } from "@heroicons/react/24/solid";
+import { BellIcon } from "@heroicons/react/24/outline"; // <-- ADICIONADO AQUI TAMBÉM
+import { appUpdates } from "@/lib/changelog"; // <-- IMPORTANDO A FONTE DA VERDADE
+
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import {
   DropdownMenu,
@@ -151,6 +154,28 @@ export function MobileHeader({
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
+  // LOGICA DO SINO DE NOVIDADES
+  const [hasNewUpdates, setHasNewUpdates] = React.useState(false);
+
+  React.useEffect(() => {
+    if (appUpdates.length > 0) {
+      const latestUpdateId = appUpdates[0].id;
+      const lastSeenId = localStorage.getItem("zibee_last_seen_update");
+
+      if (lastSeenId !== latestUpdateId) {
+        setHasNewUpdates(true);
+      }
+    }
+  }, []);
+
+  const handleOpenUpdates = () => {
+    if (appUpdates.length > 0) {
+      localStorage.setItem("zibee_last_seen_update", appUpdates[0].id);
+      setHasNewUpdates(false);
+      window.dispatchEvent(new Event("zibee:open-updates")); // Aciona o modal futuro
+    }
+  };
+
   // FUNÇÃO DE INSTALAÇÃO NATIVA
   const triggerNativeInstall = async () => {
     if (promptInstall) {
@@ -194,6 +219,22 @@ export function MobileHeader({
           </div>
 
           <div className="flex items-center gap-1">
+            {/* --- NOVO: SINO DO MOBILE --- */}
+            <button
+              onClick={handleOpenUpdates}
+              className="relative shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/20"
+              title="Novidades"
+            >
+              <BellIcon className="h-6 w-6 text-white" />
+              {hasNewUpdates && (
+                <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
+                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-primary"></span>
+                </span>
+              )}
+            </button>
+            {/* -------------------------- */}
+
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button

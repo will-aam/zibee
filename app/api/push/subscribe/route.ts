@@ -1,40 +1,17 @@
 // app/api/push/subscribe/route.ts
 import { NextResponse } from "next/server";
-import { createServerClient } from "@supabase/ssr";
-import { cookies } from "next/headers";
+import { createClient } from "@supabase/supabase-js";
+import { auth } from "@/lib/auth"; // <-- Importe a configuração do seu servidor Better-Auth
+import { headers } from "next/headers";
 
 export async function POST(request: Request) {
   try {
-    const cookieStore = await cookies();
+    // 1. Pega a sessão usando o Better-Auth
+    const session = await auth.api.getSession({
+      headers: await headers(),
+    });
 
-    // Cria o cliente do Supabase usando o novo padrão SSR
-    const supabase = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      {
-        cookies: {
-          getAll() {
-            return cookieStore.getAll();
-          },
-          setAll(cookiesToSet) {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) => {
-                cookieStore.set(name, value, options);
-              });
-            } catch (error) {
-              // Ignora erros caso seja chamado de um contexto somente leitura
-            }
-          },
-        },
-      },
-    );
-
-    // Pega a sessão do usuário
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
+    if (!session || !session.user) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
@@ -48,8 +25,14 @@ export async function POST(request: Request) {
       );
     }
 
-    // Salva ou atualiza a assinatura no Supabase
-    const { error } = await supabase.from("push_subscriptions").upsert(
+    // 2. Conecta ao Supabase usando a chave Admin (bypassa o RLS)
+    const supabaseAdmin = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    );
+
+    // 3. Salva a assinatura com o ID em texto do Better-Auth
+    const { error } = await supabaseAdmin.from("push_subscriptions").upsert(
       {
         user_id: session.user.id,
         endpoint: endpoint,

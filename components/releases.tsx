@@ -97,11 +97,17 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
 
+  // PASSO 1: ESTADO DO MODAL ATUALIZADO
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
     type: "single" | "bulk" | null;
     id?: number;
+    grupoParcelaId?: string | null; // <-- NOVO: Guardar o fio invisível
   }>({ isOpen: false, type: null });
+
+  // <-- NOVO: Estado para rastrear a escolha do usuário no Modal (excluir só 1 ou todas)
+  const [excluirTodasParcelas, setExcluirTodasParcelas] = useState(false);
+
   const [isDeleting, setIsDeleting] = useState(false);
 
   useEffect(() => {
@@ -340,8 +346,20 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
     setDeleteConfig({ isOpen: true, type: "bulk" });
   };
 
+  // PASSO 2: LÓGICA DE EXCLUSÃO INTERCEPTANDO O FILO INVISÍVEL
   const handleDeleteClick = (id: number) => {
-    setDeleteConfig({ isOpen: true, type: "single", id });
+    // Procurar o lançamento na memória para ver se tem o grupo
+    const lancamentoParaExcluir = lancamentos.find((l) => l.id === id);
+
+    // Resetar o switch para false toda vez que abrir o modal
+    setExcluirTodasParcelas(false);
+
+    setDeleteConfig({
+      isOpen: true,
+      type: "single",
+      id,
+      grupoParcelaId: (lancamentoParaExcluir as any)?.grupo_parcela_id || null, // Pega o fio invisível se existir
+    });
   };
 
   const closeDeleteDialog = () => {
@@ -371,30 +389,72 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
         await query;
         toast({ title: `${idsToDelete.length} excluídos.` });
         window.dispatchEvent(new Event("zibee:transaction-changed"));
+
+        // PASSO 3: NOVA LÓGICA DE EXCLUSÃO NO BANCO
       } else if (deleteConfig.type === "single" && deleteConfig.id) {
         const isShadow = deleteConfig.id < 0;
         const realId = isShadow ? -deleteConfig.id : deleteConfig.id;
 
-        const remaining = lancamentos.filter((l) => l.id !== deleteConfig.id);
-        setLancamentos(remaining);
-        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
-          remaining;
-
         let query;
+
+        // Se for uma conta fixa (sombra), apagamos da tabela de matrizes
         if (isShadow) {
+          const remaining = lancamentos.filter((l) => l.id !== deleteConfig.id);
+          setLancamentos(remaining);
+          memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+            remaining;
+
           query = supabase.from("despesas_fixas").delete().eq("id", realId);
+          if (activeContext === "grupo" && currentGroupId)
+            query = query.eq("grupo_id", currentGroupId);
+          else query = query.eq("user_id", userId).is("grupo_id", null);
+
+          await query;
+          toast({ title: "Conta Fixa cancelada!" });
         } else {
-          query = supabase.from("lancamentos").delete().eq("id", realId);
+          // Lançamento normal. Pode ser parcela ou não.
+          // Se ele marcou para apagar TODAS as parcelas e temos um grupo_parcela_id
+          if (excluirTodasParcelas && deleteConfig.grupoParcelaId) {
+            // Tira da tela tudo que for desse grupo (apenas o que estiver no mês visível sumirá agora)
+            const remaining = lancamentos.filter(
+              (l: any) => l.grupo_parcela_id !== deleteConfig.grupoParcelaId,
+            );
+            setLancamentos(remaining);
+            memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+              remaining;
+
+            // Manda o banco apagar tudo ligado àquele código
+            query = supabase
+              .from("lancamentos")
+              .delete()
+              .eq("grupo_parcela_id", deleteConfig.grupoParcelaId);
+
+            if (activeContext === "grupo" && currentGroupId)
+              query = query.eq("grupo_id", currentGroupId);
+            else query = query.eq("user_id", userId).is("grupo_id", null);
+
+            await query;
+            toast({ title: "Todas as parcelas foram excluídas!" });
+          } else {
+            // Fluxo Padrão: Apaga só o item que ele clicou
+            const remaining = lancamentos.filter(
+              (l) => l.id !== deleteConfig.id,
+            );
+            setLancamentos(remaining);
+            memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
+              remaining;
+
+            query = supabase.from("lancamentos").delete().eq("id", realId);
+
+            if (activeContext === "grupo" && currentGroupId)
+              query = query.eq("grupo_id", currentGroupId);
+            else query = query.eq("user_id", userId).is("grupo_id", null);
+
+            await query;
+            toast({ title: "Excluído com sucesso." });
+          }
         }
 
-        if (activeContext === "grupo" && currentGroupId)
-          query = query.eq("grupo_id", currentGroupId);
-        else query = query.eq("user_id", userId).is("grupo_id", null);
-
-        await query;
-        toast({
-          title: isShadow ? "Conta Fixa cancelada!" : "Excluído com sucesso",
-        });
         window.dispatchEvent(new Event("zibee:transaction-changed"));
       }
     } catch {
@@ -730,6 +790,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
             : closeDeleteDialog()
         }
       >
+        {/* PASSO 4: MODAL VISUAL ATUALIZADO COM O SWITCH DE EXCLUSÃO EM CASCATA */}
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
@@ -748,6 +809,27 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
                   : "Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita."}
             </AlertDialogDescription>
           </AlertDialogHeader>
+
+          {/* NOVA SEÇÃO: O Switch aparece só se for uma despesa parcelada do novo modelo */}
+          {deleteConfig.type === "single" &&
+            deleteConfig.grupoParcelaId &&
+            !isShadowDeleting && (
+              <div className="bg-muted/30 p-4 rounded-xl border border-border/50 flex items-center justify-between mt-2">
+                <div className="space-y-0.5">
+                  <Label className="text-sm font-bold text-foreground">
+                    Excluir todas as parcelas?
+                  </Label>
+                  <p className="text-xs text-muted-foreground">
+                    Apagará todos os lançamentos futuros vinculados a esta
+                    compra.
+                  </p>
+                </div>
+                <Switch
+                  checked={excluirTodasParcelas}
+                  onCheckedChange={setExcluirTodasParcelas}
+                />
+              </div>
+            )}
 
           <AlertDialogFooter>
             <AlertDialogCancel disabled={isDeleting}>

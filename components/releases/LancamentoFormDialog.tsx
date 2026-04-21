@@ -153,20 +153,19 @@ export function LancamentoFormDialog({
     return target;
   };
 
-  // PASSO 1: A MATEMÁTICA DAS PARCELAS CORRIGIDA
   const createRecurrenceItems = (basePayload: Omit<Lancamento, "id">) => {
     const items: Omit<Lancamento, "id">[] = [];
     const baseDate = parseDateLocal(basePayload.data_vencimento);
 
     if (recurrenceEndType === "ocorrencias") {
       const total = recurrenceOccurrences;
-      const valorParcela = Number(basePayload.valor) / total; // <-- FAZ A DIVISÃO AQUI
+      const valorParcela = Number(basePayload.valor) / total;
 
       for (let i = 1; i <= total; i++) {
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
           ...basePayload,
-          valor: valorParcela, // <-- APLICA O VALOR DIVIDIDO AQUI
+          valor: valorParcela,
           data_vencimento: formatDateLocal(nextDate),
           pago: i === 1 ? formData.pago || false : false,
           parcela_atual: i,
@@ -190,7 +189,6 @@ export function LancamentoFormDialog({
         parcelasCount++;
       }
 
-      // Calcula o valor apenas se houver parcelas para evitar divisão por zero
       const valorParcela =
         parcelasCount > 0
           ? Number(basePayload.valor) / parcelasCount
@@ -200,7 +198,7 @@ export function LancamentoFormDialog({
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
           ...basePayload,
-          valor: valorParcela, // <-- APLICA O VALOR DIVIDIDO AQUI
+          valor: valorParcela,
           data_vencimento: formatDateLocal(nextDate),
           pago: i === 1 ? formData.pago || false : false,
           parcela_atual: i,
@@ -273,15 +271,13 @@ export function LancamentoFormDialog({
 
       if (lancamentoToEdit) {
         if (lancamentoToEdit.isShadow) {
-          // PASSO 2: O FLUXO INTELIGENTE DE PAGAMENTO DE SOMBRAS
           if (formData.pago || isCartao) {
             const materializadoPayload = {
               ...basePayload,
-              pago: isCartao ? false : true, // Se for cartão vai pra fatura (false), se for Pix já nasce pago (true)
+              pago: isCartao ? false : true,
               conta_fixa_id: lancamentoToEdit.conta_fixa_id,
             };
 
-            // Removemos lixos que não vão pro banco
             delete (materializadoPayload as any).isShadow;
             delete (materializadoPayload as any).status_fixa;
 
@@ -290,7 +286,6 @@ export function LancamentoFormDialog({
               title: isCartao ? "Lançado na fatura!" : "Conta do mês paga!",
             });
           } else {
-            // Se não marcou como pago e não é cartão, atualiza a regra matriz blindando o cartão
             const dia = parseInt(formData.data_vencimento!.split("-")[2]);
             const updateMasterPayload = {
               nome: formData.descricao,
@@ -298,7 +293,7 @@ export function LancamentoFormDialog({
               dia_vencimento: dia,
               categoria: formData.categoria?.trim(),
               forma_pagamento: formData.forma_pagamento?.trim(),
-              cartao_id: null, // <-- BLINDAGEM: A matriz NUNCA terá um cartão atrelado
+              cartao_id: null,
               status: statusFixa,
             };
 
@@ -346,7 +341,6 @@ export function LancamentoFormDialog({
           toast({ title: "Lançamento Atualizado!" });
         }
       } else {
-        // CRIAÇÃO DE NOVA CONTA FIXA
         if (repeatType === "fixa" && formData.tipo === "Despesa") {
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const payloadFixa = {
@@ -355,7 +349,7 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: null, // <-- BLINDAGEM: Não deixa cadastrar matriz com cartão
+            cartao_id: null,
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",
@@ -368,7 +362,17 @@ export function LancamentoFormDialog({
 
           toast({ title: "Conta Fixa Cadastrada com Sucesso!" });
         } else if (repeatType === "parcelada" && formData.tipo === "Despesa") {
-          const recurrenceItems = createRecurrenceItems(basePayload);
+          // GERA O FIO INVISÍVEL: Um ID único para amarrar todas essas parcelas
+          const grupoParcelaId = `parcela-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+
+          // Anexa o grupo_parcela_id no payload base
+          const payloadComGrupo = {
+            ...basePayload,
+            grupo_parcela_id: grupoParcelaId,
+          };
+
+          // Passa o payload com o grupo para a função que gera as parcelas
+          const recurrenceItems = createRecurrenceItems(payloadComGrupo);
           await supabase.from("lancamentos").insert(recurrenceItems);
           toast({ title: "Parcelas Criadas com Sucesso!" });
         } else {
@@ -621,7 +625,6 @@ export function LancamentoFormDialog({
             )}
 
             <div className="flex flex-col gap-2 mt-2">
-              {/* PASSO 3: LIBERAR O CHECKBOX PARA A SOMBRA (Removido o !lancamentoToEdit?.isShadow) */}
               {repeatType !== "fixa" && !isCartao && (
                 <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
                   <Checkbox

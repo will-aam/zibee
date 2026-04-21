@@ -7,6 +7,7 @@ import {
   PlusIcon,
   ArrowPathIcon,
   TrashIcon,
+  BellAlertIcon, // <-- ADICIONADO
 } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
@@ -27,6 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { cn } from "@/lib/utils"; // <-- ADICIONADO (Necessário para o botão de notificação)
 
 interface ConfiguracoesProps {
   onNavigate?: (tab: string) => void;
@@ -76,6 +78,22 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
   const [isUpdatingCategoria, setIsUpdatingCategoria] = useState(false);
   const [isDeletingCategoria, setIsDeletingCategoria] = useState(false);
 
+  // ESTADOS DE NOTIFICAÇÃO
+  const [isSubscribing, setIsSubscribing] = useState(false);
+  const [isSubscribed, setIsSubscribed] = useState(false);
+
+  // Verifica o status da inscrição quando a página carrega
+  useEffect(() => {
+    async function checkSubscription() {
+      if ("serviceWorker" in navigator && "PushManager" in window) {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        setIsSubscribed(!!subscription);
+      }
+    }
+    checkSubscription();
+  }, []);
+
   const fetchData = useCallback(
     async (forceUpdate = false) => {
       if (!userId) return;
@@ -111,6 +129,83 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
   useEffect(() => {
     fetchData();
   }, [fetchData]);
+
+  // --- FUNÇÃO PARA ATIVAR NOTIFICAÇÕES ---
+  const urlBase64ToUint8Array = (base64String: string) => {
+    const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
+    const base64 = (base64String + padding)
+      .replace(/\-/g, "+")
+      .replace(/_/g, "/");
+
+    const rawData = window.atob(base64);
+    const outputArray = new Uint8Array(rawData.length);
+
+    for (let i = 0; i < rawData.length; ++i) {
+      outputArray[i] = rawData.charCodeAt(i);
+    }
+    return outputArray;
+  };
+
+  const handleSubscribePush = async () => {
+    setIsSubscribing(true);
+    try {
+      // 1. Pede permissão ao usuário
+      const permission = await Notification.requestPermission();
+      if (permission !== "granted") {
+        toast({
+          title: "Permissão negada para notificações.",
+          variant: "destructive",
+        });
+        setIsSubscribing(false);
+        return;
+      }
+
+      // 2. Registra no Service Worker
+      const registration = await navigator.serviceWorker.ready;
+
+      const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      if (!publicVapidKey) {
+        toast({
+          title: "Erro",
+          description: "Chave VAPID não configurada no sistema.",
+          variant: "destructive",
+        });
+        return;
+      }
+
+      // 3. Gera a assinatura digital
+      const subscription = await registration.pushManager.subscribe({
+        userVisibleOnly: true,
+        applicationServerKey: urlBase64ToUint8Array(publicVapidKey),
+      });
+
+      // 4. Envia para a API que criamos
+      const response = await fetch("/api/push/subscribe", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ subscription }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Falha ao salvar a assinatura no servidor");
+      }
+
+      setIsSubscribed(true);
+      toast({
+        title: "Notificações Ativadas!",
+        description: "Você receberá alertas do Zibee.",
+      });
+    } catch (error: any) {
+      console.error("Erro no Push:", error);
+      toast({
+        title: "Erro ao ativar notificações",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubscribing(false);
+    }
+  };
 
   // --- FUNÇÕES DE ADIÇÃO ---
   const handleAddCategoria = async () => {
@@ -318,6 +413,53 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
                     </span>
                   </button>
                 ))
+              )}
+            </div>
+          </section>
+
+          <hr className="border-border/50" />
+
+          {/* SESSÃO: NOTIFICAÇÕES PWA */}
+          <section className="space-y-4 bg-muted/20 p-5 rounded-2xl border border-border/50">
+            <div className="flex items-center gap-2 text-foreground">
+              <BellAlertIcon className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight leading-none">
+                  Notificações do Sistema
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Receba avisos importantes como o fechamento da fatura.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                onClick={handleSubscribePush}
+                disabled={isSubscribing || isSubscribed}
+                className={cn(
+                  "h-11 rounded-xl px-6 font-semibold shadow-sm",
+                  isSubscribed
+                    ? "bg-green-500/10 text-green-600 hover:bg-green-500/10 hover:text-green-600 cursor-default opacity-100"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                )}
+              >
+                {isSubscribing ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 animate-spin mr-2" />{" "}
+                    Ativando...
+                  </>
+                ) : isSubscribed ? (
+                  "Notificações Ativadas"
+                ) : (
+                  "Permitir Notificações"
+                )}
+              </Button>
+              {!isSubscribed && (
+                <p className="text-[11px] text-muted-foreground mt-2 max-w-sm">
+                  Ao clicar, o navegador pedirá sua autorização. Funciona no
+                  Android, Windows e iOS (16.4+).
+                </p>
               )}
             </div>
           </section>

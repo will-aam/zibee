@@ -7,6 +7,7 @@ import { Analytics } from "@vercel/analytics/react";
 import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { PWAUpdater } from "@/components/PWAUpdater";
+import { sora } from "@/lib/fonts";
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -60,7 +61,7 @@ export default function RootLayout({
       {/* --- FIM DA TAG HEAD --- */}
 
       <body
-        className={`${geist.variable} ${geistMono.variable} font-sans antialiased bg-background text-foreground`}
+        className={`${sora.className} bg-background text-foreground antialiased`}
       >
         <ThemeProvider
           attribute="class"

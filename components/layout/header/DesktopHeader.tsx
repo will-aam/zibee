@@ -2,7 +2,7 @@
 
 import * as React from "react";
 import Image from "next/image";
-import { Sora, Audiowide } from "next/font/google";
+import { sora, audiowide } from "@/lib/fonts";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -36,9 +36,6 @@ import { CreditCardIcon as CreditCardOutline } from "@heroicons/react/24/outline
 import { CreditCardIcon as CreditCardSolid } from "@heroicons/react/24/solid";
 
 import { useTheme } from "next-themes";
-
-const sora = Sora({ subsets: ["latin"] });
-const audiowide = Audiowide({ weight: "400", subsets: ["latin"] });
 
 const CalculatorOutline = ({ className }: { className?: string }) => (
   // @ts-expect-error Tag customizada do Ionicons

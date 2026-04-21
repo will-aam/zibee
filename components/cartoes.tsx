@@ -279,7 +279,7 @@ export default function Cartoes() {
 
       // CÁLCULO DO LIMITE (Idêntico ao banco)
       const utilizado = lancamentos
-        .filter((l) => l.cartao_id === cartao.id)
+        .filter((l) => l.cartao_id === cartao.id && l.pago === false) // <-- O SEGREDO ESTÁ AQUI
         .reduce((acc, curr) => acc + Number(curr.valor), 0);
 
       const disponivel = cartao.limite

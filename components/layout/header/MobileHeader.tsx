@@ -1,7 +1,7 @@
 "use client";
 
 import * as React from "react";
-import { Sora } from "next/font/google";
+import { sora } from "@/lib/fonts";
 import {
   FunnelIcon,
   Cog6ToothIcon,
@@ -30,8 +30,6 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
-
-const sora = Sora({ subsets: ["latin"] });
 
 // --- COMPONENTE IONIC DA CALCULADORA (SOLID E ALINHADO) ---
 const CalculatorIonicSolid = ({ className }: { className?: string }) => (

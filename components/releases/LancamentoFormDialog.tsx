@@ -153,16 +153,20 @@ export function LancamentoFormDialog({
     return target;
   };
 
+  // PASSO 1: A MATEMÁTICA DAS PARCELAS CORRIGIDA
   const createRecurrenceItems = (basePayload: Omit<Lancamento, "id">) => {
     const items: Omit<Lancamento, "id">[] = [];
     const baseDate = parseDateLocal(basePayload.data_vencimento);
 
     if (recurrenceEndType === "ocorrencias") {
       const total = recurrenceOccurrences;
+      const valorParcela = Number(basePayload.valor) / total; // <-- FAZ A DIVISÃO AQUI
+
       for (let i = 1; i <= total; i++) {
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
           ...basePayload,
+          valor: valorParcela, // <-- APLICA O VALOR DIVIDIDO AQUI
           data_vencimento: formatDateLocal(nextDate),
           pago: i === 1 ? formData.pago || false : false,
           parcela_atual: i,
@@ -186,10 +190,17 @@ export function LancamentoFormDialog({
         parcelasCount++;
       }
 
+      // Calcula o valor apenas se houver parcelas para evitar divisão por zero
+      const valorParcela =
+        parcelasCount > 0
+          ? Number(basePayload.valor) / parcelasCount
+          : Number(basePayload.valor);
+
       for (let i = 1; i <= parcelasCount; i++) {
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
           ...basePayload,
+          valor: valorParcela, // <-- APLICA O VALOR DIVIDIDO AQUI
           data_vencimento: formatDateLocal(nextDate),
           pago: i === 1 ? formData.pago || false : false,
           parcela_atual: i,
@@ -262,33 +273,52 @@ export function LancamentoFormDialog({
 
       if (lancamentoToEdit) {
         if (lancamentoToEdit.isShadow) {
-          const dia = parseInt(formData.data_vencimento!.split("-")[2]);
-          const updateMasterPayload = {
-            nome: formData.descricao,
-            valor: formData.valor,
-            dia_vencimento: dia,
-            categoria: formData.categoria?.trim(),
-            forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: isCartao ? formData.cartao_id : null,
-            status: statusFixa,
-          };
+          // PASSO 2: O FLUXO INTELIGENTE DE PAGAMENTO DE SOMBRAS
+          if (formData.pago || isCartao) {
+            const materializadoPayload = {
+              ...basePayload,
+              pago: isCartao ? false : true, // Se for cartão vai pra fatura (false), se for Pix já nasce pago (true)
+              conta_fixa_id: lancamentoToEdit.conta_fixa_id,
+            };
 
-          let query = supabase
-            .from("despesas_fixas")
-            .update(updateMasterPayload)
-            .eq("id", lancamentoToEdit.conta_fixa_id);
+            // Removemos lixos que não vão pro banco
+            delete (materializadoPayload as any).isShadow;
+            delete (materializadoPayload as any).status_fixa;
 
-          if (activeContext === "grupo" && groupId)
-            query = query.eq("grupo_id", groupId);
-          else query = query.eq("user_id", userId).is("grupo_id", null);
+            await supabase.from("lancamentos").insert([materializadoPayload]);
+            toast({
+              title: isCartao ? "Lançado na fatura!" : "Conta do mês paga!",
+            });
+          } else {
+            // Se não marcou como pago e não é cartão, atualiza a regra matriz blindando o cartão
+            const dia = parseInt(formData.data_vencimento!.split("-")[2]);
+            const updateMasterPayload = {
+              nome: formData.descricao,
+              valor: formData.valor,
+              dia_vencimento: dia,
+              categoria: formData.categoria?.trim(),
+              forma_pagamento: formData.forma_pagamento?.trim(),
+              cartao_id: null, // <-- BLINDAGEM: A matriz NUNCA terá um cartão atrelado
+              status: statusFixa,
+            };
 
-          await query;
-          toast({
-            title:
-              statusFixa === "pausado"
-                ? "Conta Fixa Pausada!"
-                : "Conta Fixa Atualizada!",
-          });
+            let query = supabase
+              .from("despesas_fixas")
+              .update(updateMasterPayload)
+              .eq("id", lancamentoToEdit.conta_fixa_id);
+
+            if (activeContext === "grupo" && groupId)
+              query = query.eq("grupo_id", groupId);
+            else query = query.eq("user_id", userId).is("grupo_id", null);
+
+            await query;
+            toast({
+              title:
+                statusFixa === "pausado"
+                  ? "Conta Fixa Pausada!"
+                  : "Conta Fixa Atualizada!",
+            });
+          }
         } else {
           const updatePayload = {
             descricao: formData.descricao,
@@ -316,6 +346,7 @@ export function LancamentoFormDialog({
           toast({ title: "Lançamento Atualizado!" });
         }
       } else {
+        // CRIAÇÃO DE NOVA CONTA FIXA
         if (repeatType === "fixa" && formData.tipo === "Despesa") {
           const dia = parseInt(formData.data_vencimento!.split("-")[2]);
           const payloadFixa = {
@@ -324,7 +355,7 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: isCartao ? formData.cartao_id : null,
+            cartao_id: null, // <-- BLINDAGEM: Não deixa cadastrar matriz com cartão
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",
@@ -590,27 +621,26 @@ export function LancamentoFormDialog({
             )}
 
             <div className="flex flex-col gap-2 mt-2">
-              {repeatType !== "fixa" &&
-                !lancamentoToEdit?.isShadow &&
-                !isCartao && (
-                  <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
-                    <Checkbox
-                      id="pago"
-                      checked={formData.pago}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, pago: checked === true })
-                      }
-                    />
-                    <Label
-                      htmlFor="pago"
-                      className="cursor-pointer flex-1 font-medium"
-                    >
-                      {formData.tipo === "Receita"
-                        ? "Já foi recebido?"
-                        : "Já foi pago?"}
-                    </Label>
-                  </div>
-                )}
+              {/* PASSO 3: LIBERAR O CHECKBOX PARA A SOMBRA (Removido o !lancamentoToEdit?.isShadow) */}
+              {repeatType !== "fixa" && !isCartao && (
+                <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
+                  <Checkbox
+                    id="pago"
+                    checked={formData.pago}
+                    onCheckedChange={(checked) =>
+                      setFormData({ ...formData, pago: checked === true })
+                    }
+                  />
+                  <Label
+                    htmlFor="pago"
+                    className="cursor-pointer flex-1 font-medium"
+                  >
+                    {formData.tipo === "Receita"
+                      ? "Já foi recebido?"
+                      : "Já foi pago?"}
+                  </Label>
+                </div>
+              )}
 
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">

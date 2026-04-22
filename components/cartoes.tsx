@@ -277,10 +277,11 @@ export default function Cartoes() {
         0,
       );
 
-      // CÁLCULO DO LIMITE (Idêntico ao banco)
-      const utilizado = lancamentos
-        .filter((l) => l.cartao_id === cartao.id && l.pago === false) // <-- O SEGREDO ESTÁ AQUI
-        .reduce((acc, curr) => acc + Number(curr.valor), 0);
+      const utilizado =
+        lancamentos
+          .filter((l) => l.cartao_id === cartao.id && l.pago === false)
+          .reduce((acc, curr) => acc + Number(curr.valor), 0) +
+        sombrasFixas.reduce((acc, curr) => acc + Number(curr.valor), 0);
 
       const disponivel = cartao.limite
         ? Math.max(0, cartao.limite - utilizado)

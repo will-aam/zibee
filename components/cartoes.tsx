@@ -209,6 +209,8 @@ export default function Cartoes() {
       }
       setIsModalOpen(false);
       fetchData();
+
+      window.dispatchEvent(new Event("zibee:cards-changed"));
     } catch (error: any) {
       toast({ title: "Erro ao salvar", variant: "destructive" });
     }
@@ -221,6 +223,7 @@ export default function Cartoes() {
       toast({ title: "Cartão removido." });
       setDeleteConfig({ isOpen: false, id: null });
       fetchData();
+      window.dispatchEvent(new Event("zibee:cards-changed"));
     } catch (error) {
       toast({ title: "Erro ao excluir", variant: "destructive" });
     }

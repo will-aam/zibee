@@ -283,27 +283,34 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
     fetchAllData();
   }, [fetchAllData]);
 
-  // --- PASSO 2: ESCUTA DE CATEGORIAS CRIADAS ---
+  // --- ESCUTAS GLOBAIS DE ATUALIZAÇÃO ---
   useEffect(() => {
+    // 1. O que fazer quando uma categoria mudar:
     const handleCategoriesChanged = () => {
-      // 1. Limpa o cache de categorias do contexto atual para forçar a busca no banco
       delete memoryCache.categorias[activeContext];
-
-      // 2. Refaz a busca invisivelmente
       fetchAllData();
     };
 
+    // 2. O que fazer quando um cartão mudar:
+    const handleCardsChanged = () => {
+      delete memoryCache.cartoes[activeContext]; // Limpa a memória velha dos cartões
+      fetchAllData(); // Busca a lista nova silenciosamente
+    };
+
+    // Ligando os "ouvidos"
     window.addEventListener(
       "zibee:categories-changed",
       handleCategoriesChanged,
     );
+    window.addEventListener("zibee:cards-changed", handleCardsChanged);
 
-    // Remove o listener quando o componente for desmontado para evitar duplicações
+    // Desligando quando sair da tela
     return () => {
       window.removeEventListener(
         "zibee:categories-changed",
         handleCategoriesChanged,
       );
+      window.removeEventListener("zibee:cards-changed", handleCardsChanged);
     };
   }, [activeContext, fetchAllData]);
   // ----------------------------------------------

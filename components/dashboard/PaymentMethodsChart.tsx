@@ -50,20 +50,35 @@ export function PaymentMethodsChart({
       .sort((a, b) => b.value - a.value); // Ordena do maior pro menor
   }, [despesas, fixas]);
 
+  // Função que customiza o texto da legenda para incluir o valor
+  const renderLegendText = (value: string, entry: any) => {
+    const valorFormatado = hidden ? "****" : formatMoney(entry.payload.value);
+    return (
+      <span className="text-foreground ml-1">
+        {value}{" "}
+        <span className="font-bold text-muted-foreground ml-1">
+          {valorFormatado}
+        </span>
+      </span>
+    );
+  };
+
   return (
     <div className="h-full flex flex-col">
       <h2 className="text-lg font-semibold flex items-center gap-2 text-foreground/80 mb-6">
         <CreditCardIcon className="h-5 w-5 text-indigo-500" /> Formas de
         Pagamento
       </h2>
-      <div className="h-[250px] w-full">
+
+      {/* Ajustamos a altura para garantir que a legenda com valores caiba no mobile */}
+      <div className="h-[280px] w-full">
         {data.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <PieChart>
               <Pie
                 data={data}
                 cx="50%"
-                cy="50%"
+                cy="45%" // Subimos o gráfico um pouco para dar mais espaço à legenda
                 innerRadius={60}
                 outerRadius={80}
                 paddingAngle={5}
@@ -92,9 +107,12 @@ export function PaymentMethodsChart({
               />
               <Legend
                 verticalAlign="bottom"
-                height={36}
                 iconType="circle"
-                wrapperStyle={{ fontSize: "12px" }}
+                formatter={renderLegendText} // <-- Aplicamos o texto customizado aqui
+                wrapperStyle={{
+                  fontSize: "12px",
+                  paddingTop: "20px", // Dá um respiro entre o gráfico e a legenda
+                }}
               />
             </PieChart>
           </ResponsiveContainer>

@@ -295,7 +295,10 @@ export default function Header({
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
       />
-      <UpdatesModal />
+
+      {/* ALTERAÇÃO AQUI: Passamos o onNavigate para o Modal */}
+      <UpdatesModal onNavigate={onNavigate} />
+
       <PushPermissionModal />
     </>
   );

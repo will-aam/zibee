@@ -6,7 +6,7 @@ import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 
-// IMPORTANDO OS NOVOS COMPONENTES
+// IMPORTANDO OS COMPONENTES
 import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
 import { ExpenseEvolutionChart } from "@/components/dashboard/ExpenseEvolutionChart";
 import { ExpenseCategories } from "@/components/dashboard/ExpenseCategories";
@@ -86,17 +86,21 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const readRange = useCallback(() => {
     if (typeof window === "undefined")
       return { from: null, to: null, key: `all_${activeContext}` };
+
     const from = localStorage.getItem(STORAGE_FROM_KEY);
     const to = localStorage.getItem(STORAGE_TO_KEY);
+
     if (from || to)
       return {
         from: from || null,
         to: to || null,
         key: `${from}_${to}_${activeContext}`,
       };
+
     const mes = localStorage.getItem(STORAGE_MONTH_KEY) || mesSelecionado;
     if (!mes || mes === "todos")
       return { from: null, to: null, key: `all_${activeContext}` };
+
     const range = monthToRange(mes);
     return { ...range, key: `${range.from}_${range.to}_${activeContext}` };
   }, [mesSelecionado, activeContext]);
@@ -139,17 +143,20 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   const fetchDashboardData = useCallback(async () => {
     if (!userId) return;
+
     try {
       const { from, to, key } = readRange();
       if (!dashboardCache.dataByRange[key]) setLoading(true);
 
       let groupId = null;
+
       if (activeContext === "grupo") {
         const { data: myGroup } = await supabase
           .from("grupos")
           .select("id")
           .eq("criador_id", userId)
           .maybeSingle();
+
         if (myGroup) groupId = myGroup.id;
         else {
           const { data: membership } = await supabase
@@ -160,11 +167,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             .maybeSingle();
           if (membership) groupId = membership.grupo_id;
         }
+
         if (!groupId) {
           setLoading(false);
           return;
         }
       }
+
       setCurrentGroupId(groupId);
 
       let queryDespesasVariaveis = supabase
@@ -172,11 +181,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .select("*")
         .eq("tipo", "Despesa")
         .is("conta_fixa_id", null);
+
       let queryReceitas = supabase
         .from("lancamentos")
         .select("*")
         .eq("tipo", "Receita")
         .eq("pago", true);
+
       let queryVencimentos = supabase
         .from("lancamentos")
         .select("*")
@@ -185,11 +196,13 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .is("cartao_id", null)
         .order("data_vencimento", { ascending: true })
         .limit(5);
+
       let queryFixasDashboard = supabase
         .from("despesas_fixas")
         .select("*")
         .eq("status", "ativo")
         .order("dia_vencimento", { ascending: true });
+
       let queryCartoes = supabase.from("cartoes_credito").select("*");
 
       if (activeContext === "grupo" && groupId) {
@@ -260,10 +273,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         variaveisData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       const fetchedTotalRec =
         receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+
       const dadosFixasValidos = fixasData || [];
       const fetchedTotalFixas =
         dadosFixasValidos.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
         0;
+
       const todosOsGastos = [...fetchedDespesasBrutas, ...dadosFixasValidos];
 
       const categoriasMap = todosOsGastos.reduce((acc: any, curr) => {
@@ -275,73 +290,84 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       }, {});
 
       const fetchedCategoriasChart = Object.entries(categoriasMap || {})
-        .map(([name, data]: any) => {
-          return {
-            name,
-            value: Number(data.total),
-            items: data.items.sort(
-              (a: any, b: any) =>
-                new Date(a.data_vencimento || a.dia_vencimento).getTime() -
-                new Date(b.data_vencimento || b.dia_vencimento).getTime(),
-            ),
-          };
-        })
+        .map(([name, data]: any) => ({
+          name,
+          value: Number(data.total),
+          items: data.items.sort(
+            (a: any, b: any) =>
+              new Date(a.data_vencimento || a.dia_vencimento).getTime() -
+              new Date(b.data_vencimento || b.dia_vencimento).getTime(),
+          ),
+        }))
         .sort((a, b) => b.value - a.value)
         .slice(0, 6);
 
+      // --- Vencimentos + Faturas de Cartão (injeção) ---
       let fetchedVencimentos = vencimentosData || [];
+
       if (cartoesData && cartoesData.length > 0) {
         const faturasInjetaveis: any[] = [];
+
         cartoesData.forEach((cartao) => {
           const comprasPendentesCartao = todosOsGastos.filter(
             (d) => d.cartao_id === cartao.id && !d.pago,
           );
-          if (comprasPendentesCartao.length > 0) {
-            const faturasAgrupadas: Record<string, number> = {};
-            comprasPendentesCartao.forEach((compra) => {
-              let dataBaseStr = compra.data_vencimento;
-              if (!dataBaseStr) {
-                const [anoF, mesF] = (
-                  readRange().from || getCurrentYearMonth() + "-01"
-                ).split("-");
-                dataBaseStr = `${anoF}-${mesF}-${String(compra.dia_vencimento).padStart(2, "0")}`;
-              }
-              const dataCompra = new Date(dataBaseStr + "T12:00:00");
-              if (isNaN(dataCompra.getTime())) return;
-              let mesFatura = dataCompra.getMonth();
-              let anoFatura = dataCompra.getFullYear();
-              if (dataCompra.getDate() > cartao.dia_fechamento) mesFatura++;
-              if (cartao.dia_vencimento <= cartao.dia_fechamento) mesFatura++;
-              if (mesFatura > 11) {
-                mesFatura = 0;
-                anoFatura++;
-              }
-              const dataVencimentoReal = new Date(
-                anoFatura,
-                mesFatura,
-                cartao.dia_vencimento,
-                12,
-                0,
-                0,
-              );
-              const chaveIso = dataVencimentoReal.toISOString();
-              if (!faturasAgrupadas[chaveIso]) faturasAgrupadas[chaveIso] = 0;
-              faturasAgrupadas[chaveIso] += Number(compra.valor);
-            });
-            Object.entries(faturasAgrupadas).forEach(
-              ([dataIso, totalValor]) => {
-                faturasInjetaveis.push({
-                  id: `fatura-${cartao.id}-${dataIso}`,
-                  descricao: `Fatura ${cartao.nome}`,
-                  valor: totalValor,
-                  data_vencimento: dataIso,
-                  pago: false,
-                  isFatura: true,
-                });
-              },
+
+          if (comprasPendentesCartao.length === 0) return;
+
+          const faturasAgrupadas: Record<string, number> = {};
+
+          comprasPendentesCartao.forEach((compra) => {
+            let dataBaseStr = compra.data_vencimento;
+
+            if (!dataBaseStr) {
+              const [anoF, mesF] = (
+                readRange().from || getCurrentYearMonth() + "-01"
+              ).split("-");
+              dataBaseStr = `${anoF}-${mesF}-${String(compra.dia_vencimento).padStart(2, "0")}`;
+            }
+
+            const dataCompra = new Date(dataBaseStr + "T12:00:00");
+            if (isNaN(dataCompra.getTime())) return;
+
+            let mesFatura = dataCompra.getMonth();
+            let anoFatura = dataCompra.getFullYear();
+
+            if (dataCompra.getDate() > cartao.dia_fechamento) mesFatura++;
+            if (cartao.dia_vencimento <= cartao.dia_fechamento) mesFatura++;
+
+            if (mesFatura > 11) {
+              mesFatura = 0;
+              anoFatura++;
+            }
+
+            const dataVencimentoReal = new Date(
+              anoFatura,
+              mesFatura,
+              cartao.dia_vencimento,
+              12,
+              0,
+              0,
             );
-          }
+
+            const chaveIso = dataVencimentoReal.toISOString();
+
+            if (!faturasAgrupadas[chaveIso]) faturasAgrupadas[chaveIso] = 0;
+            faturasAgrupadas[chaveIso] += Number(compra.valor);
+          });
+
+          Object.entries(faturasAgrupadas).forEach(([dataIso, totalValor]) => {
+            faturasInjetaveis.push({
+              id: `fatura-${cartao.id}-${dataIso}`,
+              descricao: `Fatura ${cartao.nome}`,
+              valor: totalValor,
+              data_vencimento: dataIso,
+              pago: false,
+              isFatura: true,
+            });
+          });
         });
+
         fetchedVencimentos = [...fetchedVencimentos, ...faturasInjetaveis]
           .sort(
             (a, b) =>
@@ -370,6 +396,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       if (activeContext === "pessoal") {
         dashboardCache.totalDespesasFixas[activeContext] = fetchedTotalFixas;
         dashboardCache.listaFixas[activeContext] = dadosFixasValidos;
+
         if (metaData !== null) {
           setMetaFixada(metaData);
           dashboardCache.metaFixada[activeContext] = metaData;
@@ -387,10 +414,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   useEffect(() => {
     if (userId) fetchDashboardData();
   }, [fetchDashboardData, userId]);
+
   useEffect(() => {
     const current =
       localStorage.getItem(STORAGE_MONTH_KEY) || getCurrentYearMonth();
     setMesSelecionado(current);
+
     window.addEventListener(FILTER_EVENT, fetchDashboardData);
     return () => window.removeEventListener(FILTER_EVENT, fetchDashboardData);
   }, [fetchDashboardData]);
@@ -401,13 +430,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   ) => {
     try {
       const novoStatus = !currentStatus;
+
       let query = supabase
         .from("lancamentos")
         .update({ pago: novoStatus })
         .eq("id", lancamentoId);
+
       if (activeContext === "grupo" && currentGroupId)
         query = query.eq("grupo_id", currentGroupId);
       else query = query.eq("user_id", userId).is("grupo_id", null);
+
       await query;
       fetchDashboardData();
       window.dispatchEvent(new Event("zibee:transaction-changed"));
@@ -447,12 +479,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     const hoje = new Date();
     const diasFiltrar =
       periodoGrafico === "7D" ? 7 : periodoGrafico === "30D" ? 30 : 999;
+
     const dataLimite = new Date(
       hoje.getTime() - diasFiltrar * 24 * 60 * 60 * 1000,
     );
+
     const filtrados = despesasBrutas.filter(
       (d) => new Date(d.data_vencimento) >= dataLimite,
     );
+
     const agrupado = filtrados.reduce((acc: any, curr) => {
       const d = new Date(curr.data_vencimento);
       d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
@@ -463,6 +498,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       acc[dataStr] = (acc[dataStr] || 0) + Number(curr.valor);
       return acc;
     }, {});
+
     return Object.keys(agrupado)
       .sort()
       .map((data) => ({ data, valor: agrupado[data] }));
@@ -509,27 +545,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         />
       </section>
 
-      {/* SEÇÃO 2: GRÁFICOS (EVOLUÇÃO E FORMAS DE PAGAMENTO) - APENAS DESKTOP */}
-      <div className="grid gap-12 md:grid-cols-2 pt-4  md:grid">
-        <ExpenseEvolutionChart
-          dadosGraficoEvolucao={dadosGraficoEvolucao}
-          periodoGrafico={periodoGrafico}
-          setPeriodoGrafico={setPeriodoGrafico}
-          formatMoney={formatMoney}
-          hidden={hidden}
-        />
-        <section>
-          <PaymentMethodsChart
-            despesas={despesasBrutas}
-            fixas={listaFixas}
-            formatMoney={formatMoney}
-            hidden={hidden}
-          />
-        </section>
-      </div>
-
-      {/* SEÇÃO 3: CATEGORIAS EM ACORDEÃO E PRÓXIMOS VENCIMENTOS */}
-      <div className="grid gap-12 md:grid-cols-2 pt-4">
+      {/* ========================= */}
+      {/* MOBILE (< md) */}
+      {/* Ordem: Onde gasto -> Formas pgto -> Vencimentos -> Metas */}
+      {/* NÃO mostra Evolução */}
+      {/* ========================= */}
+      <div className="space-y-10 md:hidden">
         <ExpenseCategories
           categoriasChart={categoriasChart}
           expandedCategory={expandedCategory}
@@ -539,47 +560,141 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           formatMoney={formatMoney}
           togglePagoLancamento={togglePagoLancamento}
         />
+
+        <PaymentMethodsChart
+          despesas={despesasBrutas}
+          fixas={listaFixas}
+          formatMoney={formatMoney}
+          hidden={hidden}
+        />
+
         <UpcomingBills
           proximosVencimentos={proximosVencimentos}
           formatMoney={formatMoney}
         />
+
+        {activeContext === "pessoal" && metaFixada && (
+          <section
+            onClick={() => onNavigate && onNavigate("metas")}
+            className="mt-2 pt-6 border-t border-border/50 cursor-pointer group"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80 group-hover:text-primary transition-colors">
+                <FireIcon className="h-4 w-4 text-primary" /> Meta:{" "}
+                {metaFixada.nome}
+              </h2>
+              <span className="text-sm font-bold text-foreground">
+                {progressoMeta.toFixed(1)}%
+              </span>
+            </div>
+            <Progress
+              value={progressoMeta}
+              className="h-2.5 mb-3 bg-secondary"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground font-medium">
+              <span>
+                {formatMoney(
+                  Number(
+                    metaFixada.valor_atual || metaFixada.valor_depositado || 0,
+                  ),
+                )}
+              </span>
+              <span>
+                Objetivo:{" "}
+                {formatMoney(
+                  Number(
+                    metaFixada.valor_objetivo || metaFixada.valor_total || 0,
+                  ),
+                )}
+              </span>
+            </div>
+          </section>
+        )}
       </div>
 
-      {/* META FIXADA (Só no modo pessoal) */}
-      {activeContext === "pessoal" && metaFixada && (
-        <section
-          onClick={() => onNavigate && onNavigate("metas")}
-          className="mt-8 pt-6 border-t border-border/50 cursor-pointer group"
-        >
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80 group-hover:text-primary transition-colors">
-              <FireIcon className="h-4 w-4 text-primary" /> Meta:{" "}
-              {metaFixada.nome}
-            </h2>
-            <span className="text-sm font-bold text-foreground">
-              {progressoMeta.toFixed(1)}%
-            </span>
-          </div>
-          <Progress value={progressoMeta} className="h-2.5 mb-3 bg-secondary" />
-          <div className="flex justify-between text-xs text-muted-foreground font-medium">
-            <span>
-              {formatMoney(
-                Number(
-                  metaFixada.valor_atual || metaFixada.valor_depositado || 0,
-                ),
-              )}
-            </span>
-            <span>
-              Objetivo:{" "}
-              {formatMoney(
-                Number(
-                  metaFixada.valor_objetivo || metaFixada.valor_total || 0,
-                ),
-              )}
-            </span>
-          </div>
-        </section>
-      )}
+      {/* ========================= */}
+      {/* DESKTOP (>= md) */}
+      {/* Layout: Evolução (linha inteira) -> Onde gasto + Formas pgto -> Vencimentos -> Metas */}
+      {/* ========================= */}
+      <div className="hidden md:block space-y-12">
+        {/* Evolução: linha inteira */}
+        <div className="pt-4">
+          <ExpenseEvolutionChart
+            dadosGraficoEvolucao={dadosGraficoEvolucao}
+            periodoGrafico={periodoGrafico}
+            setPeriodoGrafico={setPeriodoGrafico}
+            formatMoney={formatMoney}
+            hidden={hidden}
+          />
+        </div>
+
+        {/* Onde gasto + Formas de pagamento: 2 colunas */}
+        <div className="grid gap-12 md:grid-cols-2 pt-2">
+          <ExpenseCategories
+            categoriasChart={categoriasChart}
+            expandedCategory={expandedCategory}
+            setExpandedCategory={setExpandedCategory}
+            totalDespesas={totalDespesas}
+            totalDespesasFixas={totalDespesasFixas}
+            formatMoney={formatMoney}
+            togglePagoLancamento={togglePagoLancamento}
+          />
+
+          <PaymentMethodsChart
+            despesas={despesasBrutas}
+            fixas={listaFixas}
+            formatMoney={formatMoney}
+            hidden={hidden}
+          />
+        </div>
+
+        {/* Próximos vencimentos: abaixo */}
+        <div className="pt-2">
+          <UpcomingBills
+            proximosVencimentos={proximosVencimentos}
+            formatMoney={formatMoney}
+          />
+        </div>
+
+        {/* Metas: abaixo */}
+        {activeContext === "pessoal" && metaFixada && (
+          <section
+            onClick={() => onNavigate && onNavigate("metas")}
+            className="mt-2 pt-6 border-t border-border/50 cursor-pointer group"
+          >
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80 group-hover:text-primary transition-colors">
+                <FireIcon className="h-4 w-4 text-primary" /> Meta:{" "}
+                {metaFixada.nome}
+              </h2>
+              <span className="text-sm font-bold text-foreground">
+                {progressoMeta.toFixed(1)}%
+              </span>
+            </div>
+            <Progress
+              value={progressoMeta}
+              className="h-2.5 mb-3 bg-secondary"
+            />
+            <div className="flex justify-between text-xs text-muted-foreground font-medium">
+              <span>
+                {formatMoney(
+                  Number(
+                    metaFixada.valor_atual || metaFixada.valor_depositado || 0,
+                  ),
+                )}
+              </span>
+              <span>
+                Objetivo:{" "}
+                {formatMoney(
+                  Number(
+                    metaFixada.valor_objetivo || metaFixada.valor_total || 0,
+                  ),
+                )}
+              </span>
+            </div>
+          </section>
+        )}
+      </div>
     </div>
   );
 }

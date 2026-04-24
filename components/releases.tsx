@@ -611,6 +611,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               categoriasOptions={categoriasDB}
               pagamentoOptions={formasPagamentoDB}
             />
+
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-4 sm:gap-6 px-1">
                 <div className="flex items-center gap-2">

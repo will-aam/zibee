@@ -547,7 +547,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* ========================= */}
       {/* MOBILE (< md) */}
-      {/* Ordem: Onde gasto -> Formas pgto -> Vencimentos -> Metas */}
+      {/* Ordem: Onde gasto -> Vencimentos -> Formas pgto -> Metas */}
       {/* NÃO mostra Evolução */}
       {/* ========================= */}
       <div className="space-y-10 md:hidden">
@@ -561,16 +561,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           togglePagoLancamento={togglePagoLancamento}
         />
 
+        <UpcomingBills
+          proximosVencimentos={proximosVencimentos}
+          formatMoney={formatMoney}
+        />
+
         <PaymentMethodsChart
           despesas={despesasBrutas}
           fixas={listaFixas}
           formatMoney={formatMoney}
           hidden={hidden}
-        />
-
-        <UpcomingBills
-          proximosVencimentos={proximosVencimentos}
-          formatMoney={formatMoney}
         />
 
         {activeContext === "pessoal" && metaFixada && (

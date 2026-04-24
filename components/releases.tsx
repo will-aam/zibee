@@ -283,6 +283,31 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
     fetchAllData();
   }, [fetchAllData]);
 
+  // --- PASSO 2: ESCUTA DE CATEGORIAS CRIADAS ---
+  useEffect(() => {
+    const handleCategoriesChanged = () => {
+      // 1. Limpa o cache de categorias do contexto atual para forçar a busca no banco
+      delete memoryCache.categorias[activeContext];
+
+      // 2. Refaz a busca invisivelmente
+      fetchAllData();
+    };
+
+    window.addEventListener(
+      "zibee:categories-changed",
+      handleCategoriesChanged,
+    );
+
+    // Remove o listener quando o componente for desmontado para evitar duplicações
+    return () => {
+      window.removeEventListener(
+        "zibee:categories-changed",
+        handleCategoriesChanged,
+      );
+    };
+  }, [activeContext, fetchAllData]);
+  // ----------------------------------------------
+
   const lancamentosFiltrados = lancamentos.filter((l) => {
     if ((l as any).status_fixa === "pausado" && !mostrarOcultos) return false;
 
@@ -586,7 +611,6 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               categoriasOptions={categoriasDB}
               pagamentoOptions={formasPagamentoDB}
             />
-
             <div className="flex items-center justify-between pt-1">
               <div className="flex items-center gap-4 sm:gap-6 px-1">
                 <div className="flex items-center gap-2">

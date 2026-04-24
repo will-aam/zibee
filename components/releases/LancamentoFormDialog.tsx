@@ -85,6 +85,11 @@ export function LancamentoFormDialog({
 
   const [statusFixa, setStatusFixa] = useState<"ativo" | "pausado">("ativo");
 
+  // NOVOS ESTADOS PARA CATEGORIA E VALOR
+  const [isCreatingCategory, setIsCreatingCategory] = useState(false);
+  const [newCategoryName, setNewCategoryName] = useState("");
+  const [valorInput, setValorInput] = useState("0,00");
+
   const categoriasUnicas = Array.from(
     new Set(categoriasDB.map((c) => c.nome.trim())),
   );
@@ -96,6 +101,7 @@ export function LancamentoFormDialog({
     formData.forma_pagamento?.toLowerCase().includes("cartão") ||
     formData.forma_pagamento?.toLowerCase().includes("cartao");
 
+  // Sincroniza o valor visual (máscara) quando carrega um lançamento para edição
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData({
@@ -103,6 +109,17 @@ export function LancamentoFormDialog({
         categoria: lancamentoToEdit.categoria?.trim(),
         forma_pagamento: lancamentoToEdit.forma_pagamento?.trim(),
       });
+      // Formata o valor inicial para a máscara
+      if (lancamentoToEdit.valor) {
+        setValorInput(
+          lancamentoToEdit.valor.toLocaleString("pt-BR", {
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          }),
+        );
+      } else {
+        setValorInput("0,00");
+      }
       setRepeatType(lancamentoToEdit.isShadow ? "fixa" : "unica");
       setStatusFixa("ativo");
       setRecurrenceEndType("ocorrencias");
@@ -125,8 +142,67 @@ export function LancamentoFormDialog({
       setRecurrenceEndType("ocorrencias");
       setRecurrenceEndDate("");
       setRecurrenceOccurrences(2);
+      setValorInput("0,00");
     }
   }, [lancamentoToEdit, isOpen, categoriasDB, formasPagamentoDB]);
+
+  // FUNÇÃO DE MÁSCARA DE DINHEIRO
+  const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    // Remove tudo que não é número
+    const value = e.target.value.replace(/\D/g, "");
+
+    // Converte para número decimal (centavos)
+    const numericValue = parseInt(value || "0", 10) / 100;
+
+    // Atualiza o visual com formatação brasileira
+    setValorInput(
+      numericValue.toLocaleString("pt-BR", {
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }),
+    );
+
+    // Atualiza o valor real no formData
+    setFormData({ ...formData, valor: numericValue });
+  };
+
+  // FUNÇÃO PARA CRIAR NOVA CATEGORIA
+  const handleCreateCategory = async (
+    e: React.MouseEvent | React.KeyboardEvent,
+  ) => {
+    e.preventDefault();
+    if (!newCategoryName.trim() || !userId) return;
+
+    try {
+      const novaCategoria = {
+        nome: newCategoryName.trim(),
+        user_id: userId,
+        grupo_id: activeContext === "grupo" ? groupId : null,
+        tipo: formData.tipo === "Receita" ? "receita" : "despesa", // Tenta inferir pelo tipo atual
+        cor: "#64748b", // Cor padrão genérica
+        icone: "🏷️", // Ícone padrão genérico
+      };
+
+      const { data, error } = await supabase
+        .from("categorias")
+        .insert([novaCategoria])
+        .select();
+      if (error) throw error;
+
+      // Seleciona a nova categoria no formulário
+      setFormData({ ...formData, categoria: novaCategoria.nome });
+      setNewCategoryName("");
+      setIsCreatingCategory(false);
+
+      // Dispara evento para recarregar categorias em background
+      window.dispatchEvent(new Event("zibee:categories-changed"));
+
+      toast({ title: "Categoria criada com sucesso!" });
+    } catch (error: any) {
+      console.error(error);
+      toast({ title: "Erro ao criar categoria", variant: "destructive" });
+    }
+  };
 
   const formatDateLocal = (date: Date) => {
     const year = date.getFullYear();
@@ -435,15 +511,10 @@ export function LancamentoFormDialog({
                     R${" "}
                   </span>
                   <Input
-                    type="number"
-                    step="0.01"
-                    value={formData.valor || ""}
-                    onChange={(e) =>
-                      setFormData({
-                        ...formData,
-                        valor: Number(e.target.value),
-                      })
-                    }
+                    type="text"
+                    inputMode="numeric"
+                    value={valorInput}
+                    onChange={handleValorChange}
                     required
                     className="pl-9"
                   />
@@ -478,6 +549,13 @@ export function LancamentoFormDialog({
                 onValueChange={(v) =>
                   setFormData({ ...formData, categoria: v })
                 }
+                onOpenChange={(open) => {
+                  // Reseta estado de criação se fechar o select
+                  if (!open) {
+                    setIsCreatingCategory(false);
+                    setNewCategoryName("");
+                  }
+                }}
               >
                 <SelectTrigger>
                   <SelectValue />
@@ -488,6 +566,46 @@ export function LancamentoFormDialog({
                       {nome}
                     </SelectItem>
                   ))}
+
+                  {/* Área de criação de nova categoria */}
+                  <div className="p-2 border-t mt-1">
+                    {!isCreatingCategory ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        className="w-full justify-start text-sm text-primary"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setIsCreatingCategory(true);
+                        }}
+                      >
+                        <PlusIcon className="w-4 h-4 mr-2" /> Nova Categoria
+                      </Button>
+                    ) : (
+                      <div
+                        className="flex items-center gap-2"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Input
+                          autoFocus
+                          placeholder="Nome da categoria"
+                          value={newCategoryName}
+                          onChange={(e) => setNewCategoryName(e.target.value)}
+                          className="h-8 text-sm"
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") handleCreateCategory(e);
+                          }}
+                        />
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={(e) => handleCreateCategory(e as any)}
+                        >
+                          Salvar
+                        </Button>
+                      </div>
+                    )}
+                  </div>
                 </SelectContent>
               </Select>
             </div>
@@ -625,26 +743,6 @@ export function LancamentoFormDialog({
             )}
 
             <div className="flex flex-col gap-2 mt-2">
-              {repeatType !== "fixa" && !isCartao && (
-                <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300">
-                  <Checkbox
-                    id="pago"
-                    checked={formData.pago}
-                    onCheckedChange={(checked) =>
-                      setFormData({ ...formData, pago: checked === true })
-                    }
-                  />
-                  <Label
-                    htmlFor="pago"
-                    className="cursor-pointer flex-1 font-medium"
-                  >
-                    {formData.tipo === "Receita"
-                      ? "Já foi recebido?"
-                      : "Já foi pago?"}
-                  </Label>
-                </div>
-              )}
-
               {formData.tipo === "Despesa" && !lancamentoToEdit && (
                 <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
                   <div className="flex items-center gap-2">
@@ -795,9 +893,8 @@ export function LancamentoFormDialog({
                                     : undefined
                                 }
                                 onSelect={(date) => {
-                                  if (date) {
+                                  if (date)
                                     setRecurrenceEndDate(formatDateLocal(date));
-                                  }
                                 }}
                                 initialFocus
                               />
@@ -849,6 +946,29 @@ export function LancamentoFormDialog({
                   )}
                 </div>
               )}
+
+              {/* BLOCO 2: */}
+              {repeatType !== "fixa" &&
+                !isCartao &&
+                !lancamentoToEdit?.isShadow && (
+                  <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
+                    <Checkbox
+                      id="pago"
+                      checked={formData.pago}
+                      onCheckedChange={(checked) =>
+                        setFormData({ ...formData, pago: checked === true })
+                      }
+                    />
+                    <Label
+                      htmlFor="pago"
+                      className="cursor-pointer flex-1 font-medium"
+                    >
+                      {formData.tipo === "Receita"
+                        ? "Já foi recebido?"
+                        : "Já foi pago?"}
+                    </Label>
+                  </div>
+                )}
             </div>
             <div className="h-4"></div>
           </form>

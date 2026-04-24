@@ -4,7 +4,13 @@ import * as React from "react";
 import { CalendarIcon, XMarkIcon } from "@heroicons/react/24/solid";
 import { Button } from "@/components/ui/button";
 
-type PresetKey = "this_month" | "last_month" | "all_time" | "custom";
+// 1. Adicionado "next_month" aos presets
+type PresetKey =
+  | "this_month"
+  | "last_month"
+  | "next_month"
+  | "all_time"
+  | "custom";
 
 export type DateRangeValue = {
   from: string | null;
@@ -56,6 +62,14 @@ function getLastMonthRange() {
   const year = now.getMonth() === 0 ? now.getFullYear() - 1 : now.getFullYear();
   const month = now.getMonth() === 0 ? 12 : now.getMonth();
   return monthRange(year, month);
+}
+
+// 2. Nova função para calcular as datas do próximo mês
+function getNextMonthRange() {
+  const now = new Date();
+  // O JavaScript lida automaticamente com a virada de ano ao passar um mês > 11
+  const nextDate = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+  return monthRange(nextDate.getFullYear(), nextDate.getMonth() + 1);
 }
 
 function readStored(): DateRangeValue {
@@ -118,12 +132,11 @@ function PresetPill({
   );
 }
 
-// NOVO: Componente inteligente para digitação de data com máscara e validação
 function DateInput({
   label,
-  value, // formato YYYY-MM-DD
+  value,
   disabled,
-  onChange, // devolve YYYY-MM-DD ou null
+  onChange,
 }: {
   label: string;
   value: string | null;
@@ -133,7 +146,6 @@ function DateInput({
   const [localValue, setLocalValue] = React.useState("");
   const [error, setError] = React.useState(false);
 
-  // Sincroniza o valor de fora (YYYY-MM-DD) para dentro (DD/MM/YYYY)
   React.useEffect(() => {
     if (!value) {
       setLocalValue("");
@@ -148,10 +160,9 @@ function DateInput({
   }, [value]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    let raw = e.target.value.replace(/\D/g, ""); // Remove tudo que não for número
-    if (raw.length > 8) raw = raw.slice(0, 8); // Limita a 8 dígitos numéricos
+    let raw = e.target.value.replace(/\D/g, "");
+    if (raw.length > 8) raw = raw.slice(0, 8);
 
-    // Aplica a máscara DD/MM/YYYY automaticamente
     let formatted = raw;
     if (raw.length > 4) {
       formatted = `${raw.slice(0, 2)}/${raw.slice(2, 4)}/${raw.slice(4)}`;
@@ -161,14 +172,12 @@ function DateInput({
 
     setLocalValue(formatted);
 
-    // Se apagou tudo, reseta o erro e avisa o componente pai
     if (formatted.length === 0) {
       setError(false);
       onChange(null);
       return;
     }
 
-    // Se completou a digitação, faz a validação da data
     if (raw.length === 8) {
       const d = parseInt(raw.slice(0, 2), 10);
       const m = parseInt(raw.slice(2, 4), 10);
@@ -176,7 +185,6 @@ function DateInput({
 
       const date = new Date(y, m - 1, d);
 
-      // Checa se é uma data real (evita coisas como 31/02/2024)
       if (
         date.getFullYear() === y &&
         date.getMonth() === m - 1 &&
@@ -188,15 +196,14 @@ function DateInput({
         );
       } else {
         setError(true);
-        onChange(null); // Data é inválida, anula pro componente pai
+        onChange(null);
       }
     } else {
-      setError(false); // Enquanto está digitando, não exibe erro imediatamente
+      setError(false);
     }
   };
 
   const handleBlur = () => {
-    // Se o usuário clicou fora e a data não terminou de ser digitada, acusa erro
     if (localValue.length > 0 && localValue.length < 10) {
       setError(true);
       onChange(null);
@@ -252,6 +259,12 @@ export default function DateRangeFilterDrawer({
     }
     if (preset === "last_month") {
       const r = getLastMonthRange();
+      setFrom(r.from);
+      setTo(r.to);
+    }
+    // 3. Adicionada a regra para quando o preset "next_month" for selecionado
+    if (preset === "next_month") {
+      const r = getNextMonthRange();
       setFrom(r.from);
       setTo(r.to);
     }
@@ -311,7 +324,6 @@ export default function DateRangeFilterDrawer({
     onClose();
   }
 
-  // Só permite digitar nas datas quando a opção for Personalizado
   const disableDates = preset !== "custom";
 
   return (
@@ -337,7 +349,6 @@ export default function DateRangeFilterDrawer({
         "
         aria-label="Filtros do dashboard"
       >
-        {/* header */}
         <div className="px-4 pt-4 pb-3 border-b flex items-center justify-between gap-3">
           <div className="min-w-0">
             <p className="text-base font-semibold flex items-center gap-2">
@@ -355,7 +366,6 @@ export default function DateRangeFilterDrawer({
           </button>
         </div>
 
-        {/* content */}
         <div className="px-4 py-4 overflow-y-auto flex-1 space-y-4">
           <div className="flex flex-wrap gap-2">
             <PresetPill
@@ -370,6 +380,14 @@ export default function DateRangeFilterDrawer({
               onClick={() => setPreset("last_month")}
             >
               Mês passado
+            </PresetPill>
+
+            {/* 4. Botão novo para o Próximo Mês */}
+            <PresetPill
+              active={preset === "next_month"}
+              onClick={() => setPreset("next_month")}
+            >
+              Próx. mês
             </PresetPill>
 
             <PresetPill
@@ -416,7 +434,6 @@ export default function DateRangeFilterDrawer({
           ) : null}
         </div>
 
-        {/* footer */}
         <div className="px-4 py-4 border-t">
           <div className="grid grid-cols-1 gap-2">
             <Button className="w-full" onClick={apply} disabled={!canApply}>

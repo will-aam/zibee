@@ -7,7 +7,7 @@ import {
   PlusIcon,
   ArrowPathIcon,
   TrashIcon,
-  BellAlertIcon, // <-- ADICIONADO
+  BellAlertIcon,
 } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
@@ -28,8 +28,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cn } from "@/lib/utils"; // <-- ADICIONADO (Necessário para o botão de notificação)
-
+import { cn } from "@/lib/utils";
 interface ConfiguracoesProps {
   onNavigate?: (tab: string) => void;
 }

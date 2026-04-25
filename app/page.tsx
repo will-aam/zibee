@@ -5,7 +5,7 @@ import Header from "@/components/layout/header";
 import Dashboard from "@/components/layout/header/dashboard";
 import Lancamentos from "@/components/releases";
 import Metas from "@/components/goals";
-import Configuracoes from "@/components/configuracoes";
+import Configuracoes from "@/components/settings";
 import DespesasFixas from "@/components/features/fixed-expenses";
 import Receitas from "@/components/receitas";
 import GruposConfig from "@/components/groups";

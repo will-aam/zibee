@@ -7,7 +7,7 @@ import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/lib/supabase";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 
-// Apenas Heroicons
+// Adicionado Cog6ToothIcon e ChevronRightIcon para o novo menu
 import {
   XMarkIcon,
   UserIcon,
@@ -18,6 +18,8 @@ import {
   ChevronDownIcon,
   HeartIcon,
   ShareIcon,
+  Cog6ToothIcon,
+  ChevronRightIcon,
 } from "@heroicons/react/24/solid";
 
 import { Button } from "../ui/button";
@@ -59,6 +61,7 @@ interface ProfileAvatarModalProps {
   userId?: string;
   onLogout?: () => void;
   isLoggingOut?: boolean;
+  onNavigateSettings?: () => void; // Prop para navegar para as configurações
 }
 
 export default function ProfileAvatarModal({
@@ -78,6 +81,7 @@ export default function ProfileAvatarModal({
   userId,
   onLogout,
   isLoggingOut = false,
+  onNavigateSettings,
 }: ProfileAvatarModalProps) {
   const isMobile = useIsMobile();
   const { toast } = useToast();
@@ -111,7 +115,7 @@ export default function ProfileAvatarModal({
 
   const visibleOptions = allSeedOptions.slice(0, visibleCount);
 
-  // LÓGICA APRIMORADA DE COMPARTILHAMENTO
+  // LÓGICA DE COMPARTILHAMENTO
   const handleShareApp = async () => {
     const shareText =
       "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada: https://zibee.vercel.app/";
@@ -123,10 +127,8 @@ export default function ProfileAvatarModal({
 
     try {
       if (navigator.share) {
-        // Abre a gaveta nativa do celular (WhatsApp, Insta, etc)
         await navigator.share(shareData);
       } else {
-        // Fallback para quem não tem suporte nativo (PC)
         await navigator.clipboard.writeText(shareText);
         toast({
           title: "Copiado para a área de transferência! 📋",
@@ -221,6 +223,15 @@ export default function ProfileAvatarModal({
     setIsProcessingInvite(false);
   };
 
+  const handleSettingsClick = () => {
+    onClose();
+    if (onNavigateSettings) {
+      onNavigateSettings();
+    } else {
+      window.location.href = "/configuracoes";
+    }
+  };
+
   if (!open) return null;
 
   return (
@@ -235,35 +246,20 @@ export default function ProfileAvatarModal({
           ${isMobile ? "left-0 top-0 h-full w-full animate-in slide-in-from-left" : "left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[640px] rounded-[40px] border border-border/50 animate-in zoom-in-95"}
         `}
       >
-        <div className="px-6 py-6 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            {isMobile && (
-              <button
-                onClick={onLogout}
-                disabled={isLoggingOut}
-                className="p-2 -ml-2 text-red-500 active:scale-90 transition-transform"
-                title="Sair da Conta"
-              >
-                {isLoggingOut ? (
-                  <ArrowPathIcon className="h-6 w-6 animate-spin" />
-                ) : (
-                  <ArrowLeftOnRectangleIcon className="h-6 w-6" />
-                )}
-              </button>
-            )}
-            <h2 className="text-xl font-bold tracking-tight">
-              {isMobile ? "Minha Conta" : "Perfil"}
-            </h2>
-          </div>
+        {/* CABEÇALHO LIMPO */}
+        <div className="px-6 py-6 flex items-center justify-between border-b border-border/30">
+          <h2 className="text-xl font-bold tracking-tight">
+            {isMobile ? "Minha Conta" : "Perfil"}
+          </h2>
 
           <button
-            className="p-2.5 rounded-full hover:bg-muted transition-colors shrink-0"
+            className="p-2.5 rounded-full bg-muted/50 hover:bg-muted transition-colors shrink-0"
             onClick={onClose}
             disabled={
               saving || isSavingAvatar || isProcessingInvite || isLoggingOut
             }
           >
-            <XMarkIcon className="h-6 w-6" />
+            <XMarkIcon className="h-5 w-5" />
           </button>
         </div>
 
@@ -275,122 +271,178 @@ export default function ProfileAvatarModal({
           </div>
         )}
 
-        <div className="overflow-y-auto flex-1 custom-scrollbar">
-          {/* WORKSPACES (MOBILE) */}
+        <div className="overflow-y-auto flex-1 custom-scrollbar pb-6">
+          {/* TUDO ISSO AQUI SÓ APARECE NO MOBILE */}
           {isMobile && (
-            <div className="px-6 py-6 bg-muted/10">
-              <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">
-                Seu Espaço de Trabalho
-              </p>
-              {pendingInvite ? (
-                <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-3xl p-5 mb-4 animate-in zoom-in-95">
-                  <div className="flex items-center gap-3 mb-3">
-                    <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
-                      <UserGroupIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
-                        Convite Recebido
-                      </p>
-                      <p className="font-semibold text-foreground text-sm">
-                        {pendingInvite.grupo_nome}
-                      </p>
-                    </div>
-                  </div>
-                  <div className="flex gap-2 mt-4">
-                    <Button
-                      variant="outline"
-                      className="flex-1 rounded-xl h-10 bg-white dark:bg-background border-border/50"
-                      onClick={handleRejectInvite}
-                      disabled={isProcessingInvite}
-                    >
-                      Recusar
-                    </Button>
-                    <Button
-                      className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white"
-                      onClick={handleAcceptInvite}
-                      disabled={isProcessingInvite}
-                    >
-                      {isProcessingInvite ? (
-                        <ArrowPathIcon className="w-4 h-4 animate-spin" />
-                      ) : (
-                        "Aceitar"
-                      )}
-                    </Button>
-                  </div>
-                </div>
-              ) : (
-                <div className="grid grid-cols-2 gap-3">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      onContextChange?.("pessoal");
-                      onClose();
-                    }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${activeContext === "pessoal" ? "border-primary bg-primary/10 text-primary shadow-sm" : "border-border bg-background text-muted-foreground"}`}
-                  >
-                    <UserIcon className="w-7 h-7" />
-                    <span className="font-bold text-xs uppercase tracking-wide">
-                      Pessoal
-                    </span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (hasPremiumAccess) {
-                        onContextChange?.("grupo");
-                        onClose();
-                      } else {
-                        handleWhatsAppContact();
-                      }
-                    }}
-                    className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${activeContext === "grupo" ? "border-primary bg-primary/10 text-primary shadow-sm" : "border-border bg-background text-muted-foreground"}`}
-                  >
-                    {!hasPremiumAccess && (
-                      <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-bl-lg">
-                        PRO
+            <>
+              {/* SEÇÃO: ESPAÇO DE TRABALHO */}
+              <div className="px-6 pt-6 pb-2">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">
+                  Espaço de Trabalho
+                </p>
+                {pendingInvite ? (
+                  <div className="bg-blue-50/50 dark:bg-blue-950/20 border border-blue-200 dark:border-blue-900 rounded-3xl p-5 animate-in zoom-in-95">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-full bg-blue-100 dark:bg-blue-900 flex items-center justify-center shrink-0">
+                        <UserGroupIcon className="w-5 h-5 text-blue-600 dark:text-blue-400" />
                       </div>
-                    )}
-                    {hasPremiumAccess ? (
-                      <UserGroupIcon className="w-7 h-7" />
-                    ) : (
-                      <LockClosedIcon className="w-7 h-7 text-amber-500/80" />
-                    )}
-                    <span className="font-bold text-xs uppercase tracking-wide">
-                      Grupo
-                    </span>
+                      <div>
+                        <p className="text-xs font-bold text-blue-600 dark:text-blue-400 uppercase tracking-wider">
+                          Convite Recebido
+                        </p>
+                        <p className="font-semibold text-foreground text-sm">
+                          {pendingInvite.grupo_nome}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-2 mt-4">
+                      <Button
+                        variant="outline"
+                        className="flex-1 rounded-xl h-10 bg-white dark:bg-background border-border/50"
+                        onClick={handleRejectInvite}
+                        disabled={isProcessingInvite}
+                      >
+                        Recusar
+                      </Button>
+                      <Button
+                        className="flex-1 rounded-xl h-10 bg-blue-600 hover:bg-blue-700 text-white"
+                        onClick={handleAcceptInvite}
+                        disabled={isProcessingInvite}
+                      >
+                        {isProcessingInvite ? (
+                          <ArrowPathIcon className="w-4 h-4 animate-spin" />
+                        ) : (
+                          "Aceitar"
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        onContextChange?.("pessoal");
+                        onClose();
+                      }}
+                      className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all ${activeContext === "pessoal" ? "border-primary bg-primary/10 text-primary shadow-sm" : "border-border bg-background text-muted-foreground hover:bg-muted/50"}`}
+                    >
+                      <UserIcon className="w-7 h-7" />
+                      <span className="font-bold text-xs uppercase tracking-wide">
+                        Pessoal
+                      </span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (hasPremiumAccess) {
+                          onContextChange?.("grupo");
+                          onClose();
+                        } else {
+                          handleWhatsAppContact();
+                        }
+                      }}
+                      className={`p-4 rounded-2xl border-2 flex flex-col items-center justify-center gap-2 transition-all relative overflow-hidden ${activeContext === "grupo" ? "border-primary bg-primary/10 text-primary shadow-sm" : "border-border bg-background text-muted-foreground hover:bg-muted/50"}`}
+                    >
+                      {!hasPremiumAccess && (
+                        <div className="absolute top-0 right-0 bg-amber-500 text-white text-[10px] font-black px-2 py-0.5 rounded-bl-lg">
+                          PRO
+                        </div>
+                      )}
+                      {hasPremiumAccess ? (
+                        <UserGroupIcon className="w-7 h-7" />
+                      ) : (
+                        <LockClosedIcon className="w-7 h-7 text-amber-500/80" />
+                      )}
+                      <span className="font-bold text-xs uppercase tracking-wide">
+                        Grupo
+                      </span>
+                    </button>
+                  </div>
+                )}
+              </div>
+
+              {/* SEÇÃO: AÇÕES DA CONTA (CONFIGURAÇÕES E SAIR) */}
+              <div className="px-6 py-4">
+                <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-3">
+                  Ajustes
+                </p>
+                <div className="flex flex-col gap-2">
+                  <button
+                    onClick={handleSettingsClick}
+                    className="flex items-center justify-between p-4 rounded-2xl bg-muted/30 border border-border/50 hover:bg-muted/60 transition-colors active:scale-[0.98] group text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground transition-colors">
+                        <Cog6ToothIcon className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-foreground">
+                          Configurações
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          Perfil, Senha e Notificações
+                        </p>
+                      </div>
+                    </div>
+                    <ChevronRightIcon className="w-5 h-5 text-muted-foreground group-hover:text-foreground transition-colors" />
+                  </button>
+
+                  <button
+                    onClick={onLogout}
+                    disabled={isLoggingOut}
+                    className="flex items-center justify-between p-4 rounded-2xl bg-red-500/5 border border-red-500/10 hover:bg-red-500/10 transition-colors active:scale-[0.98] group text-left"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-600 group-hover:bg-red-600 group-hover:text-white transition-colors">
+                        {isLoggingOut ? (
+                          <ArrowPathIcon className="w-5 h-5 animate-spin" />
+                        ) : (
+                          <ArrowLeftOnRectangleIcon className="w-5 h-5" />
+                        )}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-red-600">
+                          Sair da Conta
+                        </p>
+                        <p className="text-xs text-red-500/70 mt-0.5">
+                          Encerrar sessão atual
+                        </p>
+                      </div>
+                    </div>
                   </button>
                 </div>
-              )}
-            </div>
+              </div>
+
+              {/* BANNER: COMPARTILHE O APP (AGORA SOMENTE NO MOBILE) */}
+              <div className="mx-6 mt-2 mb-2 bg-linear-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-5 flex flex-col items-center text-center relative overflow-hidden">
+                <div className="relative flex items-center justify-center w-8 h-8 mb-3">
+                  <HeartIcon className="absolute w-8 h-8 text-primary animate-ping opacity-75 duration-1000" />
+                  <HeartIcon className="relative w-8 h-8 text-primary" />
+                </div>
+                <h3 className="font-bold text-foreground mb-1 text-lg">
+                  Ajude o projeto! 🌱
+                </h3>
+                <p className="text-xs text-muted-foreground mb-4 max-w-[250px] leading-relaxed">
+                  Gostou do Zibee? Compartilhe o aplicativo com um amigo e apoie
+                  o desenvolvedor.
+                </p>
+                <Button
+                  onClick={handleShareApp}
+                  className="w-full rounded-xl gap-2 shadow-sm hover:scale-[1.02] transition-transform font-bold h-11"
+                >
+                  <ShareIcon className="w-4 h-4" />
+                  Compartilhar Agora
+                </Button>
+              </div>
+            </>
           )}
+          {/* --- FIM DO CONTEÚDO EXCLUSIVO MOBILE --- */}
 
-          {/* NOVO BANNER: COMPARTILHE O APP (Com o coração sonar e a planta) */}
-          <div className="mx-6 mt-6 bg-linear-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-3xl p-5 flex flex-col items-center text-center relative overflow-hidden">
-            <div className="relative flex items-center justify-center w-8 h-8 mb-3">
-              <HeartIcon className="absolute w-8 h-8 text-primary animate-ping opacity-75 duration-1000" />
-              <HeartIcon className="relative w-8 h-8 text-primary" />
-            </div>
-            <h3 className="font-bold text-foreground mb-1 text-lg">
-              Ajude o projeto! 🌱
-            </h3>
-            <p className="text-xs text-muted-foreground mb-4 max-w-[250px] leading-relaxed">
-              Gostou do Zibee? Compartilhe o aplicativo com um amigo e apoie o
-              desenvolvedor.
-            </p>
-            <Button
-              onClick={handleShareApp}
-              className="w-full rounded-xl gap-2 shadow-sm hover:scale-[1.02] transition-transform font-bold h-11"
-            >
-              <ShareIcon className="w-4 h-4" />
-              Compartilhar Agora
-            </Button>
-          </div>
-
-          {/* SELEÇÃO DE AVATAR */}
-          <div className="px-6 pt-8 pb-4">
-            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-6">
-              {isMobile ? "Escolha seu novo avatar" : "Selecione um robô"}
+          {/* SELEÇÃO DE AVATAR (MOSTRA EM AMBOS: MOBILE E DESKTOP) */}
+          <div className="px-6 pt-6 pb-2">
+            <p className="text-xs font-bold text-muted-foreground uppercase tracking-widest mb-4">
+              {isMobile ? "Escolha seu avatar" : "Selecione um robô"}
             </p>
             <div className="grid grid-cols-4 sm:grid-cols-5 gap-4">
               {visibleOptions.map((seed) => {
@@ -422,7 +474,7 @@ export default function ProfileAvatarModal({
 
             {/* BOTÃO VER MAIS (PAGINAÇÃO) */}
             {visibleCount < optionsCount && (
-              <div className="mt-8 flex justify-center mb-4">
+              <div className="mt-8 flex justify-center">
                 <Button
                   variant="outline"
                   className="rounded-full px-6"
@@ -440,11 +492,10 @@ export default function ProfileAvatarModal({
 
         {/* FOOTER */}
         <div
-          className={`px-6 py-6 bg-background border-t ${!isMobile ? "rounded-b-[40px]" : ""}`}
+          className={`px-6 py-6 bg-background border-t border-border/30 shadow-[0_-10px_20px_-10px_rgba(0,0,0,0.05)] ${!isMobile ? "rounded-b-[40px]" : ""}`}
         >
-          {/* BOTÃO QUE EFETIVAMENTE SALVA */}
           <Button
-            className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest"
+            className="w-full h-14 rounded-2xl text-sm font-black uppercase tracking-widest hover:scale-[1.02] transition-transform"
             onClick={handleSaveAvatar}
             disabled={saving || isSavingAvatar || isProcessingInvite}
           >

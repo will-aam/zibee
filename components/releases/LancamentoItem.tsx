@@ -91,7 +91,11 @@ export function LancamentoItem({
             />
           </button>
         ) : (
-          <div className="pt-0.5 sm:pt-0 shrink-0 flex items-center justify-center h-7 w-7 rounded-full bg-primary/10">
+          <button
+            onClick={onTogglePago}
+            title="Item de fatura. Clique para saber mais."
+            className="pt-0.5 sm:pt-0 shrink-0 flex items-center justify-center h-7 w-7 rounded-full bg-primary/10 hover:bg-primary/20 transition-colors active:scale-95"
+          >
             <svg
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
@@ -101,7 +105,7 @@ export function LancamentoItem({
               <path d="M2.25 10.5h19.5V15a2.25 2.25 0 0 1-2.25 2.25H4.5A2.25 2.25 0 0 1 2.25 15v-4.5Z" />
               <path d="M4.5 6A2.25 2.25 0 0 0 2.25 8.25v.75h19.5v-.75A2.25 2.25 0 0 0 19.5 6H4.5Z" />
             </svg>
-          </div>
+          </button>
         )}
 
         <div className="flex flex-col min-w-0">

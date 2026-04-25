@@ -485,6 +485,17 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   };
 
   const togglePago = async (lancamento: Lancamento) => {
+    // 👇 FASE 2: BLOQUEIO DE PAGAMENTO MANUAL DE CARTÃO
+    if (lancamento.cartao_id) {
+      toast({
+        title: "Item de Fatura",
+        description:
+          "O pagamento deste item é gerido automaticamente ao pagar a fatura na aba de Cartões.",
+        // variant: "default", // opcional, caso queira que o aviso seja neutro
+      });
+      return; // Interrompe a função aqui, impedindo que vá para o banco
+    }
+
     try {
       const novoStatus = !lancamento.pago;
       if (lancamento.isShadow) {

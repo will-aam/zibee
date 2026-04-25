@@ -343,6 +343,7 @@ export function LancamentoFormDialog({
         cartao_id: isCartao ? formData.cartao_id : null,
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
+        pago: isCartao ? false : formData.pago, // <-- ADICIONADO PARA BLINDAGEM
       } as Omit<Lancamento, "id">;
 
       if (lancamentoToEdit) {
@@ -369,7 +370,7 @@ export function LancamentoFormDialog({
               dia_vencimento: dia,
               categoria: formData.categoria?.trim(),
               forma_pagamento: formData.forma_pagamento?.trim(),
-              cartao_id: null,
+              cartao_id: isCartao ? formData.cartao_id : null, // <-- CORRIGIDO
               status: statusFixa,
             };
 
@@ -425,7 +426,7 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: null,
+            cartao_id: isCartao ? formData.cartao_id : null, // <-- CORRIGIDO
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",

@@ -20,7 +20,7 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogDescription, // <-- ADICIONADO AQUI
+  DialogDescription,
   DialogFooter,
 } from "@/components/ui/dialog";
 import {
@@ -43,7 +43,7 @@ import {
   TrashIcon,
   InformationCircleIcon,
   ExclamationCircleIcon,
-  CheckCircleIcon, // <-- ADICIONADO AQUI
+  CheckCircleIcon,
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 
@@ -248,7 +248,7 @@ export default function Cartoes() {
         return d >= ciclo.inicio && d <= ciclo.fim;
       });
 
-      // --- SOMBRAS APRIMORADAS PASSO 2 ---
+      // --- SOMBRAS APRIMORADAS (EVITA DUPLICIDADE) ---
       const sombrasFixas = fixas
         .filter((f) => f.cartao_id === cartao.id)
         .map((f) => ({
@@ -257,17 +257,24 @@ export default function Cartoes() {
           valor: f.valor,
           data_vencimento: `${ano}-${String(mes + 1).padStart(2, "0")}-${String(f.dia_vencimento).padStart(2, "0")}`,
           isShadow: true,
-          // --- NOVOS CAMPOS PARA SALVAR NO BANCO ---
+          // --- CAMPOS NECESSÁRIOS PARA SALVAR NO BANCO ---
           conta_fixa_id: f.id,
           categoria: f.categoria || "Sem categoria",
           user_id: userId,
+          grupo_id: f.grupo_id, // <-- ADICIONADO PARA CONTEXTO DE GRUPO
           pago: false, // Sombra sempre nasce não paga
         }))
         .filter((s) => {
+          // 1. Verifica se já existe um lançamento real para esta conta fixa neste ciclo
+          const jaExisteReal = despesasFatura.some(
+            (real) => real.conta_fixa_id === s.conta_fixa_id,
+          );
+
+          // 2. Só mostra a sombra se não houver um real e se estiver dentro das datas do ciclo
           const d = new Date(s.data_vencimento + "T00:00:00");
-          return d >= ciclo.inicio && d <= ciclo.fim;
+          return !jaExisteReal && d >= ciclo.inicio && d <= ciclo.fim;
         });
-      // ------------------------------------
+      // -------------------------------------------------
 
       const todasDespesasMês = [...despesasFatura, ...sombrasFixas].sort(
         (a, b) =>
@@ -305,7 +312,7 @@ export default function Cartoes() {
     });
   }, [cartoes, lancamentos, fixas, date, userId]);
 
-  // --- FUNÇÃO MÁGICA DE PAGAR (PASSO 3) ---
+  // --- FUNÇÃO DE PAGAR FATURA (CONSOLIDAÇÃO) ---
   const handlePayFatura = async () => {
     if (!payFaturaConfig.fatura || !userId) return;
     setIsPaying(true);
@@ -331,6 +338,7 @@ export default function Cartoes() {
           forma_pagamento: "Cartão de Crédito",
           conta_fixa_id: s.conta_fixa_id,
           cartao_id: fatura.id,
+          grupo_id: activeContext === "grupo" ? s.grupo_id : null, // <-- ADICIONADO
           pago: true,
         }));
 
@@ -486,7 +494,7 @@ export default function Cartoes() {
                 {/* ITENS DA FATURA */}
                 {isExpanded && (
                   <div className="bg-muted/10 border-t border-border/40 p-6 animate-in slide-in-from-top-2">
-                    {/* --- PASSO 4A: TÍTULO + BOTÃO PAGAR --- */}
+                    {/* --- TÍTULO + BOTÃO PAGAR --- */}
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
@@ -690,7 +698,7 @@ export default function Cartoes() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* --- PASSO 4B: MODAL DE PAGAR FATURA --- */}
+      {/* --- MODAL DE PAGAR FATURA --- */}
       <Dialog
         open={payFaturaConfig.isOpen}
         onOpenChange={(open) =>

@@ -342,6 +342,50 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
         </div>
 
         <div className="space-y-8 pt-2">
+          {/* SESSÃO: NOTIFICAÇÕES PWA */}
+          <section className="space-y-4 bg-muted/20 p-5 rounded-2xl border border-border/50">
+            <div className="flex items-center gap-2 text-foreground">
+              <BellAlertIcon className="h-5 w-5 text-primary" />
+              <div>
+                <h2 className="text-lg font-semibold tracking-tight leading-none">
+                  Notificações do Sistema
+                </h2>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Receba avisos importantes como o fechamento da fatura.
+                </p>
+              </div>
+            </div>
+
+            <div className="pt-2">
+              <Button
+                onClick={handleSubscribePush}
+                disabled={isSubscribing || isSubscribed}
+                className={cn(
+                  "h-11 rounded-xl px-6 font-semibold shadow-sm",
+                  isSubscribed
+                    ? "bg-green-500/10 text-green-600 hover:bg-green-500/10 hover:text-green-600 cursor-default opacity-100"
+                    : "bg-primary text-primary-foreground hover:bg-primary/90",
+                )}
+              >
+                {isSubscribing ? (
+                  <>
+                    <ArrowPathIcon className="h-4 w-4 animate-spin mr-2" />{" "}
+                    Ativando...
+                  </>
+                ) : isSubscribed ? (
+                  "Notificações Ativadas"
+                ) : (
+                  "Permitir Notificações"
+                )}
+              </Button>
+              {!isSubscribed && (
+                <p className="text-[11px] text-muted-foreground mt-2 max-w-sm">
+                  Ao clicar, o navegador pedirá sua autorização. Funciona no
+                  Android, Windows e iOS (16.4+).
+                </p>
+              )}
+            </div>
+          </section>
           {/* SESSÃO: CATEGORIAS */}
           <section className="space-y-4">
             <div className="flex items-center gap-2 text-foreground">
@@ -418,51 +462,6 @@ export default function Configuracoes({ onNavigate }: ConfiguracoesProps) {
           </section>
 
           <hr className="border-border/50" />
-
-          {/* SESSÃO: NOTIFICAÇÕES PWA */}
-          <section className="space-y-4 bg-muted/20 p-5 rounded-2xl border border-border/50">
-            <div className="flex items-center gap-2 text-foreground">
-              <BellAlertIcon className="h-5 w-5 text-primary" />
-              <div>
-                <h2 className="text-lg font-semibold tracking-tight leading-none">
-                  Notificações do Sistema
-                </h2>
-                <p className="text-xs text-muted-foreground mt-1">
-                  Receba avisos importantes como o fechamento da fatura.
-                </p>
-              </div>
-            </div>
-
-            <div className="pt-2">
-              <Button
-                onClick={handleSubscribePush}
-                disabled={isSubscribing || isSubscribed}
-                className={cn(
-                  "h-11 rounded-xl px-6 font-semibold shadow-sm",
-                  isSubscribed
-                    ? "bg-green-500/10 text-green-600 hover:bg-green-500/10 hover:text-green-600 cursor-default opacity-100"
-                    : "bg-primary text-primary-foreground hover:bg-primary/90",
-                )}
-              >
-                {isSubscribing ? (
-                  <>
-                    <ArrowPathIcon className="h-4 w-4 animate-spin mr-2" />{" "}
-                    Ativando...
-                  </>
-                ) : isSubscribed ? (
-                  "Notificações Ativadas"
-                ) : (
-                  "Permitir Notificações"
-                )}
-              </Button>
-              {!isSubscribed && (
-                <p className="text-[11px] text-muted-foreground mt-2 max-w-sm">
-                  Ao clicar, o navegador pedirá sua autorização. Funciona no
-                  Android, Windows e iOS (16.4+).
-                </p>
-              )}
-            </div>
-          </section>
 
           <hr className="border-border/50" />
 

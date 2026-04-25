@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { authClient } from "@/lib/auth-client";
+import { supabase } from "@/lib/supabase"; // <-- Importamos o Supabase
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -18,7 +20,7 @@ import {
   UserGroupIcon,
 } from "@heroicons/react/24/outline";
 
-// Mini componente de Switch (Chavezinha) para não precisarmos instalar dependências extras agora
+// Mini componente de Switch (Chavezinha)
 const Toggle = ({
   checked,
   onChange,
@@ -49,29 +51,89 @@ const Toggle = ({
 
 export default function Preferences() {
   const { toast } = useToast();
+  const session = authClient.useSession();
+  const user = session.data?.user;
 
   // ESTADOS GERAIS (Chave Mestra)
   const [isSubscribing, setIsSubscribing] = useState(false);
   const [isSubscribed, setIsSubscribed] = useState(false);
 
-  // ESTADOS DAS NOTIFICAÇÕES ESPECÍFICAS (Apenas visuais por enquanto)
+  // ESTADOS DAS NOTIFICAÇÕES ESPECÍFICAS
   const [diasFatura, setDiasFatura] = useState("3");
   const [alertaNovoLancamento, setAlertaNovoLancamento] = useState(true);
   const [alertaPagamentoGrupo, setAlertaPagamentoGrupo] = useState(true);
+
+  // 1. CARREGA AS PREFERÊNCIAS DO BANCO DE DADOS
+  useEffect(() => {
+    async function loadPreferences() {
+      if (!user?.id) return;
+      const { data, error } = await supabase
+        .from("user")
+        .select("dias_fatura, alerta_lancamento_grupo, alerta_pagamento_grupo")
+        .eq("id", user.id)
+        .single();
+
+      if (!error && data) {
+        setDiasFatura(data.dias_fatura || "3");
+        setAlertaNovoLancamento(data.alerta_lancamento_grupo ?? true);
+        setAlertaPagamentoGrupo(data.alerta_pagamento_grupo ?? true);
+      }
+    }
+    loadPreferences();
+  }, [user]);
 
   // Verifica o status da inscrição push real quando a página carrega
   useEffect(() => {
     async function checkSubscription() {
       if ("serviceWorker" in navigator && "PushManager" in window) {
-        const registration = await navigator.serviceWorker.ready;
-        const subscription = await registration.pushManager.getSubscription();
-        setIsSubscribed(!!subscription);
+        try {
+          const registration = await navigator.serviceWorker.getRegistration();
+          if (registration) {
+            const subscription =
+              await registration.pushManager.getSubscription();
+            setIsSubscribed(!!subscription);
+          }
+        } catch (e) {
+          console.error("Erro ao checar subscription", e);
+        }
       }
     }
     checkSubscription();
   }, []);
 
-  // Lógica Real do Push
+  // 2. FUNÇÕES PARA ATUALIZAR O BANCO DE DADOS AUTOMATICAMENTE
+  const updatePreference = async (field: string, value: any) => {
+    if (!user?.id) return;
+    const { error } = await supabase
+      .from("user")
+      .update({ [field]: value })
+      .eq("id", user.id);
+
+    if (error) {
+      toast({
+        title: "Erro ao salvar",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleDiasFaturaChange = (val: string) => {
+    setDiasFatura(val);
+    updatePreference("dias_fatura", val);
+  };
+
+  const handleAlertaNovoLancamento = (val: boolean) => {
+    setAlertaNovoLancamento(val);
+    updatePreference("alerta_lancamento_grupo", val);
+  };
+
+  const handleAlertaPagamentoGrupo = (val: boolean) => {
+    setAlertaPagamentoGrupo(val);
+    updatePreference("alerta_pagamento_grupo", val);
+  };
+
+  // Lógica Real do Push com Trava anti Loop Infinito
   const urlBase64ToUint8Array = (base64String: string) => {
     const padding = "=".repeat((4 - (base64String.length % 4)) % 4);
     const base64 = (base64String + padding)
@@ -90,14 +152,27 @@ export default function Preferences() {
     try {
       const permission = await Notification.requestPermission();
       if (permission !== "granted") {
-        toast({ title: "Permissão negada.", variant: "destructive" });
+        toast({
+          title: "Permissão negada pelo navegador.",
+          variant: "destructive",
+        });
         setIsSubscribing(false);
         return;
       }
 
-      const registration = await navigator.serviceWorker.ready;
-      const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
+      // Corrige o loop infinito garantindo que temos um service worker ativo
+      const registration = await navigator.serviceWorker.getRegistration();
+      if (!registration) {
+        toast({
+          title: "Aguarde",
+          description: "Configurando o sistema. Tente de novo em instantes.",
+          variant: "destructive",
+        });
+        setIsSubscribing(false);
+        return;
+      }
 
+      const publicVapidKey = process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY;
       if (!publicVapidKey) {
         toast({
           title: "Erro",
@@ -128,7 +203,7 @@ export default function Preferences() {
     } catch (error: any) {
       toast({
         title: "Erro ao ativar notificações",
-        description: error.message,
+        description: error.message || "Erro desconhecido",
         variant: "destructive",
       });
     } finally {
@@ -175,10 +250,7 @@ export default function Preferences() {
         </div>
       </section>
 
-      {/* 
-        CONTEÚDO BLOQUEADO SE A CHAVE MESTRA ESTIVER DESLIGADA 
-        Usamos opacity-50 e pointer-events-none para dar o efeito visual de desativado
-      */}
+      {/* CONTEÚDO BLOQUEADO SE A CHAVE MESTRA ESTIVER DESLIGADA */}
       <div
         className={cn(
           "transition-opacity duration-300",
@@ -203,7 +275,7 @@ export default function Preferences() {
                 Lembrar sobre contas a pagar e faturas do cartão.
               </p>
             </div>
-            <Select value={diasFatura} onValueChange={setDiasFatura}>
+            <Select value={diasFatura} onValueChange={handleDiasFaturaChange}>
               <SelectTrigger className="h-11 rounded-xl w-full sm:w-[180px]">
                 <SelectValue placeholder="Selecione" />
               </SelectTrigger>
@@ -238,7 +310,7 @@ export default function Preferences() {
             </div>
             <Toggle
               checked={alertaNovoLancamento}
-              onChange={setAlertaNovoLancamento}
+              onChange={handleAlertaNovoLancamento}
             />
           </div>
 
@@ -253,7 +325,7 @@ export default function Preferences() {
             </div>
             <Toggle
               checked={alertaPagamentoGrupo}
-              onChange={setAlertaPagamentoGrupo}
+              onChange={handleAlertaPagamentoGrupo}
             />
           </div>
         </section>

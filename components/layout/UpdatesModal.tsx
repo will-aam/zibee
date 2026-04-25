@@ -19,7 +19,6 @@ import { SparklesIcon, BellIcon, InboxIcon } from "@heroicons/react/24/solid";
 import { appUpdates } from "@/lib/changelog";
 import { Button } from "@/components/ui/button";
 
-// 1. Definimos a interface para receber a função de navegação
 interface UpdatesModalProps {
   onNavigate?: (tab: string) => void;
 }
@@ -57,11 +56,14 @@ export function UpdatesModal({ onNavigate }: UpdatesModalProps) {
     };
   }, []);
 
-  // 2. Função para lidar com o clique em "Explorar novidade"
-  const handleExplore = () => {
-    setIsOpen(false); // Fecha a Sidebar
-    // Chama a função de navegação para a aba de cartões
-    onNavigate?.("cartoes");
+  const handleExplore = (updateId: string) => {
+    setIsOpen(false);
+    // Redireciona de forma inteligente baseado na novidade clicada
+    if (updateId.includes("configuracoes")) {
+      onNavigate?.("configuracoes"); // Ajuste para o nome da sua aba de settings se for diferente
+    } else {
+      onNavigate?.("cartoes");
+    }
   };
 
   return (
@@ -82,9 +84,9 @@ export function UpdatesModal({ onNavigate }: UpdatesModalProps) {
         <Tabs
           value={activeTab}
           onValueChange={setActiveTab}
-          className="flex-1 flex flex-col mt-4"
+          className="flex-1 flex flex-col mt-4 min-h-0"
         >
-          <div className="px-6">
+          <div className="px-6 shrink-0">
             <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-muted/50 p-1">
               <TabsTrigger value="notifications" className="rounded-xl gap-2">
                 <BellIcon className="h-4 w-4" />
@@ -100,7 +102,7 @@ export function UpdatesModal({ onNavigate }: UpdatesModalProps) {
           {/* ABA 1: NOTIFICAÇÕES PESSOAIS */}
           <TabsContent
             value="notifications"
-            className="flex-1 overflow-y-auto p-6 mt-0"
+            className="flex-1 overflow-y-auto p-6 mt-0 scrollbar-width-none [&::-webkit-scrollbar]:hidden"
           >
             <div className="flex flex-col items-center justify-center h-[60vh] text-center space-y-4">
               <div className="bg-muted/50 p-6 rounded-full">
@@ -120,14 +122,10 @@ export function UpdatesModal({ onNavigate }: UpdatesModalProps) {
           {/* ABA 2: ATUALIZAÇÕES DO SISTEMA (CHANGELOG) */}
           <TabsContent
             value="updates"
-            className="flex-1 overflow-y-auto p-6 mt-0"
+            className="flex-1 overflow-y-auto p-6 mt-0 scrollbar-width-none [&::-webkit-scrollbar]:hidden"
           >
-            <Accordion
-              type="single"
-              collapsible
-              className="w-full space-y-4"
-              defaultValue={appUpdates[0]?.id}
-            >
+            {/* Removido o defaultValue para que venha tudo recolhido por padrão */}
+            <Accordion type="single" collapsible className="w-full space-y-4">
               {appUpdates.map((update, index) => (
                 <AccordionItem
                   key={update.id}
@@ -161,16 +159,14 @@ export function UpdatesModal({ onNavigate }: UpdatesModalProps) {
                       ))}
                     </div>
 
-                    {/* 3. Botão configurado para navegar */}
-                    {index === 0 && (
-                      <Button
-                        variant="outline"
-                        className="w-full mt-2 rounded-xl border-primary/30 hover:bg-primary/5 text-primary font-bold"
-                        onClick={handleExplore}
-                      >
-                        Explorar novidade
-                      </Button>
-                    )}
+                    {/* Botão interativo que sabe para onde mandar */}
+                    <Button
+                      variant="outline"
+                      className="w-full mt-2 rounded-xl border-primary/30 hover:bg-primary/5 text-primary font-bold"
+                      onClick={() => handleExplore(update.id)}
+                    >
+                      Explorar novidade
+                    </Button>
                   </AccordionContent>
                 </AccordionItem>
               ))}

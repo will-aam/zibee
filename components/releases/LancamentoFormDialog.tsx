@@ -678,10 +678,12 @@ export function LancamentoFormDialog({
             )}
 
             <div className="space-y-2">
-              <Label>
+              <Label className="flex items-center gap-2">
                 {formData.tipo === "Receita"
                   ? "Data do Recebimento"
-                  : "Data de Vencimento"}
+                  : isCartao
+                    ? "Dia da Cobrança / Compra"
+                    : "Data de Vencimento"}
               </Label>
               <Popover>
                 <PopoverTrigger asChild>
@@ -724,6 +726,13 @@ export function LancamentoFormDialog({
                   />
                 </PopoverContent>
               </Popover>
+              {/* TEXTO DE AJUDA DINÂMICO PARA CARTÃO */}
+              {isCartao && formData.tipo === "Despesa" && (
+                <p className="text-xs text-muted-foreground pt-1 animate-in fade-in">
+                  * O dia em que o serviço debita no seu cartão. Ajuda a prever
+                  em qual fatura vai cair.
+                </p>
+              )}
             </div>
 
             {lancamentoToEdit?.isShadow && (

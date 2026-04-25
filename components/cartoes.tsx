@@ -248,22 +248,46 @@ export default function Cartoes() {
         return d >= ciclo.inicio && d <= ciclo.fim;
       });
 
-      // --- SOMBRAS APRIMORADAS (EVITA DUPLICIDADE) ---
+      // --- SOMBRAS APRIMORADAS (EVITA DUPLICIDADE E CORRIGE O CICLO) ---
       const sombrasFixas = fixas
         .filter((f) => f.cartao_id === cartao.id)
-        .map((f) => ({
-          id: `shadow-${f.id}`,
-          descricao: f.nome,
-          valor: f.valor,
-          data_vencimento: `${ano}-${String(mes + 1).padStart(2, "0")}-${String(f.dia_vencimento).padStart(2, "0")}`,
-          isShadow: true,
-          // --- CAMPOS NECESSÁRIOS PARA SALVAR NO BANCO ---
-          conta_fixa_id: f.id,
-          categoria: f.categoria || "Sem categoria",
-          user_id: userId,
-          grupo_id: f.grupo_id, // <-- ADICIONADO PARA CONTEXTO DE GRUPO
-          pago: false, // Sombra sempre nasce não paga
-        }))
+        .map((f) => {
+          // MÁGICA DO CICLO: Descobrir em qual mês a sombra desta fatura caiu.
+          let mesDaSombra = mes + 1;
+          let anoDaSombra = ano;
+
+          // Se a assinatura vence DEPOIS do fechamento do cartão,
+          // a cobrança que compõe a fatura atual ocorreu no mês passado.
+          if (f.dia_vencimento > cartao.dia_fechamento) {
+            mesDaSombra = mes;
+            if (mesDaSombra === 0) {
+              // Se for Janeiro, volta para Dezembro do ano passado
+              mesDaSombra = 12;
+              anoDaSombra = ano - 1;
+            }
+          }
+
+          // Prevenção de bugs: E se a assinatura for dia 31 e o mês só tiver 30 dias?
+          const ultimoDiaDoMes = new Date(
+            anoDaSombra,
+            mesDaSombra,
+            0,
+          ).getDate();
+          const diaSeguro = Math.min(f.dia_vencimento, ultimoDiaDoMes);
+
+          return {
+            id: `shadow-${f.id}`,
+            descricao: f.nome,
+            valor: f.valor,
+            data_vencimento: `${anoDaSombra}-${String(mesDaSombra).padStart(2, "0")}-${String(diaSeguro).padStart(2, "0")}`,
+            isShadow: true,
+            conta_fixa_id: f.id,
+            categoria: f.categoria || "Sem categoria",
+            user_id: userId,
+            grupo_id: f.grupo_id,
+            pago: false,
+          };
+        })
         .filter((s) => {
           // 1. Verifica se já existe um lançamento real para esta conta fixa neste ciclo
           const jaExisteReal = despesasFatura.some(

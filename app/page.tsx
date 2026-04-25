@@ -5,12 +5,12 @@ import Header from "@/components/layout/header";
 import Dashboard from "@/components/layout/header/dashboard";
 import Lancamentos from "@/components/releases";
 import Metas from "@/components/goals";
-import Configuracoes from "@/components/settings";
 import DespesasFixas from "@/components/features/fixed-expenses";
 import Receitas from "@/components/receitas";
 import GruposConfig from "@/components/groups";
 import Investimentos from "@/components/Investimentos";
 import Cartoes from "@/components/cartoes";
+import Settings from "@/components/settings/Settings";
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -29,7 +29,7 @@ export default function Home() {
         {activeTab === "cartoes" && <Cartoes />}
         {activeTab === "metas" && <Metas />}
         {activeTab === "configuracoes" && (
-          <Configuracoes onNavigate={setActiveTab} />
+          <Settings onNavigate={setActiveTab} />
         )}
         {activeTab === "despesas_fixas" && <DespesasFixas />}
         {activeTab === "grupos" && <GruposConfig />}

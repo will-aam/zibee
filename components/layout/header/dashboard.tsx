@@ -214,8 +214,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       let queryCartoes = supabase.from("cartoes_credito").select("*");
 
-      // NOVA QUERY: Categorias do usuário
-      let queryCategorias = supabase.from("categorias").select("*");
+      // NOVA QUERY: Categorias do usuário (AGORA IGNORA O GRUPO_ID)
+      let queryCategorias = supabase
+        .from("categorias")
+        .select("*")
+        .eq("user_id", userId);
 
       if (activeContext === "grupo" && groupId) {
         queryDespesasVariaveis = queryDespesasVariaveis.eq("grupo_id", groupId);
@@ -223,7 +226,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         queryVencimentos = queryVencimentos.eq("grupo_id", groupId);
         queryFixasDashboard = queryFixasDashboard.eq("grupo_id", groupId);
         queryCartoes = queryCartoes.eq("grupo_id", groupId);
-        queryCategorias = queryCategorias.eq("grupo_id", groupId);
       } else {
         queryDespesasVariaveis = queryDespesasVariaveis
           .eq("user_id", userId)
@@ -238,9 +240,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryCartoes = queryCartoes.eq("user_id", userId).is("grupo_id", null);
-        queryCategorias = queryCategorias
-          .eq("user_id", userId)
-          .is("grupo_id", null);
       }
 
       if (from) {
@@ -395,9 +394,45 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .slice(0, 5);
       }
 
-      // Filtra as categorias com limite > 0 e ordena pelo maior limite
+      // ---------------------------------------------------------
+      // CÁLCULO EXATO PARA OS LIMITES (Igual à tela de Planejamento)
+      // ---------------------------------------------------------
+      const fixasPagasNoMes = new Set(
+        fetchedDespesasBrutas
+          .filter((d) => d.conta_fixa_id != null)
+          .map((d) => d.conta_fixa_id),
+      );
+
+      const gastosParaLimitesMap: Record<string, { total: number }> = {};
+
+      // 1. Soma Lançamentos Reais
+      fetchedDespesasBrutas.forEach((item) => {
+        const cat = (item.categoria || "Sem categoria").trim();
+        if (!gastosParaLimitesMap[cat])
+          gastosParaLimitesMap[cat] = { total: 0 };
+        gastosParaLimitesMap[cat].total += Number(item.valor);
+      });
+
+      // 2. Soma as "Sombras" (Fixas ainda não pagas)
+      dadosFixasValidos.forEach((fixa) => {
+        if (!fixasPagasNoMes.has(fixa.id)) {
+          const cat = (fixa.categoria || "Sem categoria").trim();
+          if (!gastosParaLimitesMap[cat])
+            gastosParaLimitesMap[cat] = { total: 0 };
+          gastosParaLimitesMap[cat].total += Number(fixa.valor);
+        }
+      });
+
+      // 3. Mapeia os Limites cruzando com o total calculado acima
       const fetchedCategoriasLimite = (categoriasData || [])
         .filter((c) => c.teto_gastos && Number(c.teto_gastos) > 0)
+        .map((c) => {
+          const gastoAtual = gastosParaLimitesMap[c.nome.trim()]?.total || 0;
+          return {
+            ...c,
+            gasto: gastoAtual,
+          };
+        })
         .sort((a, b) => Number(b.teto_gastos) - Number(a.teto_gastos));
 
       setDespesasBrutas(fetchedDespesasBrutas);
@@ -544,128 +579,162 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     "#14b8a6",
   ];
 
-  const renderCategoryBudgets = () => (
-    <section className="pt-6 border-t border-border/50">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
-          <ChartPieIcon className="h-4 w-4 text-primary" /> Planejamento de
-          Gastos
-        </h2>
-        {categoriasComLimite.length > 0 && (
-          <button
-            onClick={() => onNavigate && onNavigate("planejamento")}
-            className="text-xs text-primary hover:underline font-medium"
-          >
-            Gerenciar Limites
-          </button>
-        )}
-      </div>
+  const renderCategoryBudgets = () => {
+    // 1. Calcular Totais baseados apenas nas categorias que possuem limite
+    const totalLimite = categoriasComLimite.reduce(
+      (acc, cat) => acc + Number(cat.teto_gastos),
+      0,
+    );
+    const totalGastoLimites = categoriasComLimite.reduce(
+      (acc, cat) => acc + (cat.gasto || 0),
+      0,
+    );
 
-      {categoriasComLimite.length === 0 ? (
-        <div className="bg-muted/20 border border-dashed rounded-3xl p-8 text-center flex flex-col items-center">
-          <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
-            <ShieldExclamationIcon className="h-6 w-6 text-primary" />
-          </div>
-          <p className="text-base font-bold text-foreground mb-1">
-            Crie um planejamento
-          </p>
-          <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-            Defina limites por categoria (ex: 30% Moradia) e acompanhe seu
-            progresso para não estourar o orçamento mensal.
-          </p>
-          <Button
-            onClick={() => onNavigate && onNavigate("planejamento")}
-            className="rounded-xl px-6 h-11 shadow-sm"
-          >
-            Configurar Limites
-          </Button>
+    // 2. Porcentagem Geral do gráfico (limitado a 100% para o SVG não quebrar)
+    const porcentagemUsoGeral =
+      totalLimite > 0
+        ? Math.min((totalGastoLimites / totalLimite) * 100, 100)
+        : 0;
+
+    return (
+      <section className="pt-6 border-t border-border/50">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+            <ChartPieIcon className="h-4 w-4 text-primary" /> Planejamento de
+            Gastos
+          </h2>
+          {categoriasComLimite.length > 0 && (
+            <button
+              onClick={() => onNavigate && onNavigate("receitas")}
+              className="text-xs text-primary hover:underline font-medium"
+            >
+              Gerenciar Limites
+            </button>
+          )}
         </div>
-      ) : (
-        <div className="bg-card border border-border/50 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
-          {/* Header do Card (Total + Gráfico) */}
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
-                Total Categorizado
-              </p>
-              <p className="text-2xl sm:text-3xl font-bold tracking-tighter">
-                {formatMoney(totalCategorizado)}
-              </p>
-            </div>
 
-            {/* Gráfico Donut com CSS Conic Gradient */}
-            <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0">
-              <div
-                className="absolute inset-0 rounded-full"
-                style={{
-                  background: `conic-gradient(${categoriasComLimite
-                    .map((cat, i) => {
-                      const prevSum = categoriasComLimite
-                        .slice(0, i)
-                        .reduce((acc, c) => acc + Number(c.teto_gastos), 0);
-                      const startPct =
-                        totalCategorizado > 0
-                          ? (prevSum / totalCategorizado) * 100
-                          : 0;
-                      const endPct =
-                        totalCategorizado > 0
-                          ? ((prevSum + Number(cat.teto_gastos)) /
-                              totalCategorizado) *
-                            100
-                          : 0;
-                      return `${categoryColors[i % categoryColors.length]} ${startPct}% ${endPct}%`;
-                    })
-                    .join(", ")})`,
-                }}
-              />
-              <div className="absolute inset-2 sm:inset-2.5 bg-card rounded-full" />
+        {categoriasComLimite.length === 0 ? (
+          <div className="bg-muted/20 border border-dashed rounded-3xl p-8 text-center flex flex-col items-center">
+            <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
+              <ShieldExclamationIcon className="h-6 w-6 text-primary" />
             </div>
+            <p className="text-base font-bold text-foreground mb-1">
+              Crie um planejamento
+            </p>
+            <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+              Defina limites por categoria (ex: 30% Moradia) e acompanhe seu
+              progresso para não estourar o orçamento.
+            </p>
+            <Button
+              onClick={() => onNavigate && onNavigate("receitas")}
+              className="rounded-xl px-6 h-11 shadow-sm"
+            >
+              Configurar Limites
+            </Button>
           </div>
+        ) : (
+          <div className="bg-card border border-border/50 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
+            {/* Header: Total Gasto vs Total Limite + Gráfico */}
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                  Gasto vs Planejado
+                </p>
+                <div className="flex items-baseline gap-1.5">
+                  <p className="text-2xl sm:text-3xl font-bold tracking-tighter text-foreground">
+                    {formatMoney(totalGastoLimites)}
+                  </p>
+                  <p className="text-sm sm:text-base text-muted-foreground font-medium">
+                    / {formatMoney(totalLimite)}
+                  </p>
+                </div>
+              </div>
 
-          {/* Lista de Categorias */}
-          <div className="space-y-3">
-            {categoriasComLimite.map((cat, idx) => {
-              const color = categoryColors[idx % categoryColors.length];
-              const pct =
-                totalCategorizado > 0
-                  ? (Number(cat.teto_gastos) / totalCategorizado) * 100
-                  : 0;
-
-              return (
-                <div
-                  key={cat.id}
-                  className="flex items-center justify-between p-3 border border-border/40 rounded-2xl hover:bg-muted/30 transition-colors"
+              {/* Gráfico SVG Donut (Criado com base no que você somou) */}
+              <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0">
+                <svg
+                  viewBox="0 0 36 36"
+                  className="w-full h-full transform -rotate-90"
                 >
-                  <div className="flex items-center gap-3">
-                    <div
-                      className="w-10 h-10 rounded-full flex items-center justify-center"
-                      style={{ backgroundColor: `${color}15` }}
-                    >
+                  {/* Fundo do círculo (Cinza) */}
+                  <path
+                    className="text-muted/30"
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                  />
+                  {/* Progresso do círculo (Cor principal ou Vermelho se estourar) */}
+                  <path
+                    className={`${totalGastoLimites > totalLimite ? "text-red-500" : "text-primary"} transition-all duration-500`}
+                    strokeDasharray={`${porcentagemUsoGeral}, 100`}
+                    d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="4"
+                    strokeLinecap="round"
+                  />
+                </svg>
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <span
+                    className={`text-[11px] sm:text-xs font-bold ${totalGastoLimites > totalLimite ? "text-red-500" : ""}`}
+                  >
+                    {porcentagemUsoGeral.toFixed(0)}%
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Lista de Categorias com Barra de Progresso */}
+            <div className="space-y-4 pt-2">
+              {categoriasComLimite.map((cat, idx) => {
+                const color = categoryColors[idx % categoryColors.length];
+                const gasto = cat.gasto || 0;
+                const limite = Number(cat.teto_gastos);
+                const pct =
+                  limite > 0 ? Math.min((gasto / limite) * 100, 100) : 0;
+                const isOverBudget = gasto > limite;
+
+                return (
+                  <div key={cat.id} className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: color }}
+                        />
+                        <p className="text-sm font-semibold">{cat.nome}</p>
+                      </div>
+                      <div className="text-right flex items-baseline gap-1">
+                        <span
+                          className={`text-sm font-bold ${isOverBudget ? "text-red-500" : "text-foreground"}`}
+                        >
+                          {formatMoney(gasto)}
+                        </span>
+                        <span className="text-xs text-muted-foreground font-medium">
+                          / {formatMoney(limite)}
+                        </span>
+                      </div>
+                    </div>
+                    {/* Usamos div pura ao invés de <Progress> para garantir que a cor dinâmica funcione bem com o Tailwind */}
+                    <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                       <div
-                        className="w-3.5 h-3.5 rounded-full"
-                        style={{ backgroundColor: color }}
+                        className="h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${pct}%`,
+                          backgroundColor: isOverBudget ? "#ef4444" : color, // Vermelho se passar do limite
+                        }}
                       />
                     </div>
-                    <div>
-                      <p className="text-sm font-bold flex items-center gap-1.5">
-                        {pct.toFixed(0)}%{" "}
-                        <span className="text-muted-foreground font-medium text-xs sm:text-sm">
-                          para {cat.nome}
-                        </span>
-                      </p>
-                    </div>
                   </div>
-                  <div className="text-sm font-bold text-foreground">
-                    {formatMoney(Number(cat.teto_gastos))}
-                  </div>
-                </div>
-              );
-            })}
+                );
+              })}
+            </div>
           </div>
-        </div>
-      )}
-    </section>
-  );
+        )}
+      </section>
+    );
+  };
 
   if (loading) {
     return (

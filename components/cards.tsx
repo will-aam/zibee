@@ -47,6 +47,73 @@ import {
 } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 
+// ==========================================
+// COMPONENTE DE LOGOMARCAS (PURO TAILWIND)
+// ==========================================
+const BrandLogo = ({
+  brand,
+  className,
+}: {
+  brand: string;
+  className?: string;
+}) => {
+  switch (brand) {
+    case "mastercard":
+      return (
+        <div className={cn("flex items-center -space-x-2.5", className)}>
+          <div className="w-6 h-6 bg-[#EB001B] rounded-full z-10 opacity-90" />
+          <div className="w-6 h-6 bg-[#F79E1B] rounded-full z-0 opacity-90" />
+        </div>
+      );
+    case "visa":
+      return (
+        <span
+          className={cn(
+            "font-black italic text-[#1A1F71] dark:text-white tracking-tighter text-xl",
+            className,
+          )}
+        >
+          VISA
+        </span>
+      );
+    case "elo":
+      return (
+        <div
+          className={cn("flex font-black tracking-tighter text-xl", className)}
+        >
+          <span className="text-[#00A4E0]">e</span>
+          <span className="text-[#EFB700]">l</span>
+          <span className="text-[#231F20] dark:text-white">o</span>
+        </div>
+      );
+    case "amex":
+      return (
+        <div
+          className={cn(
+            "bg-[#002663] text-white font-bold text-[10px] px-1.5 py-1 rounded-sm uppercase tracking-widest",
+            className,
+          )}
+        >
+          AMEX
+        </div>
+      );
+    default:
+      return (
+        <CreditCardIcon
+          className={cn("h-6 w-6 text-muted-foreground", className)}
+        />
+      );
+  }
+};
+
+const BANDEIRAS_DISPONIVEIS = [
+  { id: "mastercard", label: "Mastercard" },
+  { id: "visa", label: "Visa" },
+  { id: "elo", label: "Elo" },
+  { id: "amex", label: "Amex" },
+  { id: "outra", label: "Outra" },
+];
+
 // Motor de Ciclo de Fatura
 function getCicloFatura(
   ano: number,
@@ -92,24 +159,21 @@ export default function Cartoes() {
     id: number | null;
   }>({ isOpen: false, id: null });
 
-  // --- NOVOS ESTADOS DO MODAL DE PAGAMENTO ---
   const [payFaturaConfig, setPayFaturaConfig] = useState<{
     isOpen: boolean;
     fatura: any | null;
   }>({ isOpen: false, fatura: null });
   const [isPaying, setIsPaying] = useState(false);
-  // -------------------------------------------
 
   const [formData, setFormData] = useState({
     nome: "",
     limite: "",
     dia_fechamento: "",
     dia_vencimento: "",
+    bandeira: "mastercard", // <-- Padrão "Pirraça" ativado!
   });
 
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
-
-  // --- PULO AUTOMÁTICO PARA A FATURA ABERTA ---
   const hasAutoJumped = useRef(false);
 
   useEffect(() => {
@@ -126,7 +190,6 @@ export default function Cartoes() {
       hasAutoJumped.current = true;
     }
   }, [cartoes]);
-  // --------------------------------------------
 
   const fetchData = useCallback(async () => {
     if (!userId) return;
@@ -171,6 +234,7 @@ export default function Cartoes() {
       limite: "",
       dia_fechamento: "",
       dia_vencimento: "",
+      bandeira: "mastercard",
     });
     setIsModalOpen(true);
   };
@@ -182,6 +246,7 @@ export default function Cartoes() {
       limite: cartao.limite?.toString() || "",
       dia_fechamento: cartao.dia_fechamento.toString(),
       dia_vencimento: cartao.dia_vencimento.toString(),
+      bandeira: cartao.bandeira || "mastercard",
     });
     setIsModalOpen(true);
   };
@@ -194,6 +259,7 @@ export default function Cartoes() {
       limite: formData.limite ? Number(formData.limite) : null,
       dia_fechamento: Number(formData.dia_fechamento),
       dia_vencimento: Number(formData.dia_vencimento),
+      bandeira: formData.bandeira, // Salva a bandeira escolhida
     };
 
     try {
@@ -248,26 +314,20 @@ export default function Cartoes() {
         return d >= ciclo.inicio && d <= ciclo.fim;
       });
 
-      // --- SOMBRAS APRIMORADAS (EVITA DUPLICIDADE E CORRIGE O CICLO) ---
       const sombrasFixas = fixas
         .filter((f) => f.cartao_id === cartao.id)
         .map((f) => {
-          // MÁGICA DO CICLO: Descobrir em qual mês a sombra desta fatura caiu.
           let mesDaSombra = mes + 1;
           let anoDaSombra = ano;
 
-          // Se a assinatura vence DEPOIS do fechamento do cartão,
-          // a cobrança que compõe a fatura atual ocorreu no mês passado.
           if (f.dia_vencimento > cartao.dia_fechamento) {
             mesDaSombra = mes;
             if (mesDaSombra === 0) {
-              // Se for Janeiro, volta para Dezembro do ano passado
               mesDaSombra = 12;
               anoDaSombra = ano - 1;
             }
           }
 
-          // Prevenção de bugs: E se a assinatura for dia 31 e o mês só tiver 30 dias?
           const ultimoDiaDoMes = new Date(
             anoDaSombra,
             mesDaSombra,
@@ -289,16 +349,12 @@ export default function Cartoes() {
           };
         })
         .filter((s) => {
-          // 1. Verifica se já existe um lançamento real para esta conta fixa neste ciclo
           const jaExisteReal = despesasFatura.some(
             (real) => real.conta_fixa_id === s.conta_fixa_id,
           );
-
-          // 2. Só mostra a sombra se não houver um real e se estiver dentro das datas do ciclo
           const d = new Date(s.data_vencimento + "T00:00:00");
           return !jaExisteReal && d >= ciclo.inicio && d <= ciclo.fim;
         });
-      // -------------------------------------------------
 
       const todasDespesasMês = [...despesasFatura, ...sombrasFixas].sort(
         (a, b) =>
@@ -332,21 +388,19 @@ export default function Cartoes() {
         utilizado,
         disponivel,
         porcentagemUso,
+        bandeira: cartao.bandeira || "mastercard", // Garante o fallback no frontend também
       };
     });
   }, [cartoes, lancamentos, fixas, date, userId]);
 
-  // --- FUNÇÃO DE PAGAR FATURA (CONSOLIDAÇÃO) ---
   const handlePayFatura = async () => {
     if (!payFaturaConfig.fatura || !userId) return;
     setIsPaying(true);
 
     try {
       const { fatura } = payFaturaConfig;
-      // 1. Filtramos apenas o que ainda não foi pago
       const unpaidItems = fatura.despesas.filter((d: any) => !d.pago);
 
-      // 2. Separamos os Lançamentos Reais e as Sombras (Fixas)
       const realIdsToUpdate = unpaidItems
         .filter((d: any) => !d.isShadow)
         .map((d: any) => d.id);
@@ -362,11 +416,10 @@ export default function Cartoes() {
           forma_pagamento: "Cartão de Crédito",
           conta_fixa_id: s.conta_fixa_id,
           cartao_id: fatura.id,
-          grupo_id: activeContext === "grupo" ? s.grupo_id : null, // <-- ADICIONADO
+          grupo_id: activeContext === "grupo" ? s.grupo_id : null,
           pago: true,
         }));
 
-      // 3. Executamos no banco de dados!
       if (realIdsToUpdate.length > 0) {
         await supabase
           .from("lancamentos")
@@ -379,15 +432,14 @@ export default function Cartoes() {
 
       toast({ title: "Fatura paga com sucesso!" });
       setPayFaturaConfig({ isOpen: false, fatura: null });
-      fetchData(); // Atualiza a tela
-      window.dispatchEvent(new Event("zibee:transaction-changed")); // Atualiza o Dashboard
+      fetchData();
+      window.dispatchEvent(new Event("zibee:transaction-changed"));
     } catch (error) {
       toast({ title: "Erro ao pagar fatura", variant: "destructive" });
     } finally {
       setIsPaying(false);
     }
   };
-  // -----------------------------------------
 
   const formatMoney = (val: number) =>
     val.toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
@@ -438,11 +490,11 @@ export default function Cartoes() {
                   className="p-6 cursor-pointer"
                   onClick={() => setExpandedCard(isExpanded ? null : fatura.id)}
                 >
-                  {/* CABEÇALHO DO CARTÃO */}
                   <div className="flex flex-col sm:flex-row justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      <div className="h-14 w-14 bg-primary/10 rounded-2xl flex items-center justify-center text-primary">
-                        <CreditCardIcon className="h-7 w-7" />
+                      {/* AQUI ESTÁ A LOGO DA BANDEIRA */}
+                      <div className="h-14 w-16 bg-muted/30 border border-border/50 rounded-xl flex items-center justify-center">
+                        <BrandLogo brand={fatura.bandeira} />
                       </div>
                       <div>
                         <h3 className="font-bold text-xl flex items-center gap-2">
@@ -468,7 +520,6 @@ export default function Cartoes() {
                       </div>
                     </div>
 
-                    {/* BARRA DE LIMITE (ESTILO BANCO) */}
                     <div className="flex-1 max-w-sm space-y-2 mt-2 sm:mt-0">
                       <div className="flex justify-between text-xs font-medium">
                         <span className="text-muted-foreground">
@@ -495,7 +546,6 @@ export default function Cartoes() {
                       )}
                     </div>
 
-                    {/* VALOR DA FATURA */}
                     <div className="flex items-center gap-4 border-t sm:border-t-0 sm:border-l border-border/40 pt-4 sm:pt-0 sm:pl-6">
                       <div className="text-right flex-1 sm:flex-none">
                         <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-0.5">
@@ -515,10 +565,8 @@ export default function Cartoes() {
                   </div>
                 </div>
 
-                {/* ITENS DA FATURA */}
                 {isExpanded && (
                   <div className="bg-muted/10 border-t border-border/40 p-6 animate-in slide-in-from-top-2">
-                    {/* --- TÍTULO + BOTÃO PAGAR --- */}
                     <div className="flex items-center justify-between mb-6">
                       <div className="flex items-center gap-3">
                         <div className="flex items-center gap-2 text-xs font-bold text-muted-foreground uppercase tracking-widest">
@@ -526,7 +574,6 @@ export default function Cartoes() {
                           desta Fatura
                         </div>
 
-                        {/* SE A FATURA TIVER VALOR E ITENS PENDENTES, MOSTRA O BOTÃO */}
                         {fatura.totalFaturaMes > 0 &&
                           fatura.despesas.some((d: any) => !d.pago) && (
                             <Button
@@ -567,7 +614,6 @@ export default function Cartoes() {
                         </Button>
                       </div>
                     </div>
-                    {/* -------------------------------------- */}
 
                     <div className="space-y-4">
                       {fatura.despesas.length > 0 ? (
@@ -624,7 +670,7 @@ export default function Cartoes() {
         </div>
       )}
 
-      {/* MODAL EDITAR/CRIAR E ALERTAS */}
+      {/* MODAL DE CRIAÇÃO/EDIÇÃO COM SELETOR DE BANDEIRA */}
       <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
         <DialogContent className="sm:max-w-md rounded-4xl">
           <DialogHeader>
@@ -632,25 +678,65 @@ export default function Cartoes() {
               {cartaoEditing ? "Editar Cartão" : "Novo Cartão"}
             </DialogTitle>
           </DialogHeader>
-          <form onSubmit={handleSave} className="space-y-4 pt-4">
+          <form onSubmit={handleSave} className="space-y-6 pt-4">
+            {/* SELETOR DE BANDEIRA */}
+            <div className="space-y-3">
+              <Label>Bandeira do Cartão</Label>
+              <div className="grid grid-cols-5 gap-2">
+                {BANDEIRAS_DISPONIVEIS.map((bandeira) => {
+                  const isSelected = formData.bandeira === bandeira.id;
+                  return (
+                    <button
+                      key={bandeira.id}
+                      type="button"
+                      onClick={() =>
+                        setFormData({ ...formData, bandeira: bandeira.id })
+                      }
+                      className={cn(
+                        "flex flex-col items-center justify-center py-3 border rounded-xl transition-all active:scale-95",
+                        isSelected
+                          ? "border-primary bg-primary/10 shadow-sm"
+                          : "border-border hover:bg-muted/50",
+                      )}
+                    >
+                      <div className="h-6 flex items-center justify-center">
+                        <BrandLogo brand={bandeira.id} />
+                      </div>
+                      <span
+                        className={cn(
+                          "text-[9px] mt-2 font-bold uppercase tracking-wider",
+                          isSelected ? "text-primary" : "text-muted-foreground",
+                        )}
+                      >
+                        {bandeira.label}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="space-y-2">
               <Label>Nome do Cartão</Label>
               <Input
                 required
+                placeholder="Ex: Nubank, Itaú..."
                 value={formData.nome}
                 onChange={(e) =>
                   setFormData({ ...formData, nome: e.target.value })
                 }
               />
             </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label>Fechamento</Label>
+                <Label>Fechamento (Dia)</Label>
                 <Input
                   type="number"
                   min="1"
                   max="31"
                   required
+                  placeholder="Ex: 15"
                   value={formData.dia_fechamento}
                   onChange={(e) =>
                     setFormData({ ...formData, dia_fechamento: e.target.value })
@@ -658,12 +744,13 @@ export default function Cartoes() {
                 />
               </div>
               <div className="space-y-2">
-                <Label>Vencimento</Label>
+                <Label>Vencimento (Dia)</Label>
                 <Input
                   type="number"
                   min="1"
                   max="31"
                   required
+                  placeholder="Ex: 22"
                   value={formData.dia_vencimento}
                   onChange={(e) =>
                     setFormData({ ...formData, dia_vencimento: e.target.value })
@@ -673,19 +760,26 @@ export default function Cartoes() {
             </div>
             <div className="space-y-2">
               <Label>Limite Total</Label>
-              <Input
-                type="number"
-                step="0.01"
-                required
-                value={formData.limite}
-                onChange={(e) =>
-                  setFormData({ ...formData, limite: e.target.value })
-                }
-              />
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  R$
+                </span>
+                <Input
+                  type="number"
+                  step="0.01"
+                  required
+                  placeholder="0.00"
+                  value={formData.limite}
+                  onChange={(e) =>
+                    setFormData({ ...formData, limite: e.target.value })
+                  }
+                  className="pl-9"
+                />
+              </div>
             </div>
             <DialogFooter>
               <Button type="submit" className="w-full h-12 rounded-xl">
-                Salvar
+                {cartaoEditing ? "Salvar Alterações" : "Criar Cartão"}
               </Button>
             </DialogFooter>
           </form>
@@ -722,7 +816,6 @@ export default function Cartoes() {
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* --- MODAL DE PAGAR FATURA --- */}
       <Dialog
         open={payFaturaConfig.isOpen}
         onOpenChange={(open) =>
@@ -733,8 +826,7 @@ export default function Cartoes() {
           <DialogHeader>
             <DialogTitle>Confirmar Pagamento</DialogTitle>
             <DialogDescription>
-              Isso marcará todos os lançamentos desta fatura como pagos e
-              debitará o valor do seu saldo geral.
+              Isso marcará todos os lançamentos desta fatura como pagos.
             </DialogDescription>
           </DialogHeader>
 
@@ -770,7 +862,6 @@ export default function Cartoes() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      {/* ---------------------------------------- */}
     </div>
   );
 }

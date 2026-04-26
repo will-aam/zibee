@@ -9,7 +9,7 @@ import DespesasFixas from "@/components/features/fixed-expenses";
 import Receitas from "@/components/receitas";
 import GruposConfig from "@/components/groups";
 import Investimentos from "@/components/Investimentos";
-import Cartoes from "@/components/cartoes";
+import Cartoes from "@/components/cards";
 import Settings from "@/components/settings/Settings";
 
 export default function Home() {

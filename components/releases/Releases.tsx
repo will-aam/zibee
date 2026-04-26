@@ -649,7 +649,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
 
               {/* NOSSO NOVO BOTÃO DE CLASSIFICAÇÃO (SORT) */}
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[130px] sm:w-[160px] shrink-0 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary rounded-xl">
+                <SelectTrigger className="w-[130px] sm:w-40 shrink-0 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary rounded-xl">
                   <div className="flex items-center gap-2 truncate">
                     <ArrowsUpDownIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
                     <SelectValue placeholder="Ordenar" />

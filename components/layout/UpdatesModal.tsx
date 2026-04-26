@@ -159,14 +159,14 @@ export function UpdatesModal({ onNavigate }: UpdatesModalProps) {
                       ))}
                     </div>
 
-                    {/* Botão interativo que sabe para onde mandar */}
+                    {/* Botão interativo que sabe para onde mandar 
                     <Button
                       variant="outline"
                       className="w-full mt-2 rounded-xl border-primary/30 hover:bg-primary/5 text-primary font-bold"
                       onClick={() => handleExplore(update.id)}
                     >
                       Explorar novidade
-                    </Button>
+                    </Button> */}
                   </AccordionContent>
                 </AccordionItem>
               ))}

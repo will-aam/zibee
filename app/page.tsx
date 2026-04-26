@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Header from "@/components/layout/header";
 import Dashboard from "@/components/layout/header/dashboard";
-import Lancamentos from "@/components/releases";
+import Lancamentos from "@/components/releases/Releases";
 import Metas from "@/components/goals";
 import DespesasFixas from "@/components/features/fixed-expenses";
 import Receitas from "@/components/receitas";

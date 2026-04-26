@@ -29,7 +29,7 @@ import {
 } from "@/components/ui/popover";
 import { Calendar } from "@/components/ui/calendar";
 import { useToast } from "@/hooks/use-toast";
-import { MinusIcon, PlusIcon } from "@heroicons/react/24/solid";
+import { MinusIcon, PlusIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
 import {
   CalendarDaysIcon,
   InformationCircleIcon,
@@ -39,6 +39,7 @@ import { cn } from "@/lib/utils";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 
+// Tipagens e Constantes
 type RecurrenceEndType = "ate_data" | "ocorrencias";
 type RepeatType = "unica" | "fixa" | "parcelada";
 const MAX_RECURRENCE_MONTHS = 600;
@@ -61,6 +62,9 @@ interface LancamentoFormDialogProps {
   groupId: string | null;
 }
 
+// ==========================================
+// COMPONENTE PRINCIPAL
+// ==========================================
 export function LancamentoFormDialog({
   isOpen,
   onClose,
@@ -75,17 +79,17 @@ export function LancamentoFormDialog({
 }: LancamentoFormDialogProps) {
   const { toast } = useToast();
 
+  // --- ESTADOS ---
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
+  const [isSubmitting, setIsSubmitting] = useState(false); // TRAVA CONTRA DEDO NERVOSO
 
   const [repeatType, setRepeatType] = useState<RepeatType>("unica");
   const [recurrenceEndType, setRecurrenceEndType] =
     useState<RecurrenceEndType>("ocorrencias");
   const [recurrenceEndDate, setRecurrenceEndDate] = useState("");
   const [recurrenceOccurrences, setRecurrenceOccurrences] = useState(2);
-
   const [statusFixa, setStatusFixa] = useState<"ativo" | "pausado">("ativo");
 
-  // NOVOS ESTADOS PARA CATEGORIA E VALOR
   const [isCreatingCategory, setIsCreatingCategory] = useState(false);
   const [newCategoryName, setNewCategoryName] = useState("");
   const [valorInput, setValorInput] = useState("0,00");
@@ -101,7 +105,7 @@ export function LancamentoFormDialog({
     formData.forma_pagamento?.toLowerCase().includes("cartão") ||
     formData.forma_pagamento?.toLowerCase().includes("cartao");
 
-  // Sincroniza o valor visual (máscara) quando carrega um lançamento para edição
+  // --- EFEITOS ---
   useEffect(() => {
     if (lancamentoToEdit) {
       setFormData({
@@ -109,17 +113,14 @@ export function LancamentoFormDialog({
         categoria: lancamentoToEdit.categoria?.trim(),
         forma_pagamento: lancamentoToEdit.forma_pagamento?.trim(),
       });
-      // Formata o valor inicial para a máscara
-      if (lancamentoToEdit.valor) {
-        setValorInput(
-          lancamentoToEdit.valor.toLocaleString("pt-BR", {
-            minimumFractionDigits: 2,
-            maximumFractionDigits: 2,
-          }),
-        );
-      } else {
-        setValorInput("0,00");
-      }
+      setValorInput(
+        lancamentoToEdit.valor
+          ? lancamentoToEdit.valor.toLocaleString("pt-BR", {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })
+          : "0,00",
+      );
       setRepeatType(lancamentoToEdit.isShadow ? "fixa" : "unica");
       setStatusFixa("ativo");
       setRecurrenceEndType("ocorrencias");
@@ -146,60 +147,44 @@ export function LancamentoFormDialog({
     }
   }, [lancamentoToEdit, isOpen, categoriasDB, formasPagamentoDB]);
 
-  // FUNÇÃO DE MÁSCARA DE DINHEIRO
+  // --- HELPERS E HANDLERS ---
   const handleValorChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    // Remove tudo que não é número
     const value = e.target.value.replace(/\D/g, "");
-
-    // Converte para número decimal (centavos)
     const numericValue = parseInt(value || "0", 10) / 100;
-
-    // Atualiza o visual com formatação brasileira
     setValorInput(
       numericValue.toLocaleString("pt-BR", {
         minimumFractionDigits: 2,
         maximumFractionDigits: 2,
       }),
     );
-
-    // Atualiza o valor real no formData
     setFormData({ ...formData, valor: numericValue });
   };
 
-  // FUNÇÃO PARA CRIAR NOVA CATEGORIA
   const handleCreateCategory = async (
     e: React.MouseEvent | React.KeyboardEvent,
   ) => {
     e.preventDefault();
     if (!newCategoryName.trim() || !userId) return;
-
     try {
       const novaCategoria = {
         nome: newCategoryName.trim(),
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
-        tipo: formData.tipo === "Receita" ? "receita" : "despesa", // Tenta inferir pelo tipo atual
-        cor: "#64748b", // Cor padrão genérica
-        icone: "🏷️", // Ícone padrão genérico
+        tipo: formData.tipo === "Receita" ? "receita" : "despesa",
+        cor: "#64748b",
+        icone: "🏷️",
       };
-
       const { data, error } = await supabase
         .from("categorias")
         .insert([novaCategoria])
         .select();
       if (error) throw error;
-
-      // Seleciona a nova categoria no formulário
       setFormData({ ...formData, categoria: novaCategoria.nome });
       setNewCategoryName("");
       setIsCreatingCategory(false);
-
-      // Dispara evento para recarregar categorias em background
       window.dispatchEvent(new Event("zibee:categories-changed"));
-
       toast({ title: "Categoria criada com sucesso!" });
-    } catch (error: any) {
-      console.error(error);
+    } catch (error) {
       toast({ title: "Erro ao criar categoria", variant: "destructive" });
     }
   };
@@ -236,7 +221,6 @@ export function LancamentoFormDialog({
     if (recurrenceEndType === "ocorrencias") {
       const total = recurrenceOccurrences;
       const valorParcela = Number(basePayload.valor) / total;
-
       for (let i = 1; i <= total; i++) {
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
@@ -254,7 +238,6 @@ export function LancamentoFormDialog({
     if (recurrenceEndType === "ate_data") {
       const end = parseDateLocal(recurrenceEndDate);
       let parcelasCount = 0;
-
       for (
         let monthOffset = 0;
         monthOffset <= MAX_RECURRENCE_MONTHS;
@@ -264,12 +247,10 @@ export function LancamentoFormDialog({
         if (nextDate > end) break;
         parcelasCount++;
       }
-
       const valorParcela =
         parcelasCount > 0
           ? Number(basePayload.valor) / parcelasCount
           : Number(basePayload.valor);
-
       for (let i = 1; i <= parcelasCount; i++) {
         const nextDate = addMonthsKeepingDay(baseDate, i - 1);
         items.push({
@@ -287,53 +268,39 @@ export function LancamentoFormDialog({
 
   const validateRecurrence = () => {
     if (repeatType === "fixa") return true;
-
     if (repeatType !== "parcelada" || formData.tipo !== "Despesa") return true;
-
     if (!formData.data_vencimento) {
       toast({
-        title: "Recorrência inválida",
-        description: "Informe a data do primeiro pagamento.",
+        title: "Atenção",
+        description: "Informe a data inicial.",
         variant: "destructive",
       });
       return false;
     }
     if (recurrenceEndType === "ocorrencias" && recurrenceOccurrences < 2) {
       toast({
-        title: "Recorrência inválida",
-        description: "O número de ocorrências deve ser pelo menos 2.",
+        title: "Atenção",
+        description: "O número mínimo de parcelas é 2.",
         variant: "destructive",
       });
       return false;
     }
-    if (recurrenceEndType === "ate_data") {
-      if (!recurrenceEndDate) {
-        toast({
-          title: "Recorrência inválida",
-          description: "Selecione a data final.",
-          variant: "destructive",
-        });
-        return false;
-      }
-      if (
-        parseDateLocal(recurrenceEndDate) <
-        parseDateLocal(formData.data_vencimento)
-      ) {
-        toast({
-          title: "Recorrência inválida",
-          description: "A data final deve ser depois do primeiro pagamento.",
-          variant: "destructive",
-        });
-        return false;
-      }
+    if (recurrenceEndType === "ate_data" && !recurrenceEndDate) {
+      toast({
+        title: "Atenção",
+        description: "Selecione a data final.",
+        variant: "destructive",
+      });
+      return false;
     }
     return true;
   };
 
+  // --- SUBMISSÃO PRINCIPAL ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!userId) return;
-    if (!validateRecurrence()) return;
+    if (isSubmitting || !userId || !validateRecurrence()) return;
+    setIsSubmitting(true); // TRAVA ATIVADA
 
     try {
       const basePayload = {
@@ -343,7 +310,7 @@ export function LancamentoFormDialog({
         cartao_id: isCartao ? formData.cartao_id : null,
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
-        pago: isCartao ? false : formData.pago, // <-- ADICIONADO PARA BLINDAGEM
+        pago: isCartao ? false : formData.pago,
       } as Omit<Lancamento, "id">;
 
       if (lancamentoToEdit) {
@@ -354,7 +321,6 @@ export function LancamentoFormDialog({
               pago: isCartao ? false : true,
               conta_fixa_id: lancamentoToEdit.conta_fixa_id,
             };
-
             delete (materializadoPayload as any).isShadow;
             delete (materializadoPayload as any).status_fixa;
 
@@ -370,7 +336,7 @@ export function LancamentoFormDialog({
               dia_vencimento: dia,
               categoria: formData.categoria?.trim(),
               forma_pagamento: formData.forma_pagamento?.trim(),
-              cartao_id: isCartao ? formData.cartao_id : null, // <-- CORRIGIDO
+              cartao_id: isCartao ? formData.cartao_id : null,
               status: statusFixa,
             };
 
@@ -378,7 +344,6 @@ export function LancamentoFormDialog({
               .from("despesas_fixas")
               .update(updateMasterPayload)
               .eq("id", lancamentoToEdit.conta_fixa_id);
-
             if (activeContext === "grupo" && groupId)
               query = query.eq("grupo_id", groupId);
             else query = query.eq("user_id", userId).is("grupo_id", null);
@@ -387,8 +352,8 @@ export function LancamentoFormDialog({
             toast({
               title:
                 statusFixa === "pausado"
-                  ? "Conta Fixa Pausada!"
-                  : "Conta Fixa Atualizada!",
+                  ? "Conta Pausada!"
+                  : "Conta Atualizada!",
             });
           }
         } else {
@@ -409,7 +374,6 @@ export function LancamentoFormDialog({
             .from("lancamentos")
             .update(updatePayload)
             .eq("id", lancamentoToEdit.id);
-
           if (activeContext === "grupo" && groupId)
             query = query.eq("grupo_id", groupId);
           else query = query.eq("user_id", userId).is("grupo_id", null);
@@ -426,29 +390,22 @@ export function LancamentoFormDialog({
             dia_vencimento: dia,
             categoria: formData.categoria?.trim(),
             forma_pagamento: formData.forma_pagamento?.trim(),
-            cartao_id: isCartao ? formData.cartao_id : null, // <-- CORRIGIDO
+            cartao_id: isCartao ? formData.cartao_id : null,
             user_id: userId,
             grupo_id: activeContext === "grupo" ? groupId : null,
             status: "ativo",
           };
-
           const { error: errFixa } = await supabase
             .from("despesas_fixas")
             .insert([payloadFixa]);
           if (errFixa) throw errFixa;
-
-          toast({ title: "Conta Fixa Cadastrada com Sucesso!" });
+          toast({ title: "Conta Fixa Cadastrada!" });
         } else if (repeatType === "parcelada" && formData.tipo === "Despesa") {
-          // GERA O FIO INVISÍVEL: Um ID único para amarrar todas essas parcelas
-          const grupoParcelaId = `parcela-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-
-          // Anexa o grupo_parcela_id no payload base
+          const grupoParcelaId = `parcela-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`;
           const payloadComGrupo = {
             ...basePayload,
             grupo_parcela_id: grupoParcelaId,
           };
-
-          // Passa o payload com o grupo para a função que gera as parcelas
           const recurrenceItems = createRecurrenceItems(payloadComGrupo);
           await supabase.from("lancamentos").insert(recurrenceItems);
           toast({ title: "Parcelas Criadas com Sucesso!" });
@@ -467,11 +424,16 @@ export function LancamentoFormDialog({
         description: error.message,
         variant: "destructive",
       });
+    } finally {
+      setIsSubmitting(false); // DESTRAVA
     }
   };
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && !isSubmitting && onClose()}
+    >
       <DialogContent
         className="w-screen h-dvh max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0"
         onInteractOutside={(e) => e.preventDefault()}
@@ -491,6 +453,7 @@ export function LancamentoFormDialog({
             onSubmit={handleSubmit}
             className="space-y-6"
           >
+            {/* SEÇÃO 1: INFORMAÇÕES BÁSICAS */}
             <div className="space-y-2">
               <Label>Descrição</Label>
               <Input
@@ -501,6 +464,7 @@ export function LancamentoFormDialog({
                 required
                 placeholder="Ex: Conta de Luz, Aluguel..."
                 className="text-lg py-6"
+                disabled={isSubmitting}
               />
             </div>
 
@@ -509,7 +473,7 @@ export function LancamentoFormDialog({
                 <Label>Valor</Label>
                 <div className="relative">
                   <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    R${" "}
+                    R$
                   </span>
                   <Input
                     type="text"
@@ -518,6 +482,7 @@ export function LancamentoFormDialog({
                     onChange={handleValorChange}
                     required
                     className="pl-9"
+                    disabled={isSubmitting}
                   />
                 </div>
               </div>
@@ -530,7 +495,7 @@ export function LancamentoFormDialog({
                   onValueChange={(v: any) =>
                     setFormData({ ...formData, tipo: v })
                   }
-                  disabled={!!lancamentoToEdit}
+                  disabled={!!lancamentoToEdit || isSubmitting}
                 >
                   <SelectTrigger>
                     <SelectValue />
@@ -543,6 +508,7 @@ export function LancamentoFormDialog({
               </div>
             </div>
 
+            {/* SEÇÃO 2: CATEGORIA E PAGAMENTO */}
             <div className="space-y-2">
               <Label>Categoria</Label>
               <Select
@@ -550,8 +516,8 @@ export function LancamentoFormDialog({
                 onValueChange={(v) =>
                   setFormData({ ...formData, categoria: v })
                 }
+                disabled={isSubmitting}
                 onOpenChange={(open) => {
-                  // Reseta estado de criação se fechar o select
                   if (!open) {
                     setIsCreatingCategory(false);
                     setNewCategoryName("");
@@ -567,8 +533,6 @@ export function LancamentoFormDialog({
                       {nome}
                     </SelectItem>
                   ))}
-
-                  {/* Área de criação de nova categoria */}
                   <div className="p-2 border-t mt-1">
                     {!isCreatingCategory ? (
                       <Button
@@ -619,6 +583,7 @@ export function LancamentoFormDialog({
               </Label>
               <Select
                 value={formData.forma_pagamento}
+                disabled={isSubmitting}
                 onValueChange={(v) =>
                   setFormData({
                     ...formData,
@@ -640,11 +605,11 @@ export function LancamentoFormDialog({
               </Select>
             </div>
 
+            {/* SEÇÃO 3: OPÇÕES ESPECÍFICAS (CARTÃO / DATAS) */}
             {isCartao && formData.tipo === "Despesa" && (
               <div className="space-y-2 p-3 bg-muted/30 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
                 <Label className="flex items-center gap-1.5 text-primary">
-                  <CreditCardIcon className="h-4 w-4" />
-                  Qual Cartão de Crédito?
+                  <CreditCardIcon className="h-4 w-4" /> Qual Cartão de Crédito?
                 </Label>
                 {cartoesDB.length > 0 ? (
                   <Select
@@ -656,6 +621,7 @@ export function LancamentoFormDialog({
                     onValueChange={(v) =>
                       setFormData({ ...formData, cartao_id: Number(v) })
                     }
+                    disabled={isSubmitting}
                   >
                     <SelectTrigger className="bg-background">
                       <SelectValue placeholder="Selecione o cartão..." />
@@ -670,8 +636,8 @@ export function LancamentoFormDialog({
                   </Select>
                 ) : (
                   <div className="text-xs text-muted-foreground pt-1 pb-1">
-                    Você ainda não cadastrou nenhum cartão. A despesa será salva
-                    sem vínculo.
+                    Você não cadastrou nenhum cartão. A despesa será salva sem
+                    vínculo.
                   </div>
                 )}
               </div>
@@ -690,6 +656,7 @@ export function LancamentoFormDialog({
                   <Button
                     type="button"
                     variant="outline"
+                    disabled={isSubmitting}
                     className={cn(
                       "w-full justify-start text-left font-normal h-10",
                       !formData.data_vencimento && "text-muted-foreground",
@@ -715,32 +682,218 @@ export function LancamentoFormDialog({
                         : undefined
                     }
                     onSelect={(date) => {
-                      if (date) {
+                      if (date)
                         setFormData({
                           ...formData,
                           data_vencimento: formatDateLocal(date),
                         });
-                      }
                     }}
                     initialFocus
                   />
                 </PopoverContent>
               </Popover>
-              {/* TEXTO DE AJUDA DINÂMICO PARA CARTÃO */}
-              {isCartao && formData.tipo === "Despesa" && (
-                <p className="text-xs text-muted-foreground pt-1 animate-in fade-in">
-                  * O dia em que o serviço debita no seu cartão. Ajuda a prever
-                  em qual fatura vai cair.
-                </p>
-              )}
             </div>
 
+            {/* SEÇÃO 4: REPETIÇÃO E RECORRÊNCIA */}
+            {formData.tipo === "Despesa" && !lancamentoToEdit && (
+              <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
+                <div className="flex items-center gap-2">
+                  <Label className="text-muted-foreground font-bold">
+                    Como essa despesa se repete?
+                  </Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button
+                        type="button"
+                        className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
+                      >
+                        <InformationCircleIcon className="h-5 w-5" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent
+                      className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-9999"
+                      align="start"
+                      side="top"
+                    >
+                      <div className="space-y-3 text-sm">
+                        <h4 className="font-bold text-foreground">
+                          Tipos de Repetição
+                        </h4>
+                        <div className="space-y-2 text-muted-foreground">
+                          <p>
+                            <strong className="text-foreground">Única:</strong>{" "}
+                            acontece só uma vez.
+                          </p>
+                          <p>
+                            <strong className="text-foreground">
+                              Recorrente:
+                            </strong>{" "}
+                            repete todo mês até pausar.
+                          </p>
+                          <p>
+                            <strong className="text-foreground">
+                              Parcelada:
+                            </strong>{" "}
+                            repete por X meses ou até data final.
+                          </p>
+                        </div>
+                      </div>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <Button
+                    type="button"
+                    variant={repeatType === "unica" ? "default" : "outline"}
+                    onClick={() => {
+                      setRepeatType("unica");
+                      setFormData((prev) => ({ ...prev, pago: false }));
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Única
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={repeatType === "fixa" ? "default" : "outline"}
+                    onClick={() => {
+                      setRepeatType("fixa");
+                      setFormData((prev) => ({ ...prev, pago: false }));
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Recorrente
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={repeatType === "parcelada" ? "default" : "outline"}
+                    onClick={() => {
+                      setRepeatType("parcelada");
+                      setFormData((prev) => ({ ...prev, pago: false }));
+                    }}
+                    disabled={isSubmitting}
+                  >
+                    Parcelada
+                  </Button>
+                </div>
+
+                {repeatType === "parcelada" && (
+                  <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-2">
+                      <Label>Até quando se repete?</Label>
+                      <Select
+                        value={recurrenceEndType}
+                        onValueChange={(v: RecurrenceEndType) =>
+                          setRecurrenceEndType(v)
+                        }
+                        disabled={isSubmitting}
+                      >
+                        <SelectTrigger className="bg-background">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="ocorrencias">
+                            Quantidade de Parcelas
+                          </SelectItem>
+                          <SelectItem value="ate_data">
+                            Até uma data limite
+                          </SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    {recurrenceEndType === "ate_data" ? (
+                      <div className="space-y-2">
+                        <Label>Data da última parcela</Label>
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              disabled={isSubmitting}
+                              className={cn(
+                                "w-full justify-start text-left font-normal h-10 bg-background",
+                                !recurrenceEndDate && "text-muted-foreground",
+                              )}
+                            >
+                              <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
+                              {recurrenceEndDate
+                                ? format(
+                                    parseDateLocal(recurrenceEndDate),
+                                    "dd 'de' MMMM 'de' yyyy",
+                                    { locale: ptBR },
+                                  )
+                                : "Selecione a data"}
+                            </Button>
+                          </PopoverTrigger>
+                          <PopoverContent className="w-auto p-0" align="start">
+                            <Calendar
+                              mode="single"
+                              locale={ptBR}
+                              selected={
+                                recurrenceEndDate
+                                  ? parseDateLocal(recurrenceEndDate)
+                                  : undefined
+                              }
+                              onSelect={(d) => {
+                                if (d) setRecurrenceEndDate(formatDateLocal(d));
+                              }}
+                              initialFocus
+                            />
+                          </PopoverContent>
+                        </Popover>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <Label>Quantos meses no total?</Label>
+                        <div className="flex items-center justify-between bg-background border rounded-xl h-12 px-2 w-full max-w-[200px]">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setRecurrenceOccurrences(
+                                Math.max(2, recurrenceOccurrences - 1),
+                              )
+                            }
+                            disabled={
+                              recurrenceOccurrences <= 2 || isSubmitting
+                            }
+                          >
+                            <MinusIcon className="h-5 w-5" />
+                          </Button>
+                          <span className="text-lg font-bold w-12 text-center">
+                            {recurrenceOccurrences}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            onClick={() =>
+                              setRecurrenceOccurrences(
+                                recurrenceOccurrences + 1,
+                              )
+                            }
+                            disabled={isSubmitting}
+                          >
+                            <PlusIcon className="h-5 w-5" />
+                          </Button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* STATUS E PAGAMENTO */}
             {lancamentoToEdit?.isShadow && (
               <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
                 <div className="space-y-0.5">
                   <Label className="text-base font-bold">Cobrança Ativa</Label>
                   <p className="text-xs text-muted-foreground">
-                    Desative para pausar esta conta fixa nos próximos meses.
+                    Pausar nos próximos meses.
                   </p>
                 </div>
                 <Switch
@@ -748,248 +901,45 @@ export function LancamentoFormDialog({
                   onCheckedChange={(c) =>
                     setStatusFixa(c ? "ativo" : "pausado")
                   }
+                  disabled={isSubmitting}
                 />
               </div>
             )}
 
-            <div className="flex flex-col gap-2 mt-2">
-              {formData.tipo === "Despesa" && !lancamentoToEdit && (
-                <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
-                  <div className="flex items-center gap-2">
-                    <Label className="text-muted-foreground font-bold">
-                      Como essa despesa se repete?
-                    </Label>
-
-                    <Popover>
-                      <PopoverTrigger asChild>
-                        <button
-                          type="button"
-                          className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
-                          aria-label="Entender tipos de repetição"
-                        >
-                          <InformationCircleIcon className="h-5 w-5" />
-                        </button>
-                      </PopoverTrigger>
-                      <PopoverContent
-                        className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-9999"
-                        align="start"
-                        side="top"
-                      >
-                        <div className="space-y-3 text-sm">
-                          <h4 className="font-bold text-foreground">
-                            Tipos de Repetição
-                          </h4>
-                          <div className="space-y-2 text-muted-foreground">
-                            <p>
-                              <strong className="text-foreground">
-                                Única:
-                              </strong>{" "}
-                              acontece só uma vez.
-                            </p>
-                            <p>
-                              <strong className="text-foreground">
-                                Recorrente:
-                              </strong>{" "}
-                              repete todo mês até você pausar ou remover.
-                            </p>
-                            <p>
-                              <strong className="text-foreground">
-                                Parcelada:
-                              </strong>{" "}
-                              repete por um número de parcelas ou até uma data
-                              final.
-                            </p>
-                          </div>
-                        </div>
-                      </PopoverContent>
-                    </Popover>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                    <Button
-                      type="button"
-                      variant={repeatType === "unica" ? "default" : "outline"}
-                      className="w-full justify-center"
-                      onClick={() => {
-                        setRepeatType("unica");
-                        setFormData((prev) => ({ ...prev, pago: false }));
-                      }}
-                    >
-                      Única
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={repeatType === "fixa" ? "default" : "outline"}
-                      className="w-full justify-center"
-                      onClick={() => {
-                        setRepeatType("fixa");
-                        setFormData((prev) => ({ ...prev, pago: false }));
-                      }}
-                    >
-                      Recorrente
-                    </Button>
-                    <Button
-                      type="button"
-                      variant={
-                        repeatType === "parcelada" ? "default" : "outline"
-                      }
-                      className="w-full justify-center"
-                      onClick={() => {
-                        setRepeatType("parcelada");
-                        setFormData((prev) => ({ ...prev, pago: false }));
-                      }}
-                    >
-                      Parcelada
-                    </Button>
-                  </div>
-
-                  {repeatType === "parcelada" && (
-                    <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2 mt-2">
-                      <div className="space-y-2">
-                        <Label>Até quando se repete?</Label>
-                        <Select
-                          value={recurrenceEndType}
-                          onValueChange={(v: RecurrenceEndType) =>
-                            setRecurrenceEndType(v)
-                          }
-                        >
-                          <SelectTrigger className="bg-background">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="ocorrencias">
-                              Quantidade de Parcelas
-                            </SelectItem>
-                            <SelectItem value="ate_data">
-                              Até uma data limite
-                            </SelectItem>
-                          </SelectContent>
-                        </Select>
-                      </div>
-
-                      {recurrenceEndType === "ate_data" && (
-                        <div className="space-y-2">
-                          <Label>Data da última parcela</Label>
-                          <Popover>
-                            <PopoverTrigger asChild>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                className={cn(
-                                  "w-full justify-start text-left font-normal h-10 bg-background",
-                                  !recurrenceEndDate && "text-muted-foreground",
-                                )}
-                              >
-                                <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
-                                {recurrenceEndDate
-                                  ? format(
-                                      parseDateLocal(recurrenceEndDate),
-                                      "dd 'de' MMMM 'de' yyyy",
-                                      { locale: ptBR },
-                                    )
-                                  : "Selecione a data limite"}
-                              </Button>
-                            </PopoverTrigger>
-                            <PopoverContent
-                              className="w-auto p-0"
-                              align="start"
-                            >
-                              <Calendar
-                                mode="single"
-                                locale={ptBR}
-                                selected={
-                                  recurrenceEndDate
-                                    ? parseDateLocal(recurrenceEndDate)
-                                    : undefined
-                                }
-                                onSelect={(date) => {
-                                  if (date)
-                                    setRecurrenceEndDate(formatDateLocal(date));
-                                }}
-                                initialFocus
-                              />
-                            </PopoverContent>
-                          </Popover>
-                        </div>
-                      )}
-
-                      {recurrenceEndType === "ocorrencias" && (
-                        <div className="space-y-2">
-                          <Label>
-                            Quantos meses no total? (Incluindo este)
-                          </Label>
-                          <div className="flex items-center justify-between bg-background border rounded-xl h-12 px-2 w-full max-w-[200px]">
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={() =>
-                                setRecurrenceOccurrences(
-                                  Math.max(2, recurrenceOccurrences - 1),
-                                )
-                              }
-                              disabled={recurrenceOccurrences <= 2}
-                            >
-                              <MinusIcon className="h-5 w-5" />
-                            </Button>
-                            <span className="text-lg font-bold w-12 text-center select-none">
-                              {recurrenceOccurrences}
-                            </span>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              className="h-8 w-8 text-muted-foreground hover:text-foreground"
-                              onClick={() =>
-                                setRecurrenceOccurrences(
-                                  recurrenceOccurrences + 1,
-                                )
-                              }
-                            >
-                              <PlusIcon className="h-5 w-5" />
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )}
+            {repeatType !== "fixa" &&
+              !isCartao &&
+              !lancamentoToEdit?.isShadow && (
+                <div className="flex items-center gap-2 border p-3 rounded-md bg-card mt-4">
+                  <Checkbox
+                    id="pago"
+                    checked={formData.pago}
+                    onCheckedChange={(c) =>
+                      setFormData({ ...formData, pago: c === true })
+                    }
+                    disabled={isSubmitting}
+                  />
+                  <Label
+                    htmlFor="pago"
+                    className="cursor-pointer flex-1 font-medium"
+                  >
+                    {formData.tipo === "Receita"
+                      ? "Já foi recebido?"
+                      : "Já foi pago?"}
+                  </Label>
                 </div>
               )}
-
-              {/* BLOCO 2: */}
-              {repeatType !== "fixa" &&
-                !isCartao &&
-                !lancamentoToEdit?.isShadow && (
-                  <div className="flex items-center gap-2 border p-3 rounded-md bg-card animate-in fade-in slide-in-from-top-2 duration-300 mt-4">
-                    <Checkbox
-                      id="pago"
-                      checked={formData.pago}
-                      onCheckedChange={(checked) =>
-                        setFormData({ ...formData, pago: checked === true })
-                      }
-                    />
-                    <Label
-                      htmlFor="pago"
-                      className="cursor-pointer flex-1 font-medium"
-                    >
-                      {formData.tipo === "Receita"
-                        ? "Já foi recebido?"
-                        : "Já foi pago?"}
-                    </Label>
-                  </div>
-                )}
-            </div>
             <div className="h-4"></div>
           </form>
         </div>
 
+        {/* RODAPÉ E BOTÕES DE AÇÃO */}
         <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t bg-background/95 backdrop-blur z-10 flex gap-3">
           <Button
             variant="outline"
             className="flex-1 rounded-xl"
             onClick={onClose}
             type="button"
+            disabled={isSubmitting}
           >
             Cancelar
           </Button>
@@ -997,8 +947,16 @@ export function LancamentoFormDialog({
             className="flex-1 rounded-xl"
             type="submit"
             form="lancamento-form"
+            disabled={isSubmitting}
           >
-            Salvar Lançamento
+            {isSubmitting ? (
+              <>
+                <ArrowPathIcon className="h-5 w-5 mr-2 animate-spin" />{" "}
+                Salvando...
+              </>
+            ) : (
+              "Salvar Lançamento"
+            )}
           </Button>
         </div>
       </DialogContent>

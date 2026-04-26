@@ -1,12 +1,11 @@
 export interface UpdateItem {
-  id: string; // ID único da atualização (geralmente usamos a data invertida para facilitar)
-  date: string; // Data formatada para exibir ao usuário
+  id: string;
+  date: string;
   title: string;
   shortDescription: string;
-  fullDescription: string[]; // Um array de parágrafos para facilitar a exibição
+  fullDescription: string[];
 }
 
-// A lista de atualizações (A mais recente deve ficar sempre no topo)
 export const appUpdates: UpdateItem[] = [
   {
     id: "2026-04-26-planejamento",

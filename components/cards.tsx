@@ -33,6 +33,11 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { useToast } from "@/hooks/use-toast";
 import {
   CreditCardIcon,
@@ -48,7 +53,7 @@ import {
 import { cn } from "@/lib/utils";
 
 // ==========================================
-// COMPONENTE DE LOGOMARCAS (PURO TAILWIND)
+// COMPONENTE DE LOGOMARCAS (REFINADAS E MODERNIZADAS)
 // ==========================================
 const BrandLogo = ({
   brand,
@@ -60,16 +65,16 @@ const BrandLogo = ({
   switch (brand) {
     case "mastercard":
       return (
-        <div className={cn("flex items-center -space-x-2.5", className)}>
-          <div className="w-6 h-6 bg-[#EB001B] rounded-full z-10 opacity-90" />
-          <div className="w-6 h-6 bg-[#F79E1B] rounded-full z-0 opacity-90" />
+        <div className={cn("flex items-center -space-x-3", className)}>
+          <div className="w-7 h-7 bg-[#EB001B] rounded-full mix-blend-multiply dark:mix-blend-normal z-10 opacity-90" />
+          <div className="w-7 h-7 bg-[#F79E1B] rounded-full mix-blend-multiply dark:mix-blend-normal z-0 opacity-90" />
         </div>
       );
     case "visa":
       return (
         <span
           className={cn(
-            "font-black italic text-[#1A1F71] dark:text-white tracking-tighter text-xl",
+            "font-sans font-black italic text-[#1A1F71] dark:text-[#1434CB] tracking-tighter text-2xl scale-y-90",
             className,
           )}
         >
@@ -79,11 +84,25 @@ const BrandLogo = ({
     case "elo":
       return (
         <div
-          className={cn("flex font-black tracking-tighter text-xl", className)}
+          className={cn(
+            "flex font-sans font-black tracking-tighter text-3xl lowercase",
+            className,
+          )}
         >
           <span className="text-[#00A4E0]">e</span>
           <span className="text-[#EFB700]">l</span>
           <span className="text-[#231F20] dark:text-white">o</span>
+        </div>
+      );
+    case "hipercard":
+      return (
+        <div
+          className={cn(
+            "bg-[#B90000] border-b-2 border-orange-500 text-white font-sans font-black italic text-[8px] px-1.5 py-0.5 rounded-sm uppercase tracking-tighter",
+            className,
+          )}
+        >
+          HIPERCARD
         </div>
       );
     case "amex":
@@ -100,7 +119,7 @@ const BrandLogo = ({
     default:
       return (
         <CreditCardIcon
-          className={cn("h-6 w-6 text-muted-foreground", className)}
+          className={cn("h-7 w-7 text-muted-foreground", className)}
         />
       );
   }
@@ -110,6 +129,7 @@ const BANDEIRAS_DISPONIVEIS = [
   { id: "mastercard", label: "Mastercard" },
   { id: "visa", label: "Visa" },
   { id: "elo", label: "Elo" },
+  { id: "hipercard", label: "Hipercard" },
   { id: "amex", label: "Amex" },
   { id: "outra", label: "Outra" },
 ];
@@ -170,7 +190,7 @@ export default function Cartoes() {
     limite: "",
     dia_fechamento: "",
     dia_vencimento: "",
-    bandeira: "mastercard", // <-- Padrão "Pirraça" ativado!
+    bandeira: "mastercard",
   });
 
   const [expandedCard, setExpandedCard] = useState<number | null>(null);
@@ -259,7 +279,7 @@ export default function Cartoes() {
       limite: formData.limite ? Number(formData.limite) : null,
       dia_fechamento: Number(formData.dia_fechamento),
       dia_vencimento: Number(formData.dia_vencimento),
-      bandeira: formData.bandeira, // Salva a bandeira escolhida
+      bandeira: formData.bandeira,
     };
 
     try {
@@ -275,7 +295,6 @@ export default function Cartoes() {
       }
       setIsModalOpen(false);
       fetchData();
-
       window.dispatchEvent(new Event("zibee:cards-changed"));
     } catch (error: any) {
       toast({ title: "Erro ao salvar", variant: "destructive" });
@@ -292,6 +311,25 @@ export default function Cartoes() {
       window.dispatchEvent(new Event("zibee:cards-changed"));
     } catch (error) {
       toast({ title: "Erro ao excluir", variant: "destructive" });
+    }
+  };
+
+  // --- NOVA FUNÇÃO: ATUALIZAR BANDEIRA RÁPIDO ---
+  const handleQuickBrandChange = async (cartaoId: number, newBrand: string) => {
+    // Atualização otimista na tela
+    setCartoes((prev) =>
+      prev.map((c) => (c.id === cartaoId ? { ...c, bandeira: newBrand } : c)),
+    );
+    try {
+      await supabase
+        .from("cartoes_credito")
+        .update({ bandeira: newBrand })
+        .eq("id", cartaoId);
+      toast({ title: "Bandeira atualizada!" });
+      window.dispatchEvent(new Event("zibee:cards-changed"));
+    } catch (error) {
+      toast({ title: "Erro ao atualizar bandeira", variant: "destructive" });
+      fetchData(); // Reverte em caso de erro
     }
   };
 
@@ -388,7 +426,7 @@ export default function Cartoes() {
         utilizado,
         disponivel,
         porcentagemUso,
-        bandeira: cartao.bandeira || "mastercard", // Garante o fallback no frontend também
+        bandeira: cartao.bandeira || "mastercard",
       };
     });
   }, [cartoes, lancamentos, fixas, date, userId]);
@@ -492,10 +530,54 @@ export default function Cartoes() {
                 >
                   <div className="flex flex-col sm:flex-row justify-between gap-6">
                     <div className="flex items-center gap-4">
-                      {/* AQUI ESTÁ A LOGO DA BANDEIRA */}
-                      <div className="h-14 w-16 bg-muted/30 border border-border/50 rounded-xl flex items-center justify-center">
-                        <BrandLogo brand={fatura.bandeira} />
-                      </div>
+                      {/* BOTÃO MÁGICO DE TROCAR BANDEIRA RÁPIDO */}
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <button
+                            type="button"
+                            onClick={(e) => e.stopPropagation()} // Impede o clique de abrir a fatura
+                            className="h-14 w-16 bg-muted/30 border border-border/50 rounded-xl flex items-center justify-center hover:bg-muted/50 transition-all hover:scale-105 active:scale-95 shrink-0 group relative overflow-hidden"
+                            title="Alterar Bandeira"
+                          >
+                            <BrandLogo brand={fatura.bandeira} />
+                            {/* Overlay sutil de edição ao passar o mouse (desktop) */}
+                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                              <PencilIcon className="h-4 w-4 text-white" />
+                            </div>
+                          </button>
+                        </PopoverTrigger>
+                        <PopoverContent
+                          className="w-[280px] p-4 rounded-2xl"
+                          align="start"
+                          onClick={(e) => e.stopPropagation()} // Impede cliques dentro do popover de fechar a fatura
+                        >
+                          <h4 className="text-xs font-bold text-muted-foreground uppercase tracking-wider mb-3 text-center">
+                            Alterar Bandeira
+                          </h4>
+                          <div className="grid grid-cols-3 gap-2">
+                            {BANDEIRAS_DISPONIVEIS.map((bandeira) => (
+                              <button
+                                key={bandeira.id}
+                                type="button"
+                                onClick={() =>
+                                  handleQuickBrandChange(fatura.id, bandeira.id)
+                                }
+                                className={cn(
+                                  "flex flex-col items-center justify-center py-2 border rounded-xl transition-all hover:bg-muted/50 active:scale-95",
+                                  fatura.bandeira === bandeira.id
+                                    ? "border-primary bg-primary/10"
+                                    : "border-border",
+                                )}
+                              >
+                                <div className="h-5 flex items-center justify-center">
+                                  <BrandLogo brand={bandeira.id} />
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        </PopoverContent>
+                      </Popover>
+
                       <div>
                         <h3 className="font-bold text-xl flex items-center gap-2">
                           {fatura.nome}
@@ -682,7 +764,7 @@ export default function Cartoes() {
             {/* SELETOR DE BANDEIRA */}
             <div className="space-y-3">
               <Label>Bandeira do Cartão</Label>
-              <div className="grid grid-cols-5 gap-2">
+              <div className="grid grid-cols-3 gap-2 sm:grid-cols-6">
                 {BANDEIRAS_DISPONIVEIS.map((bandeira) => {
                   const isSelected = formData.bandeira === bandeira.id;
                   return (
@@ -693,7 +775,7 @@ export default function Cartoes() {
                         setFormData({ ...formData, bandeira: bandeira.id })
                       }
                       className={cn(
-                        "flex flex-col items-center justify-center py-3 border rounded-xl transition-all active:scale-95",
+                        "flex flex-col items-center justify-center py-2 border rounded-xl transition-all active:scale-95",
                         isSelected
                           ? "border-primary bg-primary/10 shadow-sm"
                           : "border-border hover:bg-muted/50",
@@ -702,14 +784,6 @@ export default function Cartoes() {
                       <div className="h-6 flex items-center justify-center">
                         <BrandLogo brand={bandeira.id} />
                       </div>
-                      <span
-                        className={cn(
-                          "text-[9px] mt-2 font-bold uppercase tracking-wider",
-                          isSelected ? "text-primary" : "text-muted-foreground",
-                        )}
-                      >
-                        {bandeira.label}
-                      </span>
                     </button>
                   );
                 })}

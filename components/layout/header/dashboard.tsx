@@ -5,6 +5,7 @@ import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
+import { Button } from "@/components/ui/button";
 
 // IMPORTANDO OS COMPONENTES
 import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
@@ -19,6 +20,11 @@ import {
   EyeIcon,
   EyeSlashIcon,
 } from "@heroicons/react/24/solid";
+
+import {
+  ChartPieIcon,
+  ShieldExclamationIcon,
+} from "@heroicons/react/24/outline";
 
 interface DashboardProps {
   onNavigate?: (tab: string) => void;
@@ -136,6 +142,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     dashboardCache.metaFixada[activeContext] || null,
   );
 
+  // NOVO ESTADO: Categorias com Limites Definidos
+  const [categoriasComLimite, setCategoriasComLimite] = useState<any[]>([]);
+
   const [loading, setLoading] = useState(!cachedData);
   const [periodoGrafico, setPeriodoGrafico] = useState<"7D" | "30D" | "ALL">(
     "30D",
@@ -205,12 +214,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       let queryCartoes = supabase.from("cartoes_credito").select("*");
 
+      // NOVA QUERY: Categorias do usuário
+      let queryCategorias = supabase.from("categorias").select("*");
+
       if (activeContext === "grupo" && groupId) {
         queryDespesasVariaveis = queryDespesasVariaveis.eq("grupo_id", groupId);
         queryReceitas = queryReceitas.eq("grupo_id", groupId);
         queryVencimentos = queryVencimentos.eq("grupo_id", groupId);
         queryFixasDashboard = queryFixasDashboard.eq("grupo_id", groupId);
         queryCartoes = queryCartoes.eq("grupo_id", groupId);
+        queryCategorias = queryCategorias.eq("grupo_id", groupId);
       } else {
         queryDespesasVariaveis = queryDespesasVariaveis
           .eq("user_id", userId)
@@ -225,6 +238,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .eq("user_id", userId)
           .is("grupo_id", null);
         queryCartoes = queryCartoes.eq("user_id", userId).is("grupo_id", null);
+        queryCategorias = queryCategorias
+          .eq("user_id", userId)
+          .is("grupo_id", null);
       }
 
       if (from) {
@@ -251,6 +267,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         { data: fixasData },
         { data: metaData },
         { data: cartoesData },
+        { data: categoriasData },
       ] = await Promise.all([
         queryDespesasVariaveis,
         queryReceitas,
@@ -266,6 +283,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               .maybeSingle()
           : Promise.resolve({ data: null }),
         queryCartoes,
+        queryCategorias,
       ]);
 
       const fetchedDespesasBrutas = variaveisData || [];
@@ -377,6 +395,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .slice(0, 5);
       }
 
+      // Filtra as categorias com limite > 0 e ordena pelo maior limite
+      const fetchedCategoriasLimite = (categoriasData || [])
+        .filter((c) => c.teto_gastos && Number(c.teto_gastos) > 0)
+        .sort((a, b) => Number(b.teto_gastos) - Number(a.teto_gastos));
+
       setDespesasBrutas(fetchedDespesasBrutas);
       setTotalDespesas(fetchedTotalVariaveis);
       setTotalReceitas(fetchedTotalRec);
@@ -384,6 +407,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       setProximosVencimentos(fetchedVencimentos);
       setTotalDespesasFixas(fetchedTotalFixas);
       setListaFixas(dadosFixasValidos);
+      setCategoriasComLimite(fetchedCategoriasLimite);
 
       dashboardCache.dataByRange[key] = {
         totalDespesas: fetchedTotalVariaveis,
@@ -504,6 +528,145 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       .map((data) => ({ data, valor: agrupado[data] }));
   }, [despesasBrutas, periodoGrafico]);
 
+  // Cálculos para a nova seção de Limites
+  const totalCategorizado = categoriasComLimite.reduce(
+    (acc, cat) => acc + Number(cat.teto_gastos),
+    0,
+  );
+  // Cores fixas vibrantes para o gráfico (estilo imagem)
+  const categoryColors = [
+    "#3b82f6",
+    "#ef4444",
+    "#10b981",
+    "#a855f7",
+    "#f59e0b",
+    "#ec4899",
+    "#14b8a6",
+  ];
+
+  const renderCategoryBudgets = () => (
+    <section className="pt-6 border-t border-border/50">
+      <div className="flex items-center justify-between mb-4">
+        <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80">
+          <ChartPieIcon className="h-4 w-4 text-primary" /> Planejamento de
+          Gastos
+        </h2>
+        {categoriasComLimite.length > 0 && (
+          <button
+            onClick={() => onNavigate && onNavigate("planejamento")}
+            className="text-xs text-primary hover:underline font-medium"
+          >
+            Gerenciar Limites
+          </button>
+        )}
+      </div>
+
+      {categoriasComLimite.length === 0 ? (
+        <div className="bg-muted/20 border border-dashed rounded-3xl p-8 text-center flex flex-col items-center">
+          <div className="h-12 w-12 bg-primary/10 rounded-full flex items-center justify-center mb-3">
+            <ShieldExclamationIcon className="h-6 w-6 text-primary" />
+          </div>
+          <p className="text-base font-bold text-foreground mb-1">
+            Crie um planejamento
+          </p>
+          <p className="text-sm text-muted-foreground mb-6 max-w-sm">
+            Defina limites por categoria (ex: 30% Moradia) e acompanhe seu
+            progresso para não estourar o orçamento mensal.
+          </p>
+          <Button
+            onClick={() => onNavigate && onNavigate("planejamento")}
+            className="rounded-xl px-6 h-11 shadow-sm"
+          >
+            Configurar Limites
+          </Button>
+        </div>
+      ) : (
+        <div className="bg-card border border-border/50 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
+          {/* Header do Card (Total + Gráfico) */}
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
+                Total Categorizado
+              </p>
+              <p className="text-2xl sm:text-3xl font-bold tracking-tighter">
+                {formatMoney(totalCategorizado)}
+              </p>
+            </div>
+
+            {/* Gráfico Donut com CSS Conic Gradient */}
+            <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0">
+              <div
+                className="absolute inset-0 rounded-full"
+                style={{
+                  background: `conic-gradient(${categoriasComLimite
+                    .map((cat, i) => {
+                      const prevSum = categoriasComLimite
+                        .slice(0, i)
+                        .reduce((acc, c) => acc + Number(c.teto_gastos), 0);
+                      const startPct =
+                        totalCategorizado > 0
+                          ? (prevSum / totalCategorizado) * 100
+                          : 0;
+                      const endPct =
+                        totalCategorizado > 0
+                          ? ((prevSum + Number(cat.teto_gastos)) /
+                              totalCategorizado) *
+                            100
+                          : 0;
+                      return `${categoryColors[i % categoryColors.length]} ${startPct}% ${endPct}%`;
+                    })
+                    .join(", ")})`,
+                }}
+              />
+              <div className="absolute inset-2 sm:inset-2.5 bg-card rounded-full" />
+            </div>
+          </div>
+
+          {/* Lista de Categorias */}
+          <div className="space-y-3">
+            {categoriasComLimite.map((cat, idx) => {
+              const color = categoryColors[idx % categoryColors.length];
+              const pct =
+                totalCategorizado > 0
+                  ? (Number(cat.teto_gastos) / totalCategorizado) * 100
+                  : 0;
+
+              return (
+                <div
+                  key={cat.id}
+                  className="flex items-center justify-between p-3 border border-border/40 rounded-2xl hover:bg-muted/30 transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center"
+                      style={{ backgroundColor: `${color}15` }}
+                    >
+                      <div
+                        className="w-3.5 h-3.5 rounded-full"
+                        style={{ backgroundColor: color }}
+                      />
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold flex items-center gap-1.5">
+                        {pct.toFixed(0)}%{" "}
+                        <span className="text-muted-foreground font-medium text-xs sm:text-sm">
+                          para {cat.nome}
+                        </span>
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-sm font-bold text-foreground">
+                    {formatMoney(Number(cat.teto_gastos))}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
@@ -547,10 +710,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* ========================= */}
       {/* MOBILE (< md) */}
-      {/* Ordem: Onde gasto -> Vencimentos -> Formas pgto -> Metas */}
+      {/* Ordem: Onde gasto -> Vencimentos -> Formas pgto -> Metas -> Planejamento */}
       {/* NÃO mostra Evolução */}
       {/* ========================= */}
-      <div className="space-y-10 md:hidden">
+      <div className="space-y-8 md:hidden">
         <ExpenseCategories
           categoriasChart={categoriasChart}
           expandedCategory={expandedCategory}
@@ -610,14 +773,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </section>
         )}
+
+        {/* NOVA SEÇÃO DE PLANEJAMENTO (MOBILE) */}
+        {renderCategoryBudgets()}
       </div>
 
       {/* ========================= */}
       {/* DESKTOP (>= md) */}
-      {/* Layout: Evolução (linha inteira) -> Onde gasto + Formas pgto -> Vencimentos -> Metas */}
+      {/* Layout: Evolução (linha inteira) -> Onde gasto + Formas pgto -> Vencimentos -> Metas -> Planejamento */}
       {/* ========================= */}
       <div className="hidden md:block space-y-12">
-        {/* Evolução: linha inteira */}
         <div className="pt-4">
           <ExpenseEvolutionChart
             dadosGraficoEvolucao={dadosGraficoEvolucao}
@@ -628,7 +793,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           />
         </div>
 
-        {/* Onde gasto + Formas de pagamento: 2 colunas */}
         <div className="grid gap-12 md:grid-cols-2 pt-2">
           <ExpenseCategories
             categoriasChart={categoriasChart}
@@ -648,7 +812,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           />
         </div>
 
-        {/* Próximos vencimentos: abaixo */}
         <div className="pt-2">
           <UpcomingBills
             proximosVencimentos={proximosVencimentos}
@@ -656,7 +819,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           />
         </div>
 
-        {/* Metas: abaixo */}
         {activeContext === "pessoal" && metaFixada && (
           <section
             onClick={() => onNavigate && onNavigate("metas")}
@@ -694,6 +856,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             </div>
           </section>
         )}
+
+        {/* NOVA SEÇÃO DE PLANEJAMENTO (DESKTOP) */}
+        {renderCategoryBudgets()}
       </div>
     </div>
   );

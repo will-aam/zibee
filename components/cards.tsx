@@ -541,9 +541,6 @@ export default function Cartoes() {
                           >
                             <BrandLogo brand={fatura.bandeira} />
                             {/* Overlay sutil de edição ao passar o mouse (desktop) */}
-                            <div className="absolute inset-0 bg-black/40 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                              <PencilIcon className="h-4 w-4 text-white" />
-                            </div>
                           </button>
                         </PopoverTrigger>
                         <PopoverContent

@@ -291,6 +291,7 @@ export function MobileHeader({
                   <span className="font-medium text-sm">Alternar Tema</span>
                 </DropdownMenuItem>
 
+                {/*
                 <DropdownMenuItem
                   onClick={() => onNavigate("configuracoes")}
                   className="gap-3 p-3 rounded-xl cursor-pointer"
@@ -298,6 +299,7 @@ export function MobileHeader({
                   <Cog6ToothIcon className="h-5 w-5 text-muted-foreground" />
                   <span className="font-medium text-sm">Configurações</span>
                 </DropdownMenuItem>
+                */}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>

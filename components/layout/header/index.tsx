@@ -294,6 +294,7 @@ export default function Header({
         userId={userId}
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
+        onNavigateSettings={() => onNavigate?.("configuracoes")}
       />
 
       {/* ALTERAÇÃO AQUI: Passamos o onNavigate para o Modal */}

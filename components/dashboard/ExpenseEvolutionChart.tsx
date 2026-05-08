@@ -12,36 +12,19 @@ import {
 
 export function ExpenseEvolutionChart({
   dadosGraficoEvolucao,
-  periodoGrafico,
-  setPeriodoGrafico,
   formatMoney,
   hidden,
 }: any) {
   return (
     <section>
-      <div className="flex items-center justify-between mb-6">
+      <div className="mb-6">
         <h2 className="text-lg font-semibold text-foreground/80">
           Evolução dos Gastos Variáveis
         </h2>
-        <div className="flex bg-muted/50 rounded-lg p-1 border border-border/30">
-          {(["7D", "30D", "ALL"] as const).map((periodo) => (
-            <button
-              key={periodo}
-              onClick={() => setPeriodoGrafico(periodo)}
-              className={`px-4 py-1.5 text-xs font-semibold rounded-md transition-all ${
-                periodoGrafico === periodo
-                  ? "bg-background shadow-sm text-foreground"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              {periodo === "ALL" ? "Tudo" : periodo}
-            </button>
-          ))}
-        </div>
       </div>
 
       <div className="h-[250px] w-full">
-        {dadosGraficoEvolucao.length > 0 ? (
+        {dadosGraficoEvolucao?.length > 0 ? (
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={dadosGraficoEvolucao}

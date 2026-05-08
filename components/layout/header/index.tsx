@@ -16,6 +16,7 @@ import ProfileAvatarModal, {
 import DateRangeFilterDrawer, {
   STORAGE_FROM_KEY,
   STORAGE_TO_KEY,
+  STORAGE_PRESET_KEY,
   FILTER_EVENT,
 } from "@/components/layout/DateRangeFilterDrawer";
 
@@ -73,18 +74,24 @@ export default function Header({
   const readRange = React.useCallback(() => {
     let from = localStorage.getItem(STORAGE_FROM_KEY);
     let to = localStorage.getItem(STORAGE_TO_KEY);
+    const preset = localStorage.getItem(STORAGE_PRESET_KEY); // Lê o preset atual
 
-    if (!from || !to) {
+    if (preset === "this_month" || !from || !to) {
       const hoje = new Date();
       const ano = hoje.getFullYear();
       const mes = String(hoje.getMonth() + 1).padStart(2, "0");
       const ultimoDia = new Date(ano, hoje.getMonth() + 1, 0).getDate();
 
-      from = `${ano}-${mes}-01`;
-      to = `${ano}-${mes}-${String(ultimoDia).padStart(2, "0")}`;
+      const realFrom = `${ano}-${mes}-01`;
+      const realTo = `${ano}-${mes}-${String(ultimoDia).padStart(2, "0")}`;
 
-      localStorage.setItem(STORAGE_FROM_KEY, from);
-      localStorage.setItem(STORAGE_TO_KEY, to);
+      if (from !== realFrom || to !== realTo) {
+        from = realFrom;
+        to = realTo;
+        localStorage.setItem(STORAGE_FROM_KEY, from);
+        localStorage.setItem(STORAGE_TO_KEY, to);
+        localStorage.setItem(STORAGE_PRESET_KEY, "this_month");
+      }
     }
 
     return { from, to };

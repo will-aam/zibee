@@ -77,10 +77,18 @@ function readStored(): DateRangeValue {
   const from = localStorage.getItem(STORAGE_FROM_KEY);
   const to = localStorage.getItem(STORAGE_TO_KEY);
 
-  if (!preset) {
+  if (!preset || preset === "this_month") {
     const r = getThisMonthRange();
+
+    if (from !== r.from || to !== r.to) {
+      localStorage.setItem(STORAGE_FROM_KEY, r.from);
+      localStorage.setItem(STORAGE_TO_KEY, r.to);
+      localStorage.setItem(STORAGE_PRESET_KEY, "this_month");
+    }
+
     return { preset: "this_month", from: r.from, to: r.to };
   }
+
   return { preset, from: from || null, to: to || null };
 }
 

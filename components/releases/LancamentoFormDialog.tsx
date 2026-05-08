@@ -510,69 +510,80 @@ export function LancamentoFormDialog({
 
             {/* SEÇÃO 2: CATEGORIA E PAGAMENTO */}
             <div className="space-y-2">
-              <Label>Categoria</Label>
-              <Select
-                value={formData.categoria}
-                onValueChange={(v) =>
-                  setFormData({ ...formData, categoria: v })
-                }
-                disabled={isSubmitting}
-                onOpenChange={(open) => {
-                  if (!open) {
-                    setIsCreatingCategory(false);
-                    setNewCategoryName("");
+              <div className="flex items-center justify-between">
+                <Label>Categoria</Label>
+                {/* Botão de Nova Categoria do lado da Label */}
+                {!isCreatingCategory && (
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingCategory(true)}
+                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1 active:scale-95 transition-transform"
+                    disabled={isSubmitting}
+                  >
+                    <PlusIcon className="w-3 h-3" /> Nova Categoria
+                  </button>
+                )}
+              </div>
+
+              {isCreatingCategory ? (
+                // Modo de Criação (Substitui o Select)
+                <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                  <Input
+                    autoFocus
+                    placeholder="Nome da categoria..."
+                    value={newCategoryName}
+                    onChange={(e) => setNewCategoryName(e.target.value)}
+                    className="h-10 text-base" // text-base evita o zoom automático no iOS
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault();
+                        handleCreateCategory(e);
+                      }
+                    }}
+                    disabled={isSubmitting}
+                  />
+                  <Button
+                    type="button"
+                    onClick={(e) => handleCreateCategory(e)}
+                    disabled={!newCategoryName.trim() || isSubmitting}
+                    className="h-10 px-4"
+                  >
+                    Salvar
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => {
+                      setIsCreatingCategory(false);
+                      setNewCategoryName("");
+                    }}
+                    disabled={isSubmitting}
+                    className="h-10 px-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+                  >
+                    X
+                  </Button>
+                </div>
+              ) : (
+                // Modo Normal de Seleção
+                <Select
+                  value={formData.categoria}
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, categoria: v })
                   }
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {categoriasUnicas.map((nome) => (
-                    <SelectItem key={nome} value={nome}>
-                      {nome}
-                    </SelectItem>
-                  ))}
-                  <div className="p-2 border-t mt-1">
-                    {!isCreatingCategory ? (
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        className="w-full justify-start text-sm text-primary"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setIsCreatingCategory(true);
-                        }}
-                      >
-                        <PlusIcon className="w-4 h-4 mr-2" /> Nova Categoria
-                      </Button>
-                    ) : (
-                      <div
-                        className="flex items-center gap-2"
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        <Input
-                          autoFocus
-                          placeholder="Nome da categoria"
-                          value={newCategoryName}
-                          onChange={(e) => setNewCategoryName(e.target.value)}
-                          className="h-8 text-sm"
-                          onKeyDown={(e) => {
-                            if (e.key === "Enter") handleCreateCategory(e);
-                          }}
-                        />
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={(e) => handleCreateCategory(e as any)}
-                        >
-                          Salvar
-                        </Button>
-                      </div>
-                    )}
-                  </div>
-                </SelectContent>
-              </Select>
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="h-10">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {categoriasUnicas.map((nome) => (
+                      <SelectItem key={nome} value={nome}>
+                        {nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -592,7 +603,7 @@ export function LancamentoFormDialog({
                   })
                 }
               >
-                <SelectTrigger>
+                <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

@@ -11,6 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox"; // <-- Adicionamos o Checkbox
 import { useToast } from "@/hooks/use-toast";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,6 +40,9 @@ export function MonthTurnoverModal() {
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [monthData, setMonthData] = React.useState<MonthData | null>(null);
 
+  // NOVO ESTADO: Controla a caixinha de marcar
+  const [dontShowAgain, setDontShowAgain] = React.useState(false);
+
   const checkTurnover = React.useCallback(async () => {
     if (!userId) return;
 
@@ -47,7 +51,6 @@ export function MonthTurnoverModal() {
       const lastMonthDate = subMonths(today, 1);
       const mesAno = format(lastMonthDate, "yyyy-MM");
 
-      // 1. Verifica se já resolvemos o mês passado
       const { data: fechamento, error: fetchError } = await supabase
         .from("fechamentos_mes")
         .select("*")
@@ -62,7 +65,6 @@ export function MonthTurnoverModal() {
         return;
       }
 
-      // 2. LÓGICA CORRIGIDA: Buscar os dados EXATAMENTE como o Dashboard faz
       const start = format(startOfMonth(lastMonthDate), "yyyy-MM-dd");
       const end = format(endOfMonth(lastMonthDate), "yyyy-MM-dd");
 
@@ -71,7 +73,6 @@ export function MonthTurnoverModal() {
         { data: variaveisData },
         { data: fixasData },
       ] = await Promise.all([
-        // Receitas (Ganhos confirmados)
         supabase
           .from("lancamentos")
           .select("valor")
@@ -82,7 +83,6 @@ export function MonthTurnoverModal() {
           .gte("data_vencimento", start)
           .lte("data_vencimento", end),
 
-        // Despesas Variáveis (TUDO que gastou, pago ou não pago)
         supabase
           .from("lancamentos")
           .select("valor")
@@ -93,7 +93,6 @@ export function MonthTurnoverModal() {
           .gte("data_vencimento", start)
           .lte("data_vencimento", end),
 
-        // Despesas Fixas (TUDO que está ativo)
         supabase
           .from("despesas_fixas")
           .select("valor")
@@ -109,13 +108,11 @@ export function MonthTurnoverModal() {
       const totalFixas =
         fixasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
 
-      // Se o usuário não movimentou NADA no mês passado, ignoramos o modal
       if (totalReceitas === 0 && totalVariaveis === 0 && totalFixas === 0) {
         setIsLoading(false);
         return;
       }
 
-      // Cálculo final realista (Igualzinho ao Saldo Geral do Dashboard)
       const saldoCalculado = totalReceitas - totalVariaveis - totalFixas;
 
       setMonthData({
@@ -144,7 +141,26 @@ export function MonthTurnoverModal() {
     setActionLoading(action);
 
     try {
+      // MÁGICA AQUI: Se for "adiar" MAS o usuário marcou a caixinha
       if (action === "adiar") {
+        if (dontShowAgain) {
+          const payloadFechamento = {
+            user_id: userId,
+            mes_ano: monthData.mesAno,
+            saldo_calculado: monthData.saldo,
+            resolvido: true, // Salva como resolvido para parar de aparecer
+          };
+
+          if (monthData.idFechamento) {
+            await supabase
+              .from("fechamentos_mes")
+              .update({ resolvido: true, saldo_calculado: monthData.saldo })
+              .eq("id", monthData.idFechamento);
+          } else {
+            await supabase.from("fechamentos_mes").insert([payloadFechamento]);
+          }
+        }
+
         setIsOpen(false);
         setActionLoading(null);
         return;
@@ -219,7 +235,6 @@ export function MonthTurnoverModal() {
         className="sm:max-w-md w-[90vw] max-h-[85vh] overflow-y-auto custom-scrollbar rounded-3xl z-9999 p-0 gap-0"
         onInteractOutside={(e) => e.preventDefault()}
       >
-        {/* CABEÇALHO DINÂMICO */}
         <div
           className={`p-5 sm:p-6 text-center text-white shrink-0 ${
             isPositive
@@ -250,7 +265,6 @@ export function MonthTurnoverModal() {
           </DialogDescription>
         </div>
 
-        {/* CORPO DO MODAL */}
         <div className="p-5 sm:p-6 space-y-5 sm:space-y-6 bg-background">
           <div className="text-center space-y-1">
             <p className="text-xs sm:text-sm font-medium text-muted-foreground">
@@ -309,15 +323,34 @@ export function MonthTurnoverModal() {
               </Button>
             )}
 
-            <Button
-              variant="ghost"
-              onClick={() => handleResolve("adiar")}
-              disabled={actionLoading !== null}
-              className="w-full h-10 sm:h-12 rounded-2xl text-xs sm:text-sm text-muted-foreground hover:text-foreground"
-            >
-              <ClockIcon className="w-4 h-4 mr-1.5" />
-              Decidir mais tarde
-            </Button>
+            {/* CAIXINHA + BOTÃO DE IGNORAR */}
+            <div className="flex flex-col items-center pt-2 gap-3">
+              <div className="flex items-center gap-2">
+                <Checkbox
+                  id="dont-show"
+                  checked={dontShowAgain}
+                  onCheckedChange={(c) => setDontShowAgain(c === true)}
+                  disabled={actionLoading !== null}
+                />
+                <label
+                  htmlFor="dont-show"
+                  className="text-xs text-muted-foreground cursor-pointer font-medium select-none"
+                >
+                  Não mostrar este aviso novamente
+                </label>
+              </div>
+
+              <Button
+                variant="ghost"
+                onClick={() => handleResolve("adiar")}
+                disabled={actionLoading !== null}
+                className="w-full h-10 sm:h-12 rounded-2xl text-xs sm:text-sm text-muted-foreground hover:text-foreground"
+              >
+                <ClockIcon className="w-4 h-4 mr-1.5" />
+                {/* O texto do botão muda se a caixinha for ativada pra ficar mais claro */}
+                {dontShowAgain ? "Ignorar mês passado" : "Decidir mais tarde"}
+              </Button>
+            </div>
           </div>
         </div>
       </DialogContent>

@@ -13,7 +13,6 @@ import Investimentos from "@/components/Investimentos";
 import Cartoes from "@/components/cards";
 import Settings from "@/components/settings/Settings";
 
-// Definimos a ordem das abas principais para saber para qual lado deslizar
 const MAIN_TABS = [
   "dashboard",
   "lancamentos",
@@ -27,7 +26,6 @@ export default function Home() {
   const [direction, setDirection] = useState(0);
   const [isMobile, setIsMobile] = useState(false);
 
-  // Detecta se é mobile (apenas no cliente) para ativar/desativar o gesto
   useEffect(() => {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
@@ -35,44 +33,40 @@ export default function Home() {
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 
-  // Função inteligente que navega e calcula a direção da animação
   const handleNavigate = (newTab: string) => {
     if (activeTab === newTab) return;
 
     const currentIndex = MAIN_TABS.indexOf(activeTab);
     const newIndex = MAIN_TABS.indexOf(newTab);
 
-    // Se as duas abas fazem parte do menu principal, decide se desliza para esquerda ou direita
-    if (currentIndex !== -1 && newIndex !== -1) {
+    // MÁGICA AQUI: Só calcula direção (slide) se for Mobile
+    if (isMobile && currentIndex !== -1 && newIndex !== -1) {
       setDirection(newIndex > currentIndex ? 1 : -1);
     } else {
-      setDirection(0); // Animação neutra (fade) se for para Configurações, Cartões, etc.
+      setDirection(0); // No Desktop, a direção zero remove o deslocamento em X
     }
 
     setActiveTab(newTab);
   };
 
-  // Lógica de arrastar a tela (Swipe)
   const handleDragEnd = (e: any, { offset, velocity }: PanInfo) => {
-    if (!isMobile) return; // Trava de segurança: Nada acontece no Desktop
+    if (!isMobile) return;
 
     const currentIndex = MAIN_TABS.indexOf(activeTab);
-    if (currentIndex === -1) return; // Não faz swipe se estiver em Configurações, etc.
+    if (currentIndex === -1) return;
 
-    const swipeThreshold = 50; // Distância mínima que o dedo precisa percorrer para trocar de tela
+    const swipeThreshold = 50;
 
     if (offset.x < -swipeThreshold && currentIndex < MAIN_TABS.length - 1) {
-      // Arrastou para a Esquerda -> Vai para a Próxima aba
       handleNavigate(MAIN_TABS[currentIndex + 1]);
     } else if (offset.x > swipeThreshold && currentIndex > 0) {
-      // Arrastou para a Direita -> Vai para a aba Anterior
       handleNavigate(MAIN_TABS[currentIndex - 1]);
     }
   };
 
-  // Configuração da física da animação
   const variants = {
     enter: (dir: number) => ({
+      // Se dir for 0 (Desktop), x fica em 0. Se não, aplica o slide.
       x: dir > 0 ? "100%" : dir < 0 ? "-100%" : 0,
       opacity: 0,
     }),
@@ -81,18 +75,17 @@ export default function Home() {
       opacity: 1,
     },
     exit: (dir: number) => ({
+      // Se dir for 0 (Desktop), x fica em 0. Se não, aplica o slide.
       x: dir > 0 ? "-100%" : dir < 0 ? "100%" : 0,
       opacity: 0,
     }),
   };
 
   return (
-    // overflow-hidden no pai evita que crie barra de rolagem horizontal enquanto a tela desliza
     <div className="min-h-screen bg-background pb-24 md:pb-0 flex flex-col overflow-x-hidden">
       <Header activeTab={activeTab} onNavigate={handleNavigate} />
 
       <div className="flex-1 w-full max-w-7xl mx-auto sm:px-6 lg:px-8 relative">
-        {/* AnimatePresence mode="wait" garante que a tela atual saia antes da próxima entrar, evitando que o layout quebre */}
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.main
             key={activeTab}
@@ -102,8 +95,9 @@ export default function Home() {
             animate="center"
             exit="exit"
             transition={{
+              // Aumentamos levemente a suavidade para o Desktop
               x: { type: "spring", stiffness: 300, damping: 30 },
-              opacity: { duration: 0.2 },
+              opacity: { duration: 0.15 },
             }}
             drag={isMobile && MAIN_TABS.includes(activeTab) ? "x" : false}
             dragConstraints={{ left: 0, right: 0 }}

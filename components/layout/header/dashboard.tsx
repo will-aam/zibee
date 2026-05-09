@@ -13,6 +13,7 @@ import { ExpenseEvolutionChart } from "@/components/dashboard/ExpenseEvolutionCh
 import { ExpenseCategories } from "@/components/dashboard/ExpenseCategories";
 import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
 import { PaymentMethodsChart } from "@/components/dashboard/PaymentMethodsChart";
+import { MonthTurnoverModal } from "@/components/dashboard/MonthTurnoverModal";
 
 import {
   FireIcon,
@@ -746,6 +747,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4">
+      {/* Robô de fechamento de mês */}
+      <MonthTurnoverModal />
       {/* SEÇÃO 1: RESUMO FINANCEIRO - APENAS DESKTOP */}
       <section className="hidden md:block">
         <div className="flex items-center justify-between mb-4">

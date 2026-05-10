@@ -136,6 +136,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const [totalDespesasFixas, setTotalDespesasFixas] = useState(
     dashboardCache.totalDespesasFixas[activeContext] || 0,
   );
+
+  // NOVO ESTADO: Guarda apenas o valor das fixas que já venceram no tempo
+  const [totalFixasPagas, setTotalFixasPagas] = useState(0);
+
   const [listaFixas, setListaFixas] = useState<any[]>(
     dashboardCache.listaFixas[activeContext] || [],
   );
@@ -143,7 +147,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     dashboardCache.metaFixada[activeContext] || null,
   );
 
-  // NOVO ESTADO: Categorias com Limites Definidos
   const [categoriasComLimite, setCategoriasComLimite] = useState<any[]>([]);
 
   const [loading, setLoading] = useState(!cachedData);
@@ -215,7 +218,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       let queryCartoes = supabase.from("cartoes_credito").select("*");
 
-      // NOVA QUERY: Categorias do usuário (AGORA IGNORA O GRUPO_ID)
       let queryCategorias = supabase
         .from("categorias")
         .select("*")
@@ -297,6 +299,34 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         dadosFixasValidos.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
         0;
 
+      // =========================================================
+      // A MÁGICA DO FILTRO DO TEMPO ACONTECE AQUI
+      // =========================================================
+      const today = new Date();
+      const currentMonthStr = getCurrentYearMonth(); // Ex: "2026-05"
+      // Pega o mês que o usuário está olhando no filtro
+      const viewedMonthStr = from ? from.substring(0, 7) : currentMonthStr;
+
+      let fetchedTotalFixasPagas = 0;
+
+      if (viewedMonthStr < currentMonthStr) {
+        // Se estiver olhando um mês passado (ex: Abril), TODAS as contas já venceram
+        fetchedTotalFixasPagas = fetchedTotalFixas;
+      } else if (viewedMonthStr > currentMonthStr) {
+        // Se estiver olhando um mês futuro (ex: Junho), NENHUMA conta venceu ainda
+        fetchedTotalFixasPagas = 0;
+      } else {
+        // Se estiver no mês atual (Maio), checa o dia de hoje contra o dia do vencimento
+        const currentDay = today.getDate();
+        fetchedTotalFixasPagas = dadosFixasValidos.reduce((acc, curr) => {
+          if (Number(curr.dia_vencimento) <= currentDay) {
+            return acc + Number(curr.valor);
+          }
+          return acc;
+        }, 0);
+      }
+      // =========================================================
+
       const todosOsGastos = [...fetchedDespesasBrutas, ...dadosFixasValidos];
 
       const categoriasMap = todosOsGastos.reduce((acc: any, curr) => {
@@ -320,7 +350,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         .sort((a, b) => b.value - a.value)
         .slice(0, 6);
 
-      // --- Vencimentos + Faturas de Cartão (injeção) ---
       let fetchedVencimentos = vencimentosData || [];
 
       if (cartoesData && cartoesData.length > 0) {
@@ -395,9 +424,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           .slice(0, 5);
       }
 
-      // ---------------------------------------------------------
-      // CÁLCULO EXATO PARA OS LIMITES (Igual à tela de Planejamento)
-      // ---------------------------------------------------------
       const fixasPagasNoMes = new Set(
         fetchedDespesasBrutas
           .filter((d) => d.conta_fixa_id != null)
@@ -406,7 +432,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       const gastosParaLimitesMap: Record<string, { total: number }> = {};
 
-      // 1. Soma Lançamentos Reais
       fetchedDespesasBrutas.forEach((item) => {
         const cat = (item.categoria || "Sem categoria").trim();
         if (!gastosParaLimitesMap[cat])
@@ -414,7 +439,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         gastosParaLimitesMap[cat].total += Number(item.valor);
       });
 
-      // 2. Soma as "Sombras" (Fixas ainda não pagas)
       dadosFixasValidos.forEach((fixa) => {
         if (!fixasPagasNoMes.has(fixa.id)) {
           const cat = (fixa.categoria || "Sem categoria").trim();
@@ -424,7 +448,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         }
       });
 
-      // 3. Mapeia os Limites cruzando com o total calculado acima
       const fetchedCategoriasLimite = (categoriasData || [])
         .filter((c) => c.teto_gastos && Number(c.teto_gastos) > 0)
         .map((c) => {
@@ -442,6 +465,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       setCategoriasChart(fetchedCategoriasChart);
       setProximosVencimentos(fetchedVencimentos);
       setTotalDespesasFixas(fetchedTotalFixas);
+      setTotalFixasPagas(fetchedTotalFixasPagas); // NOVO: Atualiza o estado
       setListaFixas(dadosFixasValidos);
       setCategoriasComLimite(fetchedCategoriasLimite);
 
@@ -564,12 +588,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       .map((data) => ({ data, valor: agrupado[data] }));
   }, [despesasBrutas, periodoGrafico]);
 
-  // Cálculos para a nova seção de Limites
   const totalCategorizado = categoriasComLimite.reduce(
     (acc, cat) => acc + Number(cat.teto_gastos),
     0,
   );
-  // Cores fixas vibrantes para o gráfico (estilo imagem)
+
   const categoryColors = [
     "#3b82f6",
     "#ef4444",
@@ -581,7 +604,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   ];
 
   const renderCategoryBudgets = () => {
-    // 1. Calcular Totais baseados apenas nas categorias que possuem limite
     const totalLimite = categoriasComLimite.reduce(
       (acc, cat) => acc + Number(cat.teto_gastos),
       0,
@@ -591,7 +613,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       0,
     );
 
-    // 2. Porcentagem Geral do gráfico (limitado a 100% para o SVG não quebrar)
     const porcentagemUsoGeral =
       totalLimite > 0
         ? Math.min((totalGastoLimites / totalLimite) * 100, 100)
@@ -635,7 +656,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </div>
         ) : (
           <div className="bg-card border border-border/50 rounded-3xl p-5 sm:p-6 shadow-sm space-y-6">
-            {/* Header: Total Gasto vs Total Limite + Gráfico */}
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider mb-1">
@@ -651,13 +671,11 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 </div>
               </div>
 
-              {/* Gráfico SVG Donut (Criado com base no que você somou) */}
               <div className="relative h-16 w-16 sm:h-20 sm:w-20 shrink-0">
                 <svg
                   viewBox="0 0 36 36"
                   className="w-full h-full transform -rotate-90"
                 >
-                  {/* Fundo do círculo (Cinza) */}
                   <path
                     className="text-muted/30"
                     d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"
@@ -665,7 +683,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                     stroke="currentColor"
                     strokeWidth="4"
                   />
-                  {/* Progresso do círculo (Cor principal ou Vermelho se estourar) */}
                   <path
                     className={`${totalGastoLimites > totalLimite ? "text-red-500" : "text-primary"} transition-all duration-500`}
                     strokeDasharray={`${porcentagemUsoGeral}, 100`}
@@ -686,7 +703,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               </div>
             </div>
 
-            {/* Lista de Categorias com Barra de Progresso */}
             <div className="space-y-4 pt-2">
               {categoriasComLimite.map((cat, idx) => {
                 const color = categoryColors[idx % categoryColors.length];
@@ -717,13 +733,12 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                         </span>
                       </div>
                     </div>
-                    {/* Usamos div pura ao invés de <Progress> para garantir que a cor dinâmica funcione bem com o Tailwind */}
                     <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                       <div
                         className="h-full rounded-full transition-all duration-500"
                         style={{
                           width: `${pct}%`,
-                          backgroundColor: isOverBudget ? "#ef4444" : color, // Vermelho se passar do limite
+                          backgroundColor: isOverBudget ? "#ef4444" : color,
                         }}
                       />
                     </div>
@@ -747,9 +762,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   return (
     <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4">
-      {/* Robô de fechamento de mês */}
       <MonthTurnoverModal />
-      {/* SEÇÃO 1: RESUMO FINANCEIRO - APENAS DESKTOP */}
       <section className="hidden md:block">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground/80">
@@ -768,6 +781,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </button>
         </div>
 
+        {/* MÁGICA FINAL: Passando a nova variável totalFixasPagas */}
         <DashboardSummaryCards
           totalReceitas={totalReceitas}
           totalVariaveis={totalDespesas}
@@ -777,14 +791,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           hidden={hidden}
           formatMoney={formatMoney}
           activeContext={activeContext}
+          totalFixasPagas={totalFixasPagas}
         />
       </section>
 
-      {/* ========================= */}
-      {/* MOBILE (< md) */}
-      {/* Ordem: Onde gasto -> Vencimentos -> Formas pgto -> Metas -> Planejamento */}
-      {/* NÃO mostra Evolução */}
-      {/* ========================= */}
       <div className="space-y-8 md:hidden">
         <ExpenseCategories
           categoriasChart={categoriasChart}
@@ -846,14 +856,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </section>
         )}
 
-        {/* NOVA SEÇÃO DE PLANEJAMENTO (MOBILE) */}
         {renderCategoryBudgets()}
       </div>
 
-      {/* ========================= */}
-      {/* DESKTOP (>= md) */}
-      {/* Layout: Evolução (linha inteira) -> Onde gasto + Formas pgto -> Vencimentos -> Metas -> Planejamento */}
-      {/* ========================= */}
       <div className="hidden md:block space-y-12">
         <div className="pt-4">
           <ExpenseEvolutionChart
@@ -929,7 +934,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </section>
         )}
 
-        {/* NOVA SEÇÃO DE PLANEJAMENTO (DESKTOP) */}
         {renderCategoryBudgets()}
       </div>
     </div>

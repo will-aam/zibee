@@ -13,8 +13,8 @@ import {
   EllipsisVerticalIcon,
   SparklesIcon,
 } from "@heroicons/react/24/solid";
-import { BellIcon } from "@heroicons/react/24/outline"; // <-- ADICIONADO AQUI TAMBÉM
-import { appUpdates } from "@/lib/changelog"; // <-- IMPORTANDO A FONTE DA VERDADE
+import { BellIcon } from "@heroicons/react/24/outline";
+import { appUpdates } from "@/lib/changelog";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import {
@@ -34,7 +34,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTheme } from "next-themes";
 
-// --- COMPONENTE IONIC DA CALCULADORA (SOLID E ALINHADO) ---
 const CalculatorIonicSolid = ({ className }: { className?: string }) => (
   <div className="flex items-center justify-center">
     {/* @ts-expect-error Tag customizada do Ionicons */}
@@ -45,7 +44,6 @@ const CalculatorIonicSolid = ({ className }: { className?: string }) => (
     />
   </div>
 );
-// -----------------------------------------------------------
 
 interface MobileHeaderProps {
   activeTab: string;
@@ -58,6 +56,7 @@ interface MobileHeaderProps {
   totalDespesas: number;
   totalDespesasFixas: number;
   listaFixas?: any[];
+  totalFixasPagas?: number; // <-- 1. ABRINDO A PONTE (Interface)
   onNavigate: (tab: string) => void;
   onOpenProfile: () => void;
   onOpenFilter: () => void;
@@ -73,9 +72,7 @@ function getGreeting(): string {
 function MobileDashboardSummarySkeleton() {
   return (
     <section className="-mt-12 px-4 md:hidden">
-      {/* 1. CAIXA PRINCIPAL ESTÁTICA (Sem animate-pulse) */}
       <div className="rounded-3xl bg-background/80 backdrop-blur-xl shadow-sm border border-border/50 overflow-hidden">
-        {/* 2. CONTEÚDO INTERNO PISCANDO (animate-pulse isolado aqui) */}
         <div className="animate-pulse">
           <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3">
             <div className="flex-1">
@@ -119,6 +116,7 @@ export function MobileHeader({
   totalDespesas,
   totalDespesasFixas,
   listaFixas = [],
+  totalFixasPagas = 0, // <-- 2. RECEBENDO NA FUNÇÃO
   onNavigate,
   onOpenProfile,
   onOpenFilter,
@@ -126,13 +124,11 @@ export function MobileHeader({
   const { theme, setTheme } = useTheme();
   const [mounted, setMounted] = React.useState(false);
 
-  // ESTADOS DO PWA (Instalação)
   const [promptInstall, setPromptInstall] = React.useState<any>(null);
   const [isStandalone, setIsStandalone] = React.useState(true);
   const [showInstructions, setShowInstructions] = React.useState(false);
   const [isIOS, setIsIOS] = React.useState(false);
 
-  // EFEITOS (Hidratação do Tema + Verificação do PWA)
   React.useEffect(() => {
     setMounted(true);
 
@@ -154,7 +150,6 @@ export function MobileHeader({
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
 
-  // LOGICA DO SINO DE NOVIDADES
   const [hasNewUpdates, setHasNewUpdates] = React.useState(false);
 
   React.useEffect(() => {
@@ -172,11 +167,10 @@ export function MobileHeader({
     if (appUpdates.length > 0) {
       localStorage.setItem("zibee_last_seen_update", appUpdates[0].id);
       setHasNewUpdates(false);
-      window.dispatchEvent(new Event("zibee:open-updates")); // Aciona o modal futuro
+      window.dispatchEvent(new Event("zibee:open-updates"));
     }
   };
 
-  // FUNÇÃO DE INSTALAÇÃO NATIVA
   const triggerNativeInstall = async () => {
     if (promptInstall) {
       promptInstall.prompt();
@@ -219,7 +213,6 @@ export function MobileHeader({
           </div>
 
           <div className="flex items-center gap-1">
-            {/* --- NOVO: SINO DO MOBILE --- */}
             <button
               onClick={handleOpenUpdates}
               className="relative shrink-0 p-2.5 rounded-2xl active:scale-95 transition hover:bg-white/20"
@@ -233,7 +226,6 @@ export function MobileHeader({
                 </span>
               )}
             </button>
-            {/* -------------------------- */}
 
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -268,7 +260,6 @@ export function MobileHeader({
 
                 <DropdownMenuSeparator className="my-1 bg-border/50" />
 
-                {/* BOTÃO DE INSTALAR (SÓ APARECE SE NÃO ESTIVER INSTALADO) */}
                 {!isStandalone && (
                   <DropdownMenuItem
                     onClick={() => setShowInstructions(true)}
@@ -290,16 +281,6 @@ export function MobileHeader({
                   )}
                   <span className="font-medium text-sm">Alternar Tema</span>
                 </DropdownMenuItem>
-
-                {/*
-                <DropdownMenuItem
-                  onClick={() => onNavigate("configuracoes")}
-                  className="gap-3 p-3 rounded-xl cursor-pointer"
-                >
-                  <Cog6ToothIcon className="h-5 w-5 text-muted-foreground" />
-                  <span className="font-medium text-sm">Configurações</span>
-                </DropdownMenuItem>
-                */}
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
@@ -315,6 +296,7 @@ export function MobileHeader({
           gastosVariaveis={totalDespesas}
           contasFixasMensais={totalDespesasFixas}
           listaFixas={listaFixas}
+          totalFixasPagas={totalFixasPagas} // <-- 3. ENTREGANDO A ENCOMENDA PRO CARD MÓVEL
           onNavigate={onNavigate}
         />
       )}

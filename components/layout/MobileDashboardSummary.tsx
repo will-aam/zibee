@@ -9,6 +9,7 @@ import {
   WalletIcon,
   ArrowRightIcon,
   CalendarIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/solid";
 import { cn } from "@/lib/utils";
 import {
@@ -32,11 +33,12 @@ function maskMoney(hidden: boolean, value: number) {
 type NavigateTarget = "recorrencia_mensal" | "despesas_fixas" | "lancamentos";
 
 interface MobileDashboardSummaryProps {
-  saldoGeral: number; // Mantido por compatibilidade da prop, mas recalculamos abaixo
+  saldoGeral: number; // Mantido por compatibilidade da prop
   entradasConfirmadas: number;
   gastosVariaveis: number;
   contasFixasMensais: number;
-  listaFixas?: any[]; // NOVO: Recebe a lista para o modal
+  listaFixas?: any[];
+  totalFixasPagas?: number; // NOVO: Prop para receber as fixas já pagas do Dashboard
   onNavigate?: (target: NavigateTarget) => void;
 }
 
@@ -47,19 +49,20 @@ export default function MobileDashboardSummary({
   entradasConfirmadas,
   gastosVariaveis,
   contasFixasMensais,
-  listaFixas = [], // Inicia vazio caso o pai ainda não passe
+  listaFixas = [],
+  totalFixasPagas = 0, // Inicia em 0 caso o pai ainda não passe
   onNavigate,
 }: MobileDashboardSummaryProps) {
   const [hidden, setHidden] = React.useState(false);
-  const [isFixasModalOpen, setIsFixasModalOpen] = React.useState(false); // NOVO: Controle do Modal
+  const [isFixasModalOpen, setIsFixasModalOpen] = React.useState(false);
 
-  const hasEntradas = entradasConfirmadas > 0;
+  // MÁGICA DO CARD MUTANTE NO MOBILE
+  const isSemReceita = entradasConfirmadas <= 0;
+  const totalGastoMes = gastosVariaveis + contasFixasMensais;
+  const saldoDinheiroEmMaos =
+    entradasConfirmadas - gastosVariaveis - totalFixasPagas;
 
-  // MÁGICA AQUI: Recalculando o Saldo Geral com a nova lógica
-  const saldoGeralCalculado = React.useMemo(() => {
-    if (!hasEntradas) return 0;
-    return entradasConfirmadas - gastosVariaveis - contasFixasMensais;
-  }, [entradasConfirmadas, gastosVariaveis, contasFixasMensais, hasEntradas]);
+  const valorPrincipal = isSemReceita ? totalGastoMes : saldoDinheiroEmMaos;
 
   const loadPrivacyState = React.useCallback(() => {
     try {
@@ -87,9 +90,7 @@ export default function MobileDashboardSummary({
     }
   };
 
-  const displaySaldoGeral = !hasEntradas
-    ? "****"
-    : maskMoney(hidden, saldoGeralCalculado);
+  const displayValorPrincipal = maskMoney(hidden, valorPrincipal);
   const displayEntradas = maskMoney(hidden, entradasConfirmadas);
   const displayGastos = maskMoney(hidden, gastosVariaveis);
   const displayFixas = maskMoney(hidden, contasFixasMensais);
@@ -106,36 +107,53 @@ border border-white/10
 ring-1 ring-black/5 dark:ring-white/10
 overflow-hidden"
         >
-          {/* TOPO: SALDO GERAL + OLHO */}
+          {/* TOPO: O CARD MUTANTE */}
           <div className="px-5 pt-5 pb-4">
-            <div className="flex items-center justify-between gap-3">
+            <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
-                <p className="text-sm text-foreground/70 font-medium">
-                  Saldo geral Previsto
-                </p>
+                {/* Título Dinâmico */}
+                <div
+                  className={`flex items-center gap-1.5 text-sm font-semibold mb-1 ${
+                    isSemReceita ? "text-orange-500" : "text-emerald-500"
+                  }`}
+                >
+                  {isSemReceita ? (
+                    <>
+                      <ArrowTrendingDownIcon className="h-4 w-4" /> Total Gasto
+                      no Mês
+                    </>
+                  ) : (
+                    <>
+                      <BanknotesIcon className="h-4 w-4" /> Saldo Atual
+                    </>
+                  )}
+                </div>
 
+                {/* Valor Dinâmico */}
                 <p
                   className={cn(
                     "text-3xl font-bold tracking-tight mt-0.5",
-                    saldoGeralCalculado >= 0
-                      ? "text-foreground"
-                      : "text-destructive",
+                    !isSemReceita && saldoDinheiroEmMaos < 0
+                      ? "text-destructive"
+                      : "text-foreground",
                   )}
                 >
-                  {displaySaldoGeral}
+                  {displayValorPrincipal}
                 </p>
 
-                {!hasEntradas && (
-                  <p className="text-xs text-foreground/80 mt-1.5">
-                    Sem entradas confirmadas no período
-                  </p>
-                )}
+                {/* Subtítulo Dinâmico */}
+                <p className="text-xs text-foreground/80 mt-1.5 font-medium">
+                  {isSemReceita
+                    ? "Soma de Variáveis + Contas Fixas"
+                    : "Dinheiro livre (ignora fixas não pagas)"}
+                </p>
               </div>
 
+              {/* Botão de Olho */}
               <button
                 type="button"
                 onClick={toggleHidden}
-                className="shrink-0 h-12 w-12 rounded-full hover:bg-muted/50 active:bg-muted transition flex items-center justify-center text-muted-foreground"
+                className="shrink-0 h-12 w-12 rounded-full hover:bg-muted/50 active:bg-muted transition flex items-center justify-center text-muted-foreground bg-background/50"
                 aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
               >
                 {hidden ? (
@@ -193,7 +211,7 @@ to-transparent"
               </p>
             </div>
 
-            {/* Contas fixas mensais - AGORA ABRE O MODAL */}
+            {/* Contas fixas mensais - ABRE O MODAL */}
             <div
               role="button"
               onClick={() => setIsFixasModalOpen(true)}
@@ -223,7 +241,7 @@ to-transparent"
 
       {/* MODAL INFORMATIVO DE CONTAS FIXAS (MOBILE) */}
       <Dialog open={isFixasModalOpen} onOpenChange={setIsFixasModalOpen}>
-        <DialogContent className="w-[95vw] max-w-md rounded-3xl overflow-hidden p-0 gap-0">
+        <DialogContent className="w-[95vw] max-w-md rounded-3xl overflow-hidden p-0 gap-0 z-9999">
           <DialogHeader className="p-5 pb-4 bg-muted/30 border-b border-border/50">
             <DialogTitle className="flex items-center gap-2 text-lg">
               <WalletIcon className="h-5 w-5 text-blue-500" />

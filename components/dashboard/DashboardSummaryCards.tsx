@@ -12,6 +12,7 @@ import {
   ArrowTrendingDownIcon,
   WalletIcon,
   CalendarIcon,
+  BanknotesIcon,
 } from "@heroicons/react/24/solid";
 
 export function DashboardSummaryCards({
@@ -23,8 +24,14 @@ export function DashboardSummaryCards({
   hidden,
   formatMoney,
   activeContext,
+  totalFixasPagas = 0, // <-- NOVA PROP: Receberemos as fixas já pagas do Dashboard
 }: any) {
   const [isFixasModalOpen, setIsFixasModalOpen] = useState(false);
+
+  // MÁGICA DO CARD MUTANTE
+  const isSemReceita = totalReceitas <= 0;
+  const totalGastoMes = totalVariaveis + totalFixas;
+  const saldoDinheiroEmMaos = totalReceitas - totalVariaveis - totalFixasPagas;
 
   return (
     <>
@@ -52,7 +59,7 @@ export function DashboardSummaryCards({
         {activeContext === "pessoal" && (
           <div
             onClick={() => setIsFixasModalOpen(true)}
-            className="pb-4 border-b border-border/50 cursor-pointer"
+            className="pb-4 border-b border-border/50 cursor-pointer hover:opacity-80 transition-opacity"
           >
             <div className="flex items-center gap-2 text-sm font-medium text-blue-500 mb-1">
               <WalletIcon className="h-4 w-4" /> Contas Fixas
@@ -63,20 +70,39 @@ export function DashboardSummaryCards({
           </div>
         )}
 
+        {/* 4º CARD - O MUTANTE */}
         <div className="pb-4 border-b border-border/50">
-          <div className="flex items-center gap-2 text-sm font-medium text-muted-foreground mb-1">
-            Saldo Geral Previsto
+          <div
+            className={`flex items-center gap-2 text-sm font-medium mb-1 ${
+              isSemReceita ? "text-orange-500" : "text-emerald-500"
+            }`}
+          >
+            {isSemReceita ? (
+              <>
+                <ArrowTrendingDownIcon className="h-4 w-4" /> Total Gasto no Mês
+              </>
+            ) : (
+              <>
+                <BanknotesIcon className="h-4 w-4" /> Saldo Atual
+              </>
+            )}
           </div>
           <div
-            className={`text-3xl font-bold tracking-tight ${saldoGeral >= 0 ? "text-foreground" : "text-destructive"}`}
+            className={`text-3xl font-bold tracking-tight ${
+              !isSemReceita && saldoDinheiroEmMaos < 0
+                ? "text-destructive"
+                : "text-foreground"
+            }`}
           >
-            {totalReceitas > 0 ? formatMoney(saldoGeral) : "****"}
+            {isSemReceita
+              ? formatMoney(totalGastoMes)
+              : formatMoney(saldoDinheiroEmMaos)}
           </div>
-          {totalReceitas <= 0 && (
-            <p className="text-[11px] text-muted-foreground mt-1">
-              Sem entradas confirmadas
-            </p>
-          )}
+          <p className="text-[11px] text-muted-foreground mt-1">
+            {isSemReceita
+              ? "Soma de Variáveis + Contas Fixas"
+              : "Dinheiro livre (ignora fixas não pagas)"}
+          </p>
         </div>
       </div>
 

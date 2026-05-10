@@ -20,6 +20,15 @@ import DateRangeFilterDrawer, {
   FILTER_EVENT,
 } from "@/components/layout/DateRangeFilterDrawer";
 
+// Helper para o filtro do tempo
+function pad2(n: number) {
+  return String(n).padStart(2, "0");
+}
+function getCurrentYearMonth() {
+  const now = new Date();
+  return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
+}
+
 export default function Header({
   activeTab = "dashboard",
   onNavigate,
@@ -45,12 +54,14 @@ export default function Header({
     seed: "Zibee-1",
   });
 
-  // ESTADOS DOS TOTAIS
   const [loadingTotals, setLoadingTotals] = React.useState(true);
   const [totalReceitas, setTotalReceitas] = React.useState(0);
   const [totalDespesas, setTotalDespesas] = React.useState(0);
   const [totalDespesasFixas, setTotalDespesasFixas] = React.useState(0);
-  const [listaFixas, setListaFixas] = React.useState<any[]>([]); // NOVO: Para o modal mobile
+  const [listaFixas, setListaFixas] = React.useState<any[]>([]);
+
+  // NOVO: Estado para as fixas que já venceram no tempo
+  const [totalFixasPagas, setTotalFixasPagas] = React.useState(0);
 
   const userId = session.data?.user?.id;
   const userEmail = session.data?.user?.email;
@@ -58,7 +69,7 @@ export default function Header({
 
   const saldoGeral = React.useMemo(() => {
     if (!totalReceitas || totalReceitas <= 0) return 0;
-    return totalReceitas - totalDespesas - totalDespesasFixas; // Agora subtrai as fixas
+    return totalReceitas - totalDespesas - totalDespesasFixas;
   }, [totalReceitas, totalDespesas, totalDespesasFixas]);
 
   const handleLogout = async () => {
@@ -74,7 +85,7 @@ export default function Header({
   const readRange = React.useCallback(() => {
     let from = localStorage.getItem(STORAGE_FROM_KEY);
     let to = localStorage.getItem(STORAGE_TO_KEY);
-    const preset = localStorage.getItem(STORAGE_PRESET_KEY); // Lê o preset atual
+    const preset = localStorage.getItem(STORAGE_PRESET_KEY);
 
     if (preset === "this_month" || !from || !to) {
       const hoje = new Date();
@@ -133,11 +144,11 @@ export default function Header({
         .from("lancamentos")
         .select("valor")
         .eq("tipo", "Despesa")
-        .is("conta_fixa_id", null); // MÁGICA: Isola as variáveis
+        .is("conta_fixa_id", null);
 
       let queryF = supabase
         .from("despesas_fixas")
-        .select("*") // MÁGICA: Busca tudo (nome, data, etc)
+        .select("*")
         .eq("status", "ativo")
         .order("dia_vencimento", { ascending: true });
 
@@ -166,18 +177,43 @@ export default function Header({
         queryF,
       ]);
 
-      setTotalReceitas(
-        r?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
-      );
-      setTotalDespesas(
-        d?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
-      );
-
+      const fetchedReceitas =
+        r?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+      const fetchedDespesas =
+        d?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
       const fixasValidas = f || [];
-      setTotalDespesasFixas(
-        fixasValidas.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0,
-      );
-      setListaFixas(fixasValidas); // Guardando para o Mobile
+      const fetchedFixas =
+        fixasValidas.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
+
+      // =========================================================
+      // O FILTRO DO TEMPO (Igual ao do Desktop)
+      // =========================================================
+      const today = new Date();
+      const currentMonthStr = getCurrentYearMonth();
+      const viewedMonthStr = from ? from.substring(0, 7) : currentMonthStr;
+
+      let calcFixasPagas = 0;
+
+      if (viewedMonthStr < currentMonthStr) {
+        calcFixasPagas = fetchedFixas;
+      } else if (viewedMonthStr > currentMonthStr) {
+        calcFixasPagas = 0;
+      } else {
+        const currentDay = today.getDate();
+        calcFixasPagas = fixasValidas.reduce((acc, curr) => {
+          if (Number(curr.dia_vencimento) <= currentDay) {
+            return acc + Number(curr.valor);
+          }
+          return acc;
+        }, 0);
+      }
+      // =========================================================
+
+      setTotalReceitas(fetchedReceitas);
+      setTotalDespesas(fetchedDespesas);
+      setTotalDespesasFixas(fetchedFixas);
+      setListaFixas(fixasValidas);
+      setTotalFixasPagas(calcFixasPagas); // Salva o cálculo!
     } catch (e) {
       console.error(e);
     } finally {
@@ -276,7 +312,8 @@ export default function Header({
         totalReceitas={totalReceitas}
         totalDespesas={totalDespesas}
         totalDespesasFixas={totalDespesasFixas}
-        listaFixas={listaFixas} // MÁGICA: Lista descendo pro Mobile
+        listaFixas={listaFixas}
+        totalFixasPagas={totalFixasPagas} // MÁGICA ENVIADA: Passando pro mobile!
         onNavigate={onNavigate!}
         onOpenProfile={() => setOpenProfileDrawer(true)}
         onOpenFilter={() => setOpenFilterDrawer(true)}
@@ -304,7 +341,6 @@ export default function Header({
         onNavigateSettings={() => onNavigate?.("configuracoes")}
       />
 
-      {/* ALTERAÇÃO AQUI: Passamos o onNavigate para o Modal */}
       <UpdatesModal onNavigate={onNavigate} />
 
       <PushPermissionModal />

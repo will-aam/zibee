@@ -6,6 +6,8 @@ import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { useResumoMensal } from "@/hooks/useResumoMensal";
 
 // IMPORTANDO OS COMPONENTES
 import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
@@ -31,7 +33,6 @@ interface DashboardProps {
   onNavigate?: (tab: string) => void;
 }
 
-const STORAGE_MONTH_KEY = "dashboardFiltroMes";
 const STORAGE_FROM_KEY = "dashboardFiltroDe";
 const STORAGE_TO_KEY = "dashboardFiltroAte";
 const FILTER_EVENT = "dashboard:filter-changed";
@@ -44,29 +45,106 @@ function getCurrentYearMonth() {
   const now = new Date();
   return `${now.getFullYear()}-${pad2(now.getMonth() + 1)}`;
 }
-function monthToRange(anoMes: string) {
-  const [ano, mes] = anoMes.split("-");
-  const ultimoDia = new Date(Number(ano), Number(mes), 0).getDate();
-  return { from: `${anoMes}-01`, to: `${anoMes}-${pad2(ultimoDia)}` };
-}
-
-const dashboardCache = {
-  dataByRange: {} as Record<string, any>,
-  totalDespesasFixas: {} as Record<string, number>,
-  metaFixada: {} as Record<string, any | null>,
-  listaFixas: {} as Record<string, any[]>,
-};
 
 export default function Dashboard({ onNavigate }: DashboardProps) {
+  const queryClient = useQueryClient();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
   const { activeContext } = useWorkspace();
 
-  const [mesSelecionado, setMesSelecionado] = useState("todos");
   const [hidden, setHidden] = useState(false);
-  const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [periodoGrafico, setPeriodoGrafico] = useState<"7D" | "30D" | "ALL">(
+    "30D",
+  );
 
+  // 1. LÓGICA DE DATAS REATIVA
+  const readRange = useCallback(() => {
+    if (typeof window === "undefined") return { from: null, to: null };
+    return {
+      from: localStorage.getItem(STORAGE_FROM_KEY),
+      to: localStorage.getItem(STORAGE_TO_KEY),
+    };
+  }, []);
+
+  const [range, setRange] = useState(readRange);
+
+  useEffect(() => {
+    const handleFilter = () => setRange(readRange());
+    window.addEventListener(FILTER_EVENT, handleFilter);
+    return () => window.removeEventListener(FILTER_EVENT, handleFilter);
+  }, [readRange]);
+
+  const { from, to } = range;
+
+  // 2. O CÉREBRO COMPARTILHADO (React Query)
+  const { data: resumo, isLoading: isLoadingResumo } = useResumoMensal({
+    userId,
+    activeContext,
+    from,
+    to,
+  });
+
+  // 3. BUSCA DOS EXTRAS (Cartões, Categorias e Metas - Só roda no Dashboard)
+  const { data: extras, isLoading: isLoadingExtras } = useQuery({
+    queryKey: ["dashboard-extras", userId, activeContext],
+    enabled: !!userId,
+    queryFn: async () => {
+      let groupId = null;
+      if (activeContext === "grupo") {
+        const { data: myGroup } = await supabase
+          .from("grupos")
+          .select("id")
+          .eq("criador_id", userId)
+          .maybeSingle();
+        groupId =
+          myGroup?.id ||
+          (
+            await supabase
+              .from("membros_grupo")
+              .select("grupo_id")
+              .eq("user_id", userId)
+              .eq("status", "Aceito")
+              .maybeSingle()
+          )?.data?.grupo_id;
+        if (!groupId) return { cartoes: [], categorias: [], meta: null };
+      }
+
+      let qCartoes = supabase.from("cartoes_credito").select("*");
+      let qCategorias = supabase
+        .from("categorias")
+        .select("*")
+        .eq("user_id", userId);
+
+      if (activeContext === "grupo" && groupId) {
+        qCartoes = qCartoes.eq("grupo_id", groupId);
+      } else {
+        qCartoes = qCartoes.eq("user_id", userId).is("grupo_id", null);
+      }
+
+      const [{ data: cartoes }, { data: categorias }, { data: meta }] =
+        await Promise.all([
+          qCartoes,
+          qCategorias,
+          activeContext === "pessoal"
+            ? supabase
+                .from("metas")
+                .select("*")
+                .eq("user_id", userId)
+                .eq("fixada", true)
+                .maybeSingle()
+            : Promise.resolve({ data: null }),
+        ]);
+
+      return {
+        cartoes: cartoes || [],
+        categorias: categorias || [],
+        meta: meta || null,
+      };
+    },
+  });
+
+  // 4. PRIVACIDADE DO USUÁRIO
   const loadPrivacyState = useCallback(() => {
     try {
       const saved = localStorage.getItem(PRIVACY_STORAGE_KEY);
@@ -90,480 +168,149 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     } catch {}
   };
 
-  const readRange = useCallback(() => {
-    if (typeof window === "undefined")
-      return { from: null, to: null, key: `all_${activeContext}` };
+  // =========================================================
+  // MEMORIZAÇÃO: CÁLCULOS QUE SÓ RODAM QUANDO OS DADOS MUDAM
+  // =========================================================
+  const despesasBrutas = resumo?.despesasBrutas || [];
+  const listaFixas = resumo?.listaFixas || [];
+  const cartoesData = extras?.cartoes || [];
+  const categoriasData = extras?.categorias || [];
+  const metaFixada = extras?.meta || null;
 
-    const from = localStorage.getItem(STORAGE_FROM_KEY);
-    const to = localStorage.getItem(STORAGE_TO_KEY);
-
-    if (from || to)
-      return {
-        from: from || null,
-        to: to || null,
-        key: `${from}_${to}_${activeContext}`,
-      };
-
-    const mes = localStorage.getItem(STORAGE_MONTH_KEY) || mesSelecionado;
-    if (!mes || mes === "todos")
-      return { from: null, to: null, key: `all_${activeContext}` };
-
-    const range = monthToRange(mes);
-    return { ...range, key: `${range.from}_${range.to}_${activeContext}` };
-  }, [mesSelecionado, activeContext]);
-
-  const initialRange =
-    typeof window !== "undefined"
-      ? readRange()
-      : { key: `all_${activeContext}` };
-  const cachedData = dashboardCache.dataByRange[initialRange.key];
-
-  const [totalDespesas, setTotalDespesas] = useState(
-    cachedData?.totalDespesas || 0,
-  );
-  const [totalReceitas, setTotalReceitas] = useState(
-    cachedData?.totalReceitas || 0,
-  );
-  const [categoriasChart, setCategoriasChart] = useState<any[]>(
-    cachedData?.categoriasChart || [],
-  );
-  const [proximosVencimentos, setProximosVencimentos] = useState<any[]>(
-    cachedData?.proximosVencimentos || [],
-  );
-  const [despesasBrutas, setDespesasBrutas] = useState<any[]>(
-    cachedData?.despesasBrutas || [],
-  );
-  const [totalDespesasFixas, setTotalDespesasFixas] = useState(
-    dashboardCache.totalDespesasFixas[activeContext] || 0,
+  const todosOsGastos = useMemo(
+    () => [...despesasBrutas, ...listaFixas],
+    [despesasBrutas, listaFixas],
   );
 
-  // NOVO ESTADO: Guarda apenas o valor das fixas que já venceram no tempo
-  const [totalFixasPagas, setTotalFixasPagas] = useState(0);
+  const categoriasChart = useMemo(() => {
+    const map = todosOsGastos.reduce((acc: any, curr) => {
+      const k = curr.categoria || "Sem categoria";
+      if (!acc[k]) acc[k] = { total: 0, items: [] };
+      acc[k].total += Number(curr.valor);
+      acc[k].items.push(curr);
+      return acc;
+    }, {});
 
-  const [listaFixas, setListaFixas] = useState<any[]>(
-    dashboardCache.listaFixas[activeContext] || [],
-  );
-  const [metaFixada, setMetaFixada] = useState<any>(
-    dashboardCache.metaFixada[activeContext] || null,
-  );
+    return Object.entries(map || {})
+      .map(([name, data]: any) => ({
+        name,
+        value: Number(data.total),
+        items: data.items.sort(
+          (a: any, b: any) =>
+            new Date(a.data_vencimento || a.dia_vencimento).getTime() -
+            new Date(b.data_vencimento || b.dia_vencimento).getTime(),
+        ),
+      }))
+      .sort((a, b) => b.value - a.value)
+      .slice(0, 6);
+  }, [todosOsGastos]);
 
-  const [categoriasComLimite, setCategoriasComLimite] = useState<any[]>([]);
+  const proximosVencimentos = useMemo(() => {
+    let vencimentos = despesasBrutas.filter((d) => !d.pago && !d.cartao_id);
 
-  const [loading, setLoading] = useState(!cachedData);
-  const [periodoGrafico, setPeriodoGrafico] = useState<"7D" | "30D" | "ALL">(
-    "30D",
-  );
-
-  const fetchDashboardData = useCallback(async () => {
-    if (!userId) return;
-
-    try {
-      const { from, to, key } = readRange();
-      if (!dashboardCache.dataByRange[key]) setLoading(true);
-
-      let groupId = null;
-
-      if (activeContext === "grupo") {
-        const { data: myGroup } = await supabase
-          .from("grupos")
-          .select("id")
-          .eq("criador_id", userId)
-          .maybeSingle();
-
-        if (myGroup) groupId = myGroup.id;
-        else {
-          const { data: membership } = await supabase
-            .from("membros_grupo")
-            .select("grupo_id")
-            .eq("user_id", userId)
-            .eq("status", "Aceito")
-            .maybeSingle();
-          if (membership) groupId = membership.grupo_id;
-        }
-
-        if (!groupId) {
-          setLoading(false);
-          return;
-        }
-      }
-
-      setCurrentGroupId(groupId);
-
-      let queryDespesasVariaveis = supabase
-        .from("lancamentos")
-        .select("*")
-        .eq("tipo", "Despesa")
-        .is("conta_fixa_id", null);
-
-      let queryReceitas = supabase
-        .from("lancamentos")
-        .select("*")
-        .eq("tipo", "Receita")
-        .eq("pago", true);
-
-      let queryVencimentos = supabase
-        .from("lancamentos")
-        .select("*")
-        .eq("pago", false)
-        .eq("tipo", "Despesa")
-        .is("cartao_id", null)
-        .order("data_vencimento", { ascending: true })
-        .limit(5);
-
-      let queryFixasDashboard = supabase
-        .from("despesas_fixas")
-        .select("*")
-        .eq("status", "ativo")
-        .order("dia_vencimento", { ascending: true });
-
-      let queryCartoes = supabase.from("cartoes_credito").select("*");
-
-      let queryCategorias = supabase
-        .from("categorias")
-        .select("*")
-        .eq("user_id", userId);
-
-      if (activeContext === "grupo" && groupId) {
-        queryDespesasVariaveis = queryDespesasVariaveis.eq("grupo_id", groupId);
-        queryReceitas = queryReceitas.eq("grupo_id", groupId);
-        queryVencimentos = queryVencimentos.eq("grupo_id", groupId);
-        queryFixasDashboard = queryFixasDashboard.eq("grupo_id", groupId);
-        queryCartoes = queryCartoes.eq("grupo_id", groupId);
-      } else {
-        queryDespesasVariaveis = queryDespesasVariaveis
-          .eq("user_id", userId)
-          .is("grupo_id", null);
-        queryReceitas = queryReceitas
-          .eq("user_id", userId)
-          .is("grupo_id", null);
-        queryVencimentos = queryVencimentos
-          .eq("user_id", userId)
-          .is("grupo_id", null);
-        queryFixasDashboard = queryFixasDashboard
-          .eq("user_id", userId)
-          .is("grupo_id", null);
-        queryCartoes = queryCartoes.eq("user_id", userId).is("grupo_id", null);
-      }
-
-      if (from) {
-        queryDespesasVariaveis = queryDespesasVariaveis.gte(
-          "data_vencimento",
-          from,
+    if (cartoesData.length > 0) {
+      const faturasInjetaveis: any[] = [];
+      cartoesData.forEach((cartao) => {
+        const comprasPendentes = todosOsGastos.filter(
+          (d) => d.cartao_id === cartao.id && !d.pago,
         );
-        queryReceitas = queryReceitas.gte("data_vencimento", from);
-        queryVencimentos = queryVencimentos.gte("data_vencimento", from);
-      }
-      if (to) {
-        queryDespesasVariaveis = queryDespesasVariaveis.lte(
-          "data_vencimento",
-          to,
-        );
-        queryReceitas = queryReceitas.lte("data_vencimento", to);
-        queryVencimentos = queryVencimentos.lte("data_vencimento", to);
-      }
+        if (comprasPendentes.length === 0) return;
 
-      const [
-        { data: variaveisData },
-        { data: receitasData },
-        { data: vencimentosData },
-        { data: fixasData },
-        { data: metaData },
-        { data: cartoesData },
-        { data: categoriasData },
-      ] = await Promise.all([
-        queryDespesasVariaveis,
-        queryReceitas,
-        queryVencimentos,
-        queryFixasDashboard,
-        activeContext === "pessoal" &&
-        dashboardCache.metaFixada[activeContext] === undefined
-          ? supabase
-              .from("metas")
-              .select("*")
-              .eq("user_id", userId)
-              .eq("fixada", true)
-              .maybeSingle()
-          : Promise.resolve({ data: null }),
-        queryCartoes,
-        queryCategorias,
-      ]);
-
-      const fetchedDespesasBrutas = variaveisData || [];
-      const fetchedTotalVariaveis =
-        variaveisData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-      const fetchedTotalRec =
-        receitasData?.reduce((acc, curr) => acc + Number(curr.valor), 0) || 0;
-
-      const dadosFixasValidos = fixasData || [];
-      const fetchedTotalFixas =
-        dadosFixasValidos.reduce((acc, curr) => acc + Number(curr.valor), 0) ||
-        0;
-
-      // =========================================================
-      // A MÁGICA DO FILTRO DO TEMPO ACONTECE AQUI
-      // =========================================================
-      const today = new Date();
-      const currentMonthStr = getCurrentYearMonth(); // Ex: "2026-05"
-      // Pega o mês que o usuário está olhando no filtro
-      const viewedMonthStr = from ? from.substring(0, 7) : currentMonthStr;
-
-      let fetchedTotalFixasPagas = 0;
-
-      if (viewedMonthStr < currentMonthStr) {
-        // Se estiver olhando um mês passado (ex: Abril), TODAS as contas já venceram
-        fetchedTotalFixasPagas = fetchedTotalFixas;
-      } else if (viewedMonthStr > currentMonthStr) {
-        // Se estiver olhando um mês futuro (ex: Junho), NENHUMA conta venceu ainda
-        fetchedTotalFixasPagas = 0;
-      } else {
-        // Se estiver no mês atual (Maio), checa o dia de hoje contra o dia do vencimento
-        const currentDay = today.getDate();
-        fetchedTotalFixasPagas = dadosFixasValidos.reduce((acc, curr) => {
-          if (Number(curr.dia_vencimento) <= currentDay) {
-            return acc + Number(curr.valor);
-          }
-          return acc;
-        }, 0);
-      }
-      // =========================================================
-
-      const todosOsGastos = [...fetchedDespesasBrutas, ...dadosFixasValidos];
-
-      const categoriasMap = todosOsGastos.reduce((acc: any, curr) => {
-        const k = curr.categoria || "Sem categoria";
-        if (!acc[k]) acc[k] = { total: 0, items: [] };
-        acc[k].total += Number(curr.valor);
-        acc[k].items.push(curr);
-        return acc;
-      }, {});
-
-      const fetchedCategoriasChart = Object.entries(categoriasMap || {})
-        .map(([name, data]: any) => ({
-          name,
-          value: Number(data.total),
-          items: data.items.sort(
-            (a: any, b: any) =>
-              new Date(a.data_vencimento || a.dia_vencimento).getTime() -
-              new Date(b.data_vencimento || b.dia_vencimento).getTime(),
-          ),
-        }))
-        .sort((a, b) => b.value - a.value)
-        .slice(0, 6);
-
-      let fetchedVencimentos = vencimentosData || [];
-
-      if (cartoesData && cartoesData.length > 0) {
-        const faturasInjetaveis: any[] = [];
-
-        cartoesData.forEach((cartao) => {
-          const comprasPendentesCartao = todosOsGastos.filter(
-            (d) => d.cartao_id === cartao.id && !d.pago,
-          );
-
-          if (comprasPendentesCartao.length === 0) return;
-
-          const faturasAgrupadas: Record<string, number> = {};
-
-          comprasPendentesCartao.forEach((compra) => {
-            let dataBaseStr = compra.data_vencimento;
-
-            if (!dataBaseStr) {
-              const [anoF, mesF] = (
-                readRange().from || getCurrentYearMonth() + "-01"
-              ).split("-");
-              dataBaseStr = `${anoF}-${mesF}-${String(compra.dia_vencimento).padStart(2, "0")}`;
-            }
-
-            const dataCompra = new Date(dataBaseStr + "T12:00:00");
-            if (isNaN(dataCompra.getTime())) return;
-
-            let mesFatura = dataCompra.getMonth();
-            let anoFatura = dataCompra.getFullYear();
-
-            if (dataCompra.getDate() > cartao.dia_fechamento) mesFatura++;
-            if (cartao.dia_vencimento <= cartao.dia_fechamento) mesFatura++;
-
-            if (mesFatura > 11) {
-              mesFatura = 0;
-              anoFatura++;
-            }
-
-            const dataVencimentoReal = new Date(
-              anoFatura,
-              mesFatura,
-              cartao.dia_vencimento,
-              12,
-              0,
-              0,
+        const faturasAgrupadas: Record<string, number> = {};
+        comprasPendentes.forEach((compra) => {
+          let dataBaseStr = compra.data_vencimento;
+          if (!dataBaseStr) {
+            const [anoF, mesF] = (from || getCurrentYearMonth() + "-01").split(
+              "-",
             );
+            dataBaseStr = `${anoF}-${mesF}-${String(compra.dia_vencimento).padStart(2, "0")}`;
+          }
 
-            const chaveIso = dataVencimentoReal.toISOString();
+          const dataCompra = new Date(dataBaseStr + "T12:00:00");
+          if (isNaN(dataCompra.getTime())) return;
 
-            if (!faturasAgrupadas[chaveIso]) faturasAgrupadas[chaveIso] = 0;
-            faturasAgrupadas[chaveIso] += Number(compra.valor);
-          });
+          let mesFatura = dataCompra.getMonth();
+          let anoFatura = dataCompra.getFullYear();
 
-          Object.entries(faturasAgrupadas).forEach(([dataIso, totalValor]) => {
-            faturasInjetaveis.push({
-              id: `fatura-${cartao.id}-${dataIso}`,
-              descricao: `Fatura ${cartao.nome}`,
-              valor: totalValor,
-              data_vencimento: dataIso,
-              pago: false,
-              isFatura: true,
-            });
-          });
+          if (dataCompra.getDate() > cartao.dia_fechamento) mesFatura++;
+          if (cartao.dia_vencimento <= cartao.dia_fechamento) mesFatura++;
+          if (mesFatura > 11) {
+            mesFatura = 0;
+            anoFatura++;
+          }
+
+          const dataVencimentoReal = new Date(
+            anoFatura,
+            mesFatura,
+            cartao.dia_vencimento,
+            12,
+            0,
+            0,
+          );
+          const chaveIso = dataVencimentoReal.toISOString();
+
+          if (!faturasAgrupadas[chaveIso]) faturasAgrupadas[chaveIso] = 0;
+          faturasAgrupadas[chaveIso] += Number(compra.valor);
         });
 
-        fetchedVencimentos = [...fetchedVencimentos, ...faturasInjetaveis]
-          .sort(
-            (a, b) =>
-              new Date(a.data_vencimento).getTime() -
-              new Date(b.data_vencimento).getTime(),
-          )
-          .slice(0, 5);
-      }
+        Object.entries(faturasAgrupadas).forEach(([dataIso, totalValor]) => {
+          faturasInjetaveis.push({
+            id: `fatura-${cartao.id}-${dataIso}`,
+            descricao: `Fatura ${cartao.nome}`,
+            valor: totalValor,
+            data_vencimento: dataIso,
+            pago: false,
+            isFatura: true,
+          });
+        });
+      });
+      vencimentos = [...vencimentos, ...faturasInjetaveis];
+    }
+    return vencimentos
+      .sort(
+        (a, b) =>
+          new Date(a.data_vencimento).getTime() -
+          new Date(b.data_vencimento).getTime(),
+      )
+      .slice(0, 5);
+  }, [despesasBrutas, todosOsGastos, cartoesData, from]);
 
-      const fixasPagasNoMes = new Set(
-        fetchedDespesasBrutas
-          .filter((d) => d.conta_fixa_id != null)
-          .map((d) => d.conta_fixa_id),
-      );
+  const categoriasComLimite = useMemo(() => {
+    const fixasPagasNoMes = new Set(
+      despesasBrutas
+        .filter((d) => d.conta_fixa_id != null)
+        .map((d) => d.conta_fixa_id),
+    );
+    const gastosParaLimitesMap: Record<string, { total: number }> = {};
 
-      const gastosParaLimitesMap: Record<string, { total: number }> = {};
+    despesasBrutas.forEach((item) => {
+      const cat = (item.categoria || "Sem categoria").trim();
+      if (!gastosParaLimitesMap[cat]) gastosParaLimitesMap[cat] = { total: 0 };
+      gastosParaLimitesMap[cat].total += Number(item.valor);
+    });
 
-      fetchedDespesasBrutas.forEach((item) => {
-        const cat = (item.categoria || "Sem categoria").trim();
+    listaFixas.forEach((fixa) => {
+      if (!fixasPagasNoMes.has(fixa.id)) {
+        const cat = (fixa.categoria || "Sem categoria").trim();
         if (!gastosParaLimitesMap[cat])
           gastosParaLimitesMap[cat] = { total: 0 };
-        gastosParaLimitesMap[cat].total += Number(item.valor);
-      });
-
-      dadosFixasValidos.forEach((fixa) => {
-        if (!fixasPagasNoMes.has(fixa.id)) {
-          const cat = (fixa.categoria || "Sem categoria").trim();
-          if (!gastosParaLimitesMap[cat])
-            gastosParaLimitesMap[cat] = { total: 0 };
-          gastosParaLimitesMap[cat].total += Number(fixa.valor);
-        }
-      });
-
-      const fetchedCategoriasLimite = (categoriasData || [])
-        .filter((c) => c.teto_gastos && Number(c.teto_gastos) > 0)
-        .map((c) => {
-          const gastoAtual = gastosParaLimitesMap[c.nome.trim()]?.total || 0;
-          return {
-            ...c,
-            gasto: gastoAtual,
-          };
-        })
-        .sort((a, b) => Number(b.teto_gastos) - Number(a.teto_gastos));
-
-      setDespesasBrutas(fetchedDespesasBrutas);
-      setTotalDespesas(fetchedTotalVariaveis);
-      setTotalReceitas(fetchedTotalRec);
-      setCategoriasChart(fetchedCategoriasChart);
-      setProximosVencimentos(fetchedVencimentos);
-      setTotalDespesasFixas(fetchedTotalFixas);
-      setTotalFixasPagas(fetchedTotalFixasPagas); // NOVO: Atualiza o estado
-      setListaFixas(dadosFixasValidos);
-      setCategoriasComLimite(fetchedCategoriasLimite);
-
-      dashboardCache.dataByRange[key] = {
-        totalDespesas: fetchedTotalVariaveis,
-        totalReceitas: fetchedTotalRec,
-        categoriasChart: fetchedCategoriasChart,
-        proximosVencimentos: fetchedVencimentos,
-        despesasBrutas: fetchedDespesasBrutas,
-      };
-
-      if (activeContext === "pessoal") {
-        dashboardCache.totalDespesasFixas[activeContext] = fetchedTotalFixas;
-        dashboardCache.listaFixas[activeContext] = dadosFixasValidos;
-
-        if (metaData !== null) {
-          setMetaFixada(metaData);
-          dashboardCache.metaFixada[activeContext] = metaData;
-        }
-      } else {
-        setMetaFixada(null);
+        gastosParaLimitesMap[cat].total += Number(fixa.valor);
       }
-    } catch (error) {
-      console.error("Erro ao carregar dashboard:", error);
-    } finally {
-      setLoading(false);
-    }
-  }, [readRange, userId, activeContext]);
+    });
 
-  useEffect(() => {
-    if (userId) fetchDashboardData();
-  }, [fetchDashboardData, userId]);
-
-  useEffect(() => {
-    const current =
-      localStorage.getItem(STORAGE_MONTH_KEY) || getCurrentYearMonth();
-    setMesSelecionado(current);
-
-    window.addEventListener(FILTER_EVENT, fetchDashboardData);
-    return () => window.removeEventListener(FILTER_EVENT, fetchDashboardData);
-  }, [fetchDashboardData]);
-
-  const togglePagoLancamento = async (
-    lancamentoId: number,
-    currentStatus: boolean,
-  ) => {
-    try {
-      const novoStatus = !currentStatus;
-
-      let query = supabase
-        .from("lancamentos")
-        .update({ pago: novoStatus })
-        .eq("id", lancamentoId);
-
-      if (activeContext === "grupo" && currentGroupId)
-        query = query.eq("grupo_id", currentGroupId);
-      else query = query.eq("user_id", userId).is("grupo_id", null);
-
-      await query;
-      fetchDashboardData();
-      window.dispatchEvent(new Event("zibee:transaction-changed"));
-    } catch (error) {
-      console.error("Erro ao atualizar pagamento:", error);
-    }
-  };
-
-  const formatMoney = useCallback(
-    (val: number) => {
-      if (hidden) return "R$ ****";
-      return val.toLocaleString("pt-BR", {
-        style: "currency",
-        currency: "BRL",
-      });
-    },
-    [hidden],
-  );
-
-  const saldoGeral = useMemo(() => {
-    if (!totalReceitas || totalReceitas <= 0) return 0;
-    return totalReceitas - totalDespesas - totalDespesasFixas;
-  }, [totalReceitas, totalDespesas, totalDespesasFixas]);
-
-  const progressoMeta = useMemo(() => {
-    if (!metaFixada) return 0;
-    const totalMeta =
-      Number(metaFixada.valor_objetivo) || Number(metaFixada.valor_total) || 1;
-    const atualMeta =
-      Number(metaFixada.valor_atual) ||
-      Number(metaFixada.valor_depositado) ||
-      0;
-    return Math.min((atualMeta / totalMeta) * 100, 100);
-  }, [metaFixada]);
+    return categoriasData
+      .filter((c) => c.teto_gastos && Number(c.teto_gastos) > 0)
+      .map((c) => ({
+        ...c,
+        gasto: gastosParaLimitesMap[c.nome.trim()]?.total || 0,
+      }))
+      .sort((a, b) => Number(b.teto_gastos) - Number(a.teto_gastos));
+  }, [despesasBrutas, listaFixas, categoriasData]);
 
   const dadosGraficoEvolucao = useMemo(() => {
     const hoje = new Date();
     const diasFiltrar =
       periodoGrafico === "7D" ? 7 : periodoGrafico === "30D" ? 30 : 999;
-
     const dataLimite = new Date(
       hoje.getTime() - diasFiltrar * 24 * 60 * 60 * 1000,
     );
@@ -571,7 +318,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     const filtrados = despesasBrutas.filter(
       (d) => new Date(d.data_vencimento) >= dataLimite,
     );
-
     const agrupado = filtrados.reduce((acc: any, curr) => {
       const d = new Date(curr.data_vencimento);
       d.setMinutes(d.getMinutes() + d.getTimezoneOffset());
@@ -588,9 +334,48 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       .map((data) => ({ data, valor: agrupado[data] }));
   }, [despesasBrutas, periodoGrafico]);
 
-  const totalCategorizado = categoriasComLimite.reduce(
-    (acc, cat) => acc + Number(cat.teto_gastos),
-    0,
+  const progressoMeta = useMemo(() => {
+    if (!metaFixada) return 0;
+    const totalMeta =
+      Number(metaFixada.valor_objetivo) || Number(metaFixada.valor_total) || 1;
+    const atualMeta =
+      Number(metaFixada.valor_atual) ||
+      Number(metaFixada.valor_depositado) ||
+      0;
+    return Math.min((atualMeta / totalMeta) * 100, 100);
+  }, [metaFixada]);
+
+  // AÇÃO DE PAGAMENTO: Invalida o cache e faz a UI atualizar automaticamente!
+  const togglePagoLancamento = async (
+    lancamentoId: number,
+    currentStatus: boolean,
+  ) => {
+    try {
+      const novoStatus = !currentStatus;
+      let query = supabase
+        .from("lancamentos")
+        .update({ pago: novoStatus })
+        .eq("id", lancamentoId);
+
+      // Aqui teríamos que checar o GroupId se fosse grupo, mas como a edição em grupo
+      // é rara na Dashboard inicial, focamos no user
+      await query;
+      queryClient.invalidateQueries({ queryKey: ["resumo-mensal"] });
+      window.dispatchEvent(new Event("zibee:transaction-changed"));
+    } catch (error) {
+      console.error("Erro ao atualizar pagamento:", error);
+    }
+  };
+
+  const formatMoney = useCallback(
+    (val: number) => {
+      if (hidden) return "R$ ****";
+      return val.toLocaleString("pt-BR", {
+        style: "currency",
+        currency: "BRL",
+      });
+    },
+    [hidden],
   );
 
   const categoryColors = [
@@ -612,7 +397,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
       (acc, cat) => acc + (cat.gasto || 0),
       0,
     );
-
     const porcentagemUsoGeral =
       totalLimite > 0
         ? Math.min((totalGastoLimites / totalLimite) * 100, 100)
@@ -752,7 +536,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     );
   };
 
-  if (loading) {
+  if (isLoadingResumo || isLoadingExtras) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
         <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
@@ -763,6 +547,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   return (
     <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4">
       <MonthTurnoverModal />
+
+      {/* SEÇÃO DESKTOP: CARDS DE RESUMO (Compartilhado via React Query) */}
       <section className="hidden md:block">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground/80">
@@ -781,27 +567,27 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           </button>
         </div>
 
-        {/* MÁGICA FINAL: Passando a nova variável totalFixasPagas */}
         <DashboardSummaryCards
-          totalReceitas={totalReceitas}
-          totalVariaveis={totalDespesas}
-          totalFixas={totalDespesasFixas}
-          listaFixas={listaFixas}
-          saldoGeral={saldoGeral}
+          totalReceitas={resumo?.totalReceitas || 0}
+          totalVariaveis={resumo?.totalDespesas || 0}
+          totalFixas={resumo?.totalDespesasFixas || 0}
+          listaFixas={resumo?.listaFixas || []}
+          saldoGeral={resumo?.saldoGeral || 0}
           hidden={hidden}
           formatMoney={formatMoney}
           activeContext={activeContext}
-          totalFixasPagas={totalFixasPagas}
+          totalFixasPagas={resumo?.totalFixasPagas || 0}
         />
       </section>
 
+      {/* MOBILE */}
       <div className="space-y-8 md:hidden">
         <ExpenseCategories
           categoriasChart={categoriasChart}
           expandedCategory={expandedCategory}
           setExpandedCategory={setExpandedCategory}
-          totalDespesas={totalDespesas}
-          totalDespesasFixas={totalDespesasFixas}
+          totalDespesas={resumo?.totalDespesas || 0}
+          totalDespesasFixas={resumo?.totalDespesasFixas || 0}
           formatMoney={formatMoney}
           togglePagoLancamento={togglePagoLancamento}
         />
@@ -859,6 +645,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {renderCategoryBudgets()}
       </div>
 
+      {/* DESKTOP (Gráficos) */}
       <div className="hidden md:block space-y-12">
         <div className="pt-4">
           <ExpenseEvolutionChart
@@ -875,8 +662,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             categoriasChart={categoriasChart}
             expandedCategory={expandedCategory}
             setExpandedCategory={setExpandedCategory}
-            totalDespesas={totalDespesas}
-            totalDespesasFixas={totalDespesasFixas}
+            totalDespesas={resumo?.totalDespesas || 0}
+            totalDespesasFixas={resumo?.totalDespesasFixas || 0}
             formatMoney={formatMoney}
             togglePagoLancamento={togglePagoLancamento}
           />

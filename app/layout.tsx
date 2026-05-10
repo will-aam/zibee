@@ -8,6 +8,7 @@ import { ThemeProvider } from "next-themes";
 import { Toaster } from "@/components/ui/toaster";
 import { PWAUpdater } from "@/components/PWAUpdater";
 import { sora } from "@/lib/fonts";
+import QueryProvider from "@/components/providers/query-provider"; // <-- NOSSA IMPORTAÇÃO
 import "./globals.css";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
@@ -22,7 +23,7 @@ export const viewport: Viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
-  viewportFit: "cover", // Isso você já fez certo, garante o preenchimento total
+  viewportFit: "cover",
 };
 
 export const metadata: Metadata = {
@@ -44,6 +45,7 @@ export const metadata: Metadata = {
     title: "Zibee",
   },
 };
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -51,30 +53,31 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="pt-BR" suppressHydrationWarning>
-      {/* --- INICIO DA TAG HEAD --- */}
       <head>
         <script
           type="module"
           src="https://unpkg.com/ionicons@7.1.0/dist/ionicons/ionicons.esm.js"
         ></script>
       </head>
-      {/* --- FIM DA TAG HEAD --- */}
 
       <body
         className={`${sora.className} bg-background text-foreground antialiased`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          <WorkspaceProvider>
-            <PWAUpdater />
-            {children}
-          </WorkspaceProvider>
-          <Toaster />
-        </ThemeProvider>
+        {/* ENVELOPANDO A APLICAÇÃO COM O NOVO CÉREBRO */}
+        <QueryProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <WorkspaceProvider>
+              <PWAUpdater />
+              {children}
+            </WorkspaceProvider>
+            <Toaster />
+          </ThemeProvider>
+        </QueryProvider>
         <Analytics />
       </body>
     </html>

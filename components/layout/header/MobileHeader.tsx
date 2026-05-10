@@ -4,7 +4,6 @@ import * as React from "react";
 import { sora } from "@/lib/fonts";
 import {
   FunnelIcon,
-  Cog6ToothIcon,
   EllipsisHorizontalIcon,
   MoonIcon,
   SunIcon,

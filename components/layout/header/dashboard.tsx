@@ -8,9 +8,11 @@ import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useResumoMensal } from "@/hooks/useResumoMensal";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 // IMPORTANDO OS COMPONENTES
 import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
+import { SpendingPaceChart } from "@/components/dashboard/SpendingPaceChart";
 import { ExpenseEvolutionChart } from "@/components/dashboard/ExpenseEvolutionChart";
 import { ExpenseCategories } from "@/components/dashboard/ExpenseCategories";
 import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
@@ -77,7 +79,16 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
   const { from, to } = range;
 
-  // 2. O CÉREBRO COMPARTILHADO (React Query)
+  // Cálculo do período do Mês Passado para o gráfico comparativo
+  const lastMonthRange = useMemo(() => {
+    const lastMonth = subMonths(new Date(), 1);
+    return {
+      from: format(startOfMonth(lastMonth), "yyyy-MM-dd"),
+      to: format(endOfMonth(lastMonth), "yyyy-MM-dd"),
+    };
+  }, []);
+
+  // 2. BUSCA DE DADOS (React Query) - MÊS ATUAL
   const { data: resumo, isLoading: isLoadingResumo } = useResumoMensal({
     userId,
     activeContext,
@@ -85,7 +96,15 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     to,
   });
 
-  // 3. BUSCA DOS EXTRAS (Cartões, Categorias e Metas - Só roda no Dashboard)
+  // 2.1. BUSCA DE DADOS (React Query) - MÊS PASSADO
+  const { data: resumoPassado, isLoading: isLoadingPassado } = useResumoMensal({
+    userId,
+    activeContext,
+    from: lastMonthRange.from,
+    to: lastMonthRange.to,
+  });
+
+  // 3. BUSCA DOS EXTRAS (Cartões, Categorias e Metas)
   const { data: extras, isLoading: isLoadingExtras } = useQuery({
     queryKey: ["dashboard-extras", userId, activeContext],
     enabled: !!userId,
@@ -144,7 +163,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     },
   });
 
-  // 4. PRIVACIDADE DO USUÁRIO
+  // 4. ESTADO DE PRIVACIDADE
   const loadPrivacyState = useCallback(() => {
     try {
       const saved = localStorage.getItem(PRIVACY_STORAGE_KEY);
@@ -169,13 +188,19 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   };
 
   // =========================================================
-  // MEMORIZAÇÃO: CÁLCULOS QUE SÓ RODAM QUANDO OS DADOS MUDAM
+  // MEMORIZAÇÃO E CÁLCULOS
   // =========================================================
   const despesasBrutas = resumo?.despesasBrutas || [];
   const listaFixas = resumo?.listaFixas || [];
   const cartoesData = extras?.cartoes || [];
   const categoriasData = extras?.categorias || [];
   const metaFixada = extras?.meta || null;
+
+  const hasLastMonthData = useMemo(
+    () =>
+      resumoPassado?.despesasBrutas && resumoPassado.despesasBrutas.length > 0,
+    [resumoPassado],
+  );
 
   const todosOsGastos = useMemo(
     () => [...despesasBrutas, ...listaFixas],
@@ -345,21 +370,17 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     return Math.min((atualMeta / totalMeta) * 100, 100);
   }, [metaFixada]);
 
-  // AÇÃO DE PAGAMENTO: Invalida o cache e faz a UI atualizar automaticamente!
+  // AÇÃO DE ATUALIZAÇÃO
   const togglePagoLancamento = async (
     lancamentoId: number,
     currentStatus: boolean,
   ) => {
     try {
       const novoStatus = !currentStatus;
-      let query = supabase
+      await supabase
         .from("lancamentos")
         .update({ pago: novoStatus })
         .eq("id", lancamentoId);
-
-      // Aqui teríamos que checar o GroupId se fosse grupo, mas como a edição em grupo
-      // é rara na Dashboard inicial, focamos no user
-      await query;
       queryClient.invalidateQueries({ queryKey: ["resumo-mensal"] });
       window.dispatchEvent(new Event("zibee:transaction-changed"));
     } catch (error) {
@@ -428,8 +449,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               Crie um planejamento
             </p>
             <p className="text-sm text-muted-foreground mb-6 max-w-sm">
-              Defina limites por categoria (ex: 30% Moradia) e acompanhe seu
-              progresso para não estourar o orçamento.
+              Defina limites por categoria e acompanhe seu progresso para não
+              estourar o orçamento.
             </p>
             <Button
               onClick={() => onNavigate && onNavigate("receitas")}
@@ -536,7 +557,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     );
   };
 
-  if (isLoadingResumo || isLoadingExtras) {
+  if (isLoadingResumo || isLoadingExtras || isLoadingPassado) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
         <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
@@ -548,7 +569,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4">
       <MonthTurnoverModal />
 
-      {/* SEÇÃO DESKTOP: CARDS DE RESUMO (Compartilhado via React Query) */}
+      {/* DESKTOP RESUMO */}
       <section className="hidden md:block">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-semibold text-foreground/80">
@@ -557,7 +578,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           <button
             onClick={toggleHidden}
             className="p-2 rounded-full hover:bg-muted/80 transition-colors text-muted-foreground active:scale-95"
-            title={hidden ? "Mostrar valores" : "Ocultar valores"}
           >
             {hidden ? (
               <EyeSlashIcon className="h-5 w-5" />
@@ -582,6 +602,24 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
 
       {/* MOBILE */}
       <div className="space-y-8 md:hidden">
+        {hasLastMonthData ? (
+          <SpendingPaceChart
+            currentMonthExpenses={resumo?.despesasBrutas || []}
+            lastMonthExpenses={resumoPassado?.despesasBrutas || []}
+            formatMoney={formatMoney}
+          />
+        ) : (
+          <div className="pt-2">
+            <ExpenseEvolutionChart
+              dadosGraficoEvolucao={dadosGraficoEvolucao}
+              periodoGrafico={"30D"}
+              setPeriodoGrafico={() => {}}
+              formatMoney={formatMoney}
+              hidden={hidden}
+            />
+          </div>
+        )}
+
         <ExpenseCategories
           categoriasChart={categoriasChart}
           expandedCategory={expandedCategory}
@@ -596,7 +634,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
           proximosVencimentos={proximosVencimentos}
           formatMoney={formatMoney}
         />
-
         <PaymentMethodsChart
           despesas={despesasBrutas}
           fixas={listaFixas}
@@ -645,16 +682,24 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {renderCategoryBudgets()}
       </div>
 
-      {/* DESKTOP (Gráficos) */}
+      {/* DESKTOP GRÁFICOS */}
       <div className="hidden md:block space-y-12">
         <div className="pt-4">
-          <ExpenseEvolutionChart
-            dadosGraficoEvolucao={dadosGraficoEvolucao}
-            periodoGrafico={periodoGrafico}
-            setPeriodoGrafico={setPeriodoGrafico}
-            formatMoney={formatMoney}
-            hidden={hidden}
-          />
+          {hasLastMonthData ? (
+            <SpendingPaceChart
+              currentMonthExpenses={resumo?.despesasBrutas || []}
+              lastMonthExpenses={resumoPassado?.despesasBrutas || []}
+              formatMoney={formatMoney}
+            />
+          ) : (
+            <ExpenseEvolutionChart
+              dadosGraficoEvolucao={dadosGraficoEvolucao}
+              periodoGrafico={periodoGrafico}
+              setPeriodoGrafico={setPeriodoGrafico}
+              formatMoney={formatMoney}
+              hidden={hidden}
+            />
+          )}
         </div>
 
         <div className="grid gap-12 md:grid-cols-2 pt-2">
@@ -667,7 +712,6 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
             formatMoney={formatMoney}
             togglePagoLancamento={togglePagoLancamento}
           />
-
           <PaymentMethodsChart
             despesas={despesasBrutas}
             fixas={listaFixas}

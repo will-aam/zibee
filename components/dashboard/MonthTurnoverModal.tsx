@@ -11,7 +11,7 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox"; // <-- Adicionamos o Checkbox
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -39,8 +39,6 @@ export function MonthTurnoverModal() {
   const [isLoading, setIsLoading] = React.useState(true);
   const [actionLoading, setActionLoading] = React.useState<string | null>(null);
   const [monthData, setMonthData] = React.useState<MonthData | null>(null);
-
-  // NOVO ESTADO: Controla a caixinha de marcar
   const [dontShowAgain, setDontShowAgain] = React.useState(false);
 
   const checkTurnover = React.useCallback(async () => {
@@ -113,7 +111,9 @@ export function MonthTurnoverModal() {
         return;
       }
 
-      const saldoCalculado = totalReceitas - totalVariaveis - totalFixas;
+      // CORREÇÃO: Forçamos o arredondamento de 2 casas decimais para evitar o bug do 0.0000000001
+      let saldoCalculado = totalReceitas - totalVariaveis - totalFixas;
+      saldoCalculado = Number(saldoCalculado.toFixed(2));
 
       setMonthData({
         mesAno,
@@ -141,14 +141,13 @@ export function MonthTurnoverModal() {
     setActionLoading(action);
 
     try {
-      // MÁGICA AQUI: Se for "adiar" MAS o usuário marcou a caixinha
       if (action === "adiar") {
         if (dontShowAgain) {
           const payloadFechamento = {
             user_id: userId,
             mes_ano: monthData.mesAno,
             saldo_calculado: monthData.saldo,
-            resolvido: true, // Salva como resolvido para parar de aparecer
+            resolvido: true,
           };
 
           if (monthData.idFechamento) {
@@ -182,6 +181,7 @@ export function MonthTurnoverModal() {
         await supabase.from("fechamentos_mes").insert([payloadFechamento]);
       }
 
+      // Se o saldo não for zero e a ação for "somar_atual", cria o lançamento
       if (action === "somar_atual" && monthData.saldo !== 0) {
         const today = new Date();
         const firstDayCurrentMonth = format(startOfMonth(today), "yyyy-MM-dd");
@@ -289,7 +289,23 @@ export function MonthTurnoverModal() {
           </div>
 
           <div className="space-y-2.5 sm:space-y-3 pt-1">
-            {!isZero && (
+            {/* NOVO: Botão Único se o saldo for exatamente Zero */}
+            {isZero ? (
+              <Button
+                onClick={() => handleResolve("somar_atual")} // "somar_atual" ignorado se o saldo é 0, só finaliza seguro
+                disabled={actionLoading !== null}
+                className="w-full h-12 sm:h-14 rounded-2xl text-sm sm:text-base font-bold shadow-md bg-blue-500 hover:bg-blue-600 text-white"
+              >
+                {actionLoading === "somar_atual" ? (
+                  "Processando..."
+                ) : (
+                  <>
+                    <CheckCircleIcon className="w-5 h-5 mr-2 shrink-0" />
+                    <span className="truncate">Tudo certo! Fechar o mês</span>
+                  </>
+                )}
+              </Button>
+            ) : (
               <Button
                 onClick={() => handleResolve("somar_atual")}
                 disabled={actionLoading !== null}
@@ -310,7 +326,8 @@ export function MonthTurnoverModal() {
               </Button>
             )}
 
-            {isPositive && (
+            {/* Este botão só aparece se for POSITIVO E MAIOR QUE ZERO */}
+            {isPositive && !isZero && (
               <Button
                 variant="outline"
                 onClick={() => handleResolve("ignorar_meta")}
@@ -323,7 +340,6 @@ export function MonthTurnoverModal() {
               </Button>
             )}
 
-            {/* CAIXINHA + BOTÃO DE IGNORAR */}
             <div className="flex flex-col items-center pt-2 gap-3">
               <div className="flex items-center gap-2">
                 <Checkbox
@@ -347,7 +363,6 @@ export function MonthTurnoverModal() {
                 className="w-full h-10 sm:h-12 rounded-2xl text-xs sm:text-sm text-muted-foreground hover:text-foreground"
               >
                 <ClockIcon className="w-4 h-4 mr-1.5" />
-                {/* O texto do botão muda se a caixinha for ativada pra ficar mais claro */}
                 {dontShowAgain ? "Ignorar mês passado" : "Decidir mais tarde"}
               </Button>
             </div>

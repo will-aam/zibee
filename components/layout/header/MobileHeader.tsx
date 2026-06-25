@@ -184,12 +184,26 @@ export function MobileHeader({
   if (activeTab !== "dashboard") return null;
 
   return (
-    <section className={`md:hidden relative ${sora.className}`}>
+    <section className={`md:hidden relative min-h-[500px] ${sora.className}`}>
+      {/* 1. CAMADA DE FUNDO GLOBAL DO COMPONENTE (Z-0) */}
+      {/* Esta div agora tem uma altura fixa grande (ex: 460px) para fazer o azul dominar a tela */}
+      <div
+        className="absolute top-0 left-0 right-0 h-[460px] z-0 bg-linear-to-b from-primary via-primary/95 to-transparent backdrop-blur-xl"
+        style={{
+          // Uma dissolução super longa: fica 100% visível até 35% da altura e depois some suavemente até os 100%
+          maskImage: "linear-gradient(to bottom, black 35%, transparent 100%)",
+          WebkitMaskImage:
+            "linear-gradient(to bottom, black 35%, transparent 100%)",
+        }}
+      />
+
+      {/* 2. CONTEÚDO DO HEADER (Z-10 para ficar acima do fundo) */}
       <header
         id="mobile-header-top"
-        className="relative bg-primary text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-24"
+        // Removemos o bg-primary e adicionamos z-10 e bg-transparent
+        className="relative z-10 bg-transparent text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-16"
       >
-        <div className="relative z-10 flex items-center gap-4 mb-2">
+        <div className="flex items-center gap-4 mb-2">
           <button
             onClick={onOpenProfile}
             className="relative shrink-0 h-16 w-16 rounded-full flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
@@ -286,19 +300,23 @@ export function MobileHeader({
         </div>
       </header>
 
-      {loadingTotals ? (
-        <MobileDashboardSummarySkeleton />
-      ) : (
-        <MobileDashboardSummary
-          saldoGeral={saldoGeral}
-          entradasConfirmadas={totalReceitas}
-          gastosVariaveis={totalDespesas}
-          contasFixasMensais={totalDespesasFixas}
-          listaFixas={listaFixas}
-          totalFixasPagas={totalFixasPagas} // <-- 3. ENTREGANDO A ENCOMENDA PRO CARD MÓVEL
-          onNavigate={onNavigate}
-        />
-      )}
+      {/* 3. CAMADA DOS CARDS DE CONTEÚDO (Z-10) */}
+      {/* Envolvemos o resumo em uma div com z-10 relativo para garantir que ele fique elegantemente por cima do fundo borrado */}
+      <div className="relative z-10 mt-8 px-4">
+        {loadingTotals ? (
+          <MobileDashboardSummarySkeleton />
+        ) : (
+          <MobileDashboardSummary
+            saldoGeral={saldoGeral}
+            entradasConfirmadas={totalReceitas}
+            gastosVariaveis={totalDespesas}
+            contasFixasMensais={totalDespesasFixas}
+            listaFixas={listaFixas}
+            totalFixasPagas={totalFixasPagas}
+            onNavigate={onNavigate}
+          />
+        )}
+      </div>
 
       {/* MODAL DE INSTRUÇÕES DE INSTALAÇÃO */}
       <Dialog open={showInstructions} onOpenChange={setShowInstructions}>

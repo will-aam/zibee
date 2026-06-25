@@ -82,10 +82,33 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-0 flex flex-col overflow-x-hidden">
+    <div className="min-h-screen bg-background pb-24 md:pb-0 flex flex-col overflow-x-hidden relative">
+      {/* ========================================================================= */}
+      {/* HERO BACKGROUND MOBILE - ILUMINAÇÃO AZUL COMPLETA E VIBRANTE (APENAS MOBILE) */}
+      {/* ========================================================================= */}
+      {activeTab === "dashboard" && (
+        <div className="absolute top-0 left-0 right-0 h-[560px] pointer-events-none overflow-hidden md:hidden z-0 select-none">
+          {/* Camada 1: Sustentação do Tom Azul (Evita que o fundo escuro deixe o degradê cinzento) */}
+          <div className="absolute inset-0 bg-linear-to-b from-primary/95 via-primary/60 to-transparent" />
+
+          {/* Camada 2: Brilho de Expansão (Injeta luz azul pura nas bordas da transição, matando o efeito "preto") */}
+          <div className="absolute -top-40 left-1/2 -translate-x-1/2 w-[140%] h-[500px] bg-primary/25 rounded-full blur-[90px]" />
+
+          {/* Camada 3: Filtro de Vidro Focado */}
+          <div
+            className="absolute inset-0 backdrop-blur-[20px]"
+            style={{
+              maskImage:
+                "linear-gradient(to bottom, black 40%, transparent 100%)",
+              WebkitMaskImage:
+                "linear-gradient(to bottom, black 40%, transparent 100%)",
+            }}
+          />
+        </div>
+      )}
       <Header activeTab={activeTab} onNavigate={handleNavigate} />
 
-      <div className="flex-1 w-full max-w-7xl mx-auto sm:px-6 lg:px-8 relative">
+      <div className="flex-1 w-full max-w-7xl mx-auto sm:px-6 lg:px-8 relative z-10">
         <AnimatePresence mode="wait" initial={false} custom={direction}>
           <motion.main
             key={activeTab}

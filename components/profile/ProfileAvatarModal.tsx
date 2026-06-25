@@ -332,7 +332,7 @@ export default function ProfileAvatarModal({
                         Pessoal
                       </span>
                     </button>
-                    <button
+                    {/* <button
                       type="button"
                       onClick={() => {
                         if (hasPremiumAccess) {
@@ -357,7 +357,7 @@ export default function ProfileAvatarModal({
                       <span className="font-bold text-xs uppercase tracking-wide">
                         Grupo
                       </span>
-                    </button>
+                    </button> */}
                   </div>
                 )}
               </div>

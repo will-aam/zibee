@@ -81,6 +81,7 @@ export function ProfileMenu({
             <span className="font-semibold text-sm">Meu Pessoal</span>
           </button>
 
+          {/*
           {pendingInvite ? (
             <button
               onClick={onOpenAvatarModal}
@@ -121,6 +122,7 @@ export function ProfileMenu({
               )}
             </button>
           )}
+          */}
         </div>
       </div>
 

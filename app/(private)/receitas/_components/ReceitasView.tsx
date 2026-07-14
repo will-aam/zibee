@@ -1,11 +1,12 @@
 // app/(private)/receitas/_components/ReceitasView.tsx
 
-" client";
+"use client";
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
+
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -815,7 +816,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                 setIsLimitModalOpen(true);
               }}
             >
-              <PlusSolid className="w-4 w-4 mr-2" /> Adicionar Categoria
+              <PlusSolid className="w-4 mr-2" /> Adicionar Categoria
             </Button>
           </div>
           <div className="grid gap-4">

@@ -1,3 +1,4 @@
+// app/(private)/groups/_components/GroupManagerView.tsx
 "use client";
 
 import React, { useState, useEffect } from "react";

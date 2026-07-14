@@ -1,3 +1,4 @@
+// app/(private)/investments/page.tsx
 "use client";
 
 import UnderDevelopmentView from "@/components/shared/UnderDevelopmentView";

@@ -1,3 +1,4 @@
+// app/(private)/groups/_components/PaywallView.tsx
 "use client";
 
 import UnderDevelopmentView from "@/components/shared/UnderDevelopmentView";

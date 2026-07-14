@@ -19,7 +19,7 @@ import {
   ArrowTopRightOnSquareIcon,
 } from "@heroicons/react/24/solid";
 
-import { MetaFormSheet } from "@/components/target/MetaFormSheet";
+import { MetaFormSheet } from "./MetaFormSheet";
 import {
   AlertDialog,
   AlertDialogAction,

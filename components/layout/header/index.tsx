@@ -1,3 +1,4 @@
+// components/layout/header/index.tsx
 "use client";
 
 import * as React from "react";
@@ -116,7 +117,7 @@ export default function Header({
     <>
       <DesktopHeader
         activeTab={activeTab}
-        onNavigate={onNavigate}
+        onNavigate={onNavigate ?? (() => {})}
         userName={userName}
         avatarUrl={avatarUrl}
         pendingInvite={pendingInvite}
@@ -167,7 +168,7 @@ export default function Header({
         onNavigateSettings={() => onNavigate?.("configuracoes")}
       />
 
-      <UpdatesModal onNavigate={onNavigate} />
+      <UpdatesModal onNavigate={onNavigate ?? (() => {})} />
       <PushPermissionModal />
     </>
   );

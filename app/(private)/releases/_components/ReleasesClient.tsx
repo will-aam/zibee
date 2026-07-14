@@ -1,3 +1,4 @@
+//app/(private)/releases/page.tsx
 "use client";
 
 import type React from "react";
@@ -13,20 +14,27 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { cn } from "@/lib/utils";
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   PlusIcon,
   TrashIcon,
   FunnelIcon,
   ArrowPathIcon,
   MagnifyingGlassIcon,
   CreditCardIcon,
+  ArrowsUpDownIcon,
 } from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
 
-import { MonthSelector } from "./releases/MonthSelector";
-import { LancamentoItem } from "./releases/LancamentoItem";
-import { LancamentosFilters } from "./releases/LancamentosFilters";
-import { LancamentoFormDialog } from "./releases/LancamentoFormDialog";
-
+import { MonthSelector } from "@/components/shared/MonthSelector";
+import { LancamentoItem } from "./LancamentoItem";
+import { LancamentosFilters } from ".//LancamentosFilters";
+import { LancamentoFormDialog } from ".//LancamentoFormDialog";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -52,7 +60,7 @@ interface LancamentosProps {
   onNavigate?: (tab: string) => void;
 }
 
-export default function Lancamentos({ onNavigate }: LancamentosProps) {
+export default function Releases({ onNavigate }: LancamentosProps) {
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
@@ -89,6 +97,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
 
   const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
+  const [sortBy, setSortBy] = useState<string>("data_asc");
 
   const [filtrosTipo, setFiltrosTipo] = useState<string[]>([]);
   const [filtrosCategoria, setFiltrosCategoria] = useState<string[]>([]);
@@ -96,6 +105,9 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
   const [mostrarOcultos, setMostrarOcultos] = useState(false);
+
+  // NOVO: toggle rápido "falta pagar"
+  const [mostrarSomentePendentes, setMostrarSomentePendentes] = useState(false);
 
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
@@ -162,8 +174,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
         .from("lancamentos")
         .select("*")
         .gte("data_vencimento", dataInicio)
-        .lte("data_vencimento", dataFim)
-        .order("data_vencimento", { ascending: true });
+        .lte("data_vencimento", dataFim);
 
       let queryFixas = supabase.from("despesas_fixas").select("*");
 
@@ -244,11 +255,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
           }
         });
 
-        const todosOsDados = [...dadosLancamentos, ...sombras].sort(
-          (a, b) =>
-            new Date(a.data_vencimento).getTime() -
-            new Date(b.data_vencimento).getTime(),
-        );
+        const todosOsDados = [...dadosLancamentos, ...sombras];
 
         memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
           todosOsDados;
@@ -283,28 +290,23 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
     fetchAllData();
   }, [fetchAllData]);
 
-  // --- ESCUTAS GLOBAIS DE ATUALIZAÇÃO ---
   useEffect(() => {
-    // 1. O que fazer quando uma categoria mudar:
     const handleCategoriesChanged = () => {
       delete memoryCache.categorias[activeContext];
       fetchAllData();
     };
 
-    // 2. O que fazer quando um cartão mudar:
     const handleCardsChanged = () => {
-      delete memoryCache.cartoes[activeContext]; // Limpa a memória velha dos cartões
-      fetchAllData(); // Busca a lista nova silenciosamente
+      delete memoryCache.cartoes[activeContext];
+      fetchAllData();
     };
 
-    // Ligando os "ouvidos"
     window.addEventListener(
       "zibee:categories-changed",
       handleCategoriesChanged,
     );
     window.addEventListener("zibee:cards-changed", handleCardsChanged);
 
-    // Desligando quando sair da tela
     return () => {
       window.removeEventListener(
         "zibee:categories-changed",
@@ -313,14 +315,18 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
       window.removeEventListener("zibee:cards-changed", handleCardsChanged);
     };
   }, [activeContext, fetchAllData]);
-  // ----------------------------------------------
 
   const lancamentosFiltrados = lancamentos.filter((l) => {
     if ((l as any).status_fixa === "pausado" && !mostrarOcultos) return false;
 
-    const matchSearch = l.descricao
-      .toLowerCase()
-      .includes(searchQuery.toLowerCase());
+    const query = searchQuery.toLowerCase().trim();
+    const queryNumber = query.replace("r$", "").replace(/\s/g, "");
+
+    const matchSearch =
+      l.descricao.toLowerCase().includes(query) ||
+      String(l.valor).includes(queryNumber.replace(",", ".")) ||
+      l.valor.toFixed(2).replace(".", ",").includes(queryNumber);
+
     const matchTipo = filtrosTipo.length === 0 || filtrosTipo.includes(l.tipo);
 
     const categoriaLancamento = (l.categoria || "").trim().toLowerCase();
@@ -349,18 +355,57 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
     if (filtroNatureza === "fixa") matchNatureza = !!l.conta_fixa_id;
     if (filtroNatureza === "parcelada") matchNatureza = !!l.total_parcelas;
 
+    // NOVO: filtro rápido pendentes
+    const matchSomentePendentes = mostrarSomentePendentes ? !l.pago : true;
+
     return (
       matchSearch &&
       matchTipo &&
       matchCategoria &&
       matchPagamento &&
       matchStatus &&
-      matchNatureza
+      matchNatureza &&
+      matchSomentePendentes
     );
   });
 
+  const lancamentosOrdenados = [...lancamentosFiltrados].sort((a, b) => {
+    switch (sortBy) {
+      case "data_asc":
+        return (
+          new Date(a.data_vencimento).getTime() -
+          new Date(b.data_vencimento).getTime()
+        );
+      case "data_desc":
+        return (
+          new Date(b.data_vencimento).getTime() -
+          new Date(a.data_vencimento).getTime()
+        );
+      case "valor_desc":
+        return b.valor - a.valor;
+      case "valor_asc":
+        return a.valor - b.valor;
+      case "az":
+        return a.descricao.localeCompare(b.descricao);
+      case "za":
+        return b.descricao.localeCompare(a.descricao);
+      default:
+        return 0;
+    }
+  });
+
+  const totalFaltaPagar = lancamentosFiltrados
+    .filter((l) => !l.pago && (l.tipo || "").trim().toLowerCase() === "despesa")
+    .reduce((acc, l) => acc + Number(l.valor || 0), 0);
+
+  const formatCurrency = (value: number) =>
+    new Intl.NumberFormat("pt-BR", {
+      style: "currency",
+      currency: "BRL",
+    }).format(value);
+
   const handleSelectAll = () => {
-    const lancamentosSelecionaveis = lancamentosFiltrados.filter(
+    const lancamentosSelecionaveis = lancamentosOrdenados.filter(
       (l) => !l.isShadow && (l as any).status_fixa !== "pausado",
     );
     if (
@@ -485,15 +530,13 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
   };
 
   const togglePago = async (lancamento: Lancamento) => {
-    // 👇 FASE 2: BLOQUEIO DE PAGAMENTO MANUAL DE CARTÃO
     if (lancamento.cartao_id) {
       toast({
         title: "Item de Fatura",
         description:
           "O pagamento deste item é gerido automaticamente ao pagar a fatura na aba de Cartões.",
-        // variant: "default", // opcional, caso queira que o aviso seja neutro
       });
-      return; // Interrompe a função aqui, impedindo que vá para o banco
+      return;
     }
 
     try {
@@ -605,16 +648,62 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
 
         <div className="flex flex-col gap-4">
           <div className="flex flex-col gap-4">
-            <div className="relative group">
-              <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
-              <Input
-                placeholder="Buscar lançamentos..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
-              />
+            <div className="flex items-center gap-2">
+              <div className="relative group flex-1">
+                <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  placeholder="Buscar por nome ou valor (ex: 150,00)..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
+                />
+              </div>
+
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-[130px] sm:w-40 shrink-0 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary rounded-xl">
+                  <div className="flex items-center gap-2 truncate">
+                    <ArrowsUpDownIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <SelectValue placeholder="Ordenar" />
+                  </div>
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="data_asc">Mais antigos</SelectItem>
+                  <SelectItem value="data_desc">Mais recentes</SelectItem>
+                  <SelectItem value="valor_desc">Maior valor</SelectItem>
+                  <SelectItem value="valor_asc">Menor valor</SelectItem>
+                  <SelectItem value="az">Ordem A-Z</SelectItem>
+                  <SelectItem value="za">Ordem Z-A</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
+            {/* BLOCO COMPACTO: Filtro + Total (mobile first) */}
+            <div className="rounded-xl bg-background px-3 py-2.5">
+              <div className="flex items-center justify-between gap-2">
+                <div className="min-w-0">
+                  <p className="text-[11px] text-muted-foreground leading-none">
+                    Falta pagar
+                  </p>
+                  <p className="text-base sm:text-lg font-bold text-amber-700 leading-tight truncate">
+                    {formatCurrency(totalFaltaPagar)}
+                  </p>
+                </div>
+
+                <Button
+                  type="button"
+                  variant={mostrarSomentePendentes ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setMostrarSomentePendentes((prev) => !prev)}
+                  className={cn(
+                    "h-8 rounded-lg px-3 text-xs shrink-0",
+                    mostrarSomentePendentes &&
+                      "bg-amber-500 hover:bg-amber-600 text-white border-amber-500",
+                  )}
+                >
+                  {mostrarSomentePendentes ? "Pendentes ON" : "Filtrar"}
+                </Button>
+              </div>
+            </div>
             <LancamentosFilters
               filtrosTipo={filtrosTipo}
               setFiltrosTipo={setFiltrosTipo}
@@ -636,12 +725,12 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
                   <Checkbox
                     id="select-all"
                     checked={
-                      lancamentosFiltrados.filter(
+                      lancamentosOrdenados.filter(
                         (l) =>
                           !l.isShadow && (l as any).status_fixa !== "pausado",
                       ).length > 0 &&
                       selectedIds.length ===
-                        lancamentosFiltrados.filter(
+                        lancamentosOrdenados.filter(
                           (l) =>
                             !l.isShadow && (l as any).status_fixa !== "pausado",
                         ).length
@@ -694,7 +783,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               <div className="flex justify-center py-12">
                 <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
               </div>
-            ) : lancamentosFiltrados.length === 0 ? (
+            ) : lancamentosOrdenados.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-12 text-center border border-dashed border-border/60 rounded-2xl bg-accent/20">
                 <FunnelIcon className="h-10 w-10 text-muted-foreground/30 mb-3" />
                 <p className="text-muted-foreground font-medium">
@@ -706,9 +795,11 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
 
                 {(filtrosTipo.length > 0 ||
                   filtrosCategoria.length > 0 ||
+                  filtrosPagamento.length > 0 ||
                   searchQuery ||
                   filtroStatus ||
-                  filtroNatureza !== "todas") && (
+                  filtroNatureza !== "todas" ||
+                  mostrarSomentePendentes) && (
                   <Button
                     variant="outline"
                     size="sm"
@@ -719,6 +810,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
                       setFiltrosPagamento([]);
                       setFiltroStatus(null);
                       setFiltroNatureza("todas");
+                      setMostrarSomentePendentes(false);
                     }}
                   >
                     Limpar filtros
@@ -727,7 +819,7 @@ export default function Lancamentos({ onNavigate }: LancamentosProps) {
               </div>
             ) : (
               <div className="flex flex-col gap-2">
-                {lancamentosFiltrados.map((lancamento) => {
+                {lancamentosOrdenados.map((lancamento) => {
                   const nomeLimpo = (lancamento.categoria || "")
                     .trim()
                     .toLowerCase();

@@ -1,3 +1,4 @@
+// app/(private)/dashboard/_components/DashboardClient.tsx
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -11,13 +12,13 @@ import { useResumoMensal } from "@/hooks/useResumoMensal";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 // IMPORTANDO OS COMPONENTES
-import { DashboardSummaryCards } from "@/components/dashboard/DashboardSummaryCards";
-import { SpendingPaceChart } from "@/components/dashboard/SpendingPaceChart";
-import { ExpenseEvolutionChart } from "@/components/dashboard/ExpenseEvolutionChart";
-import { ExpenseCategories } from "@/components/dashboard/ExpenseCategories";
-import { UpcomingBills } from "@/components/dashboard/UpcomingBills";
-import { PaymentMethodsChart } from "@/components/dashboard/PaymentMethodsChart";
-import { MonthTurnoverModal } from "@/components/dashboard/MonthTurnoverModal";
+import { DashboardSummaryCards } from "@/app/(private)/dashboard/_components/DashboardSummaryCards";
+import { SpendingPaceChart } from "@/app/(private)/dashboard/_components/SpendingPaceChart";
+import { ExpenseEvolutionChart } from "@/app/(private)/dashboard/_components/ExpenseEvolutionChart";
+import { ExpenseCategories } from "@/app/(private)/dashboard/_components/ExpenseCategories";
+import { UpcomingBills } from "@/app/(private)/dashboard/_components/UpcomingBills";
+import { PaymentMethodsChart } from "@/app/(private)/dashboard/_components/PaymentMethodsChart";
+import { MonthTurnoverModal } from "@/app/(private)/dashboard/_components/MonthTurnoverModal";
 
 import {
   FireIcon,

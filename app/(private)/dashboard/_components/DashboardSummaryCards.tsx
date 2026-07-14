@@ -20,8 +20,6 @@ export function DashboardSummaryCards({
   totalVariaveis,
   totalFixas,
   listaFixas,
-  saldoGeral,
-  hidden,
   formatMoney,
   activeContext,
   totalFixasPagas = 0, // <-- NOVA PROP: Receberemos as fixas já pagas do Dashboard

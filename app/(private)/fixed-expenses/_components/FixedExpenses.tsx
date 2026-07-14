@@ -18,12 +18,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-import { SummaryCard } from "./fixed-expense/SummaryCard";
-import { ExpenseCard } from "./fixed-expense/ExpenseCard";
+import { SummaryCard } from "./SummaryCard";
+import { ExpenseCard } from "./ExpenseCard";
 import {
   EditFixedExpenseDialog,
   type DespesaFixa,
-} from "./fixed-expense/EditFixedExpenseDialog";
+} from "./EditFixedExpenseDialog";
 
 export interface ItemOpcao {
   id: number;

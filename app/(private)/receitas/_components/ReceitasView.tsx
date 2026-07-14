@@ -1,5 +1,6 @@
-//app/(private)/receitas/page.tsx
-"use client";
+// app/(private)/receitas/_components/ReceitasView.tsx
+
+" client";
 
 import { useState, useEffect, useCallback } from "react";
 import { supabase } from "@/lib/supabase";
@@ -13,7 +14,6 @@ import { Progress } from "@/components/ui/progress";
 import { MonthSelector } from "@/components/shared/MonthSelector";
 import { cn } from "@/lib/utils";
 
-// Importando Select
 import {
   Select,
   SelectContent,
@@ -22,7 +22,6 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-// Importando as Tabs
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 import {
@@ -65,6 +64,12 @@ interface CategoriaComLimite {
   teto_gastos?: number;
 }
 
+// 1. NOVA INTERFACE DE PROPS
+interface ReceitasViewProps {
+  defaultTab?: string;
+  hideTabs?: boolean;
+}
+
 function avatarUrl(style: string, seed: string) {
   const safeSeed = encodeURIComponent(seed || "Zibee");
   return `https://api.dicebear.com/9.x/${style}/svg?seed=${safeSeed}&size=96`;
@@ -72,13 +77,14 @@ function avatarUrl(style: string, seed: string) {
 
 const memoryCache = {
   receitas: null as ReceitaFixa[] | null,
-  fixasPorMes: {} as Record<string, number>, // Agora as fixas entram no cache mensal
+  fixasPorMes: {} as Record<string, number>,
   variaveisPorMes: {} as Record<string, number>,
   gastosPorCategoria: {} as Record<string, Record<string, number>>,
   avatares: {} as Record<string, string>,
 };
 
-export default function Receitas() {
+// 2. APLIQUEI AS PROPS AQUI
+export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user.id;
@@ -113,7 +119,6 @@ export default function Receitas() {
   const [novoNome, setNovoNome] = useState("");
   const [novoValor, setNovoValor] = useState("");
 
-  // Modais do Limite de Categoria
   const [isLimitModalOpen, setIsLimitModalOpen] = useState(false);
   const [categoriaEditando, setCategoriaEditando] =
     useState<CategoriaComLimite | null>(null);
@@ -173,14 +178,13 @@ export default function Receitas() {
       const inicio = `${mesReferencia}-01`;
       const fim = `${mesReferencia}-${new Date(Number(ano), Number(mes), 0).getDate()}`;
 
-      // BUSCA 1: Lançamentos Reais (Variáveis + Contas Fixas já consolidadas no mês)
       let queryDespesas = supabase
         .from("lancamentos")
         .select("valor, categoria, conta_fixa_id")
         .eq("tipo", "Despesa")
         .gte("data_vencimento", inicio)
         .lte("data_vencimento", fim);
-      // BUSCA 2: Contas Fixas ativas para pegarmos as Sombras
+
       let queryFixas = supabase
         .from("despesas_fixas")
         .select("id, valor, categoria")
@@ -190,6 +194,7 @@ export default function Receitas() {
         .from("receitas_fixas")
         .select("*")
         .order("valor", { ascending: false });
+
       let queryCategorias = supabase
         .from("categorias")
         .select("*")
@@ -241,26 +246,21 @@ export default function Receitas() {
         }
       }
 
-      // MOTOR DE PROCESSAMENTO (MÁGICA DO ORÇAMENTO)
       if (resDespesas.data && resFixas.data) {
         let somaFixas = 0;
         let somaVariaveis = 0;
         const agrupadoPorCategoria: Record<string, number> = {};
 
-        // Descobre quais contas fixas já foram materializadas (lançamentos reais) neste mês
         const fixasPagasNoMes = new Set(
           resDespesas.data
             .filter((d) => d.conta_fixa_id != null)
             .map((d) => d.conta_fixa_id),
         );
 
-        // 1. Processa Lançamentos Reais (Variáveis e Fixas já consolidadas)
         resDespesas.data.forEach((item) => {
           const val = Number(item.valor);
           const cat = item.categoria ? item.categoria.trim() : "Outros";
-
           agrupadoPorCategoria[cat] = (agrupadoPorCategoria[cat] || 0) + val;
-
           if (item.conta_fixa_id) {
             somaFixas += val;
           } else {
@@ -268,18 +268,15 @@ export default function Receitas() {
           }
         });
 
-        // 2. Processa as Sombras (Contas fixas que ainda não foram pagas/consolidadas)
         resFixas.data.forEach((fixa) => {
           if (!fixasPagasNoMes.has(fixa.id)) {
             const val = Number(fixa.valor);
             const cat = fixa.categoria ? fixa.categoria.trim() : "Outros";
-
             agrupadoPorCategoria[cat] = (agrupadoPorCategoria[cat] || 0) + val;
             somaFixas += val;
           }
         });
 
-        // 3. Atualiza Cache e Estado
         const cacheKey = `${mesReferencia}_${activeContext}`;
         memoryCache.fixasPorMes[cacheKey] = somaFixas;
         memoryCache.variaveisPorMes[cacheKey] = somaVariaveis;
@@ -327,7 +324,6 @@ export default function Receitas() {
         nome: novoNome,
         valor: Number(novoValor),
       };
-
       if (editingId) {
         let query = supabase
           .from("receitas_fixas")
@@ -342,7 +338,6 @@ export default function Receitas() {
         await supabase.from("receitas_fixas").insert([payload]);
         toast({ title: "Renda adicionada!" });
       }
-
       resetForm();
       fetchAllData();
     } catch (error: any) {
@@ -372,7 +367,6 @@ export default function Receitas() {
     }
   };
 
-  // --- SALVAR O LIMITE DA CATEGORIA ---
   const handleSaveLimit = async () => {
     const idAlvo = categoriaEditando
       ? categoriaEditando.id
@@ -381,7 +375,6 @@ export default function Receitas() {
       toast({ title: "Selecione uma categoria", variant: "destructive" });
       return;
     }
-
     setIsSaving(true);
     try {
       const val = Number(novoLimite) || 0;
@@ -389,9 +382,7 @@ export default function Receitas() {
         .from("categorias")
         .update({ teto_gastos: val })
         .eq("id", idAlvo);
-
       if (error) throw error;
-
       toast({ title: val > 0 ? "Limite atualizado!" : "Limite removido." });
       setIsLimitModalOpen(false);
       fetchAllData();
@@ -426,7 +417,6 @@ export default function Receitas() {
     );
   }
 
-  // Filtragem de categorias: As rastreadas e as disponíveis para rastrear
   const categoriasRastreadas = categorias.filter(
     (c) => c.teto_gastos && c.teto_gastos > 0,
   );
@@ -452,9 +442,15 @@ export default function Receitas() {
         </p>
       </div>
 
-      <Tabs defaultValue="planejador" className="w-full">
-        {/* MENU TABS */}
-        <div className="w-full bg-muted/30 p-1 rounded-2xl mb-6 overflow-x-auto scrollbar-hide flex items-center shadow-inner">
+      {/* 3. DEFAULT TAB DINÂMICO AQUI */}
+      <Tabs defaultValue={defaultTab || "planejador"} className="w-full">
+        {/* 4. ESCONDE O MENU DE ABAS SE A PROP ESTIVER ATIVA */}
+        <div
+          className={cn(
+            "w-full bg-muted/30 p-1 rounded-2xl mb-6 overflow-x-auto scrollbar-hide flex items-center shadow-inner",
+            hideTabs && "hidden",
+          )}
+        >
           <TabsList className="flex h-auto w-max min-w-full bg-transparent justify-start sm:justify-center gap-1 p-0 m-0">
             <TabsTrigger
               value="planejador"
@@ -674,7 +670,6 @@ export default function Receitas() {
               Como seu orçamento se comporta diante da regra de ouro financeira.
             </p>
           </div>
-
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2">
@@ -715,7 +710,6 @@ export default function Receitas() {
                 )}
               </div>
             </div>
-
             <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-orange-500/10 rounded-lg text-orange-500">
@@ -755,7 +749,6 @@ export default function Receitas() {
                 )}
               </div>
             </div>
-
             <div className="bg-card border rounded-2xl p-5 shadow-sm space-y-4">
               <div className="flex items-center gap-2">
                 <div className="p-2 bg-green-500/10 rounded-lg text-green-500">
@@ -813,7 +806,6 @@ export default function Receitas() {
                 para não estourar o orçamento.
               </p>
             </div>
-
             <Button
               className="rounded-xl shrink-0"
               onClick={() => {
@@ -823,10 +815,9 @@ export default function Receitas() {
                 setIsLimitModalOpen(true);
               }}
             >
-              <PlusSolid className="w-4 h-4 mr-2" /> Adicionar Categoria
+              <PlusSolid className="w-4 w-4 mr-2" /> Adicionar Categoria
             </Button>
           </div>
-
           <div className="grid gap-4">
             {categoriasRastreadas.length === 0 ? (
               <div className="py-12 flex flex-col items-center text-center text-sm text-muted-foreground bg-accent/30 rounded-3xl border border-dashed">
@@ -843,7 +834,6 @@ export default function Receitas() {
                 const nomeLimpo = cat.nome.trim();
                 const limite = cat.teto_gastos || 0;
                 const gasto = gastosCategorizados[nomeLimpo] || 0;
-
                 const margem = limite - gasto;
                 const percentualGasto = limite > 0 ? (gasto / limite) * 100 : 0;
 
@@ -900,7 +890,6 @@ export default function Receitas() {
                             Editar
                           </Button>
                         </div>
-
                         <div className="space-y-2">
                           <div className="flex justify-between text-sm">
                             <span className="font-medium text-muted-foreground">
@@ -913,12 +902,10 @@ export default function Receitas() {
                               Limite: {formatMoney(limite)}
                             </span>
                           </div>
-
                           <Progress
                             value={Math.min(percentualGasto, 100)}
                             className={cn("h-2.5", progressColor)}
                           />
-
                           <div className="flex items-center justify-between mt-2">
                             <div
                               className={cn(
@@ -952,7 +939,6 @@ export default function Receitas() {
         </TabsContent>
       </Tabs>
 
-      {/* MODAL PARA DEFINIR LIMITE DE CATEGORIA */}
       <Dialog open={isLimitModalOpen} onOpenChange={setIsLimitModalOpen}>
         <DialogContent className="sm:max-w-md rounded-3xl">
           <DialogHeader>
@@ -986,14 +972,12 @@ export default function Receitas() {
                 </Select>
               </div>
             )}
-
             {categoriaEditando && (
               <p className="text-sm text-muted-foreground">
                 Qual é o valor máximo que você deseja gastar com{" "}
                 <strong>{categoriaEditando.nome}</strong> por mês?
               </p>
             )}
-
             <div className="space-y-2">
               <Label>Limite (R$)</Label>
               <Input

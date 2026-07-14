@@ -5,13 +5,14 @@ import * as React from "react";
 import { useTheme } from "next-themes";
 import {
   ChevronLeftIcon,
-  BanknotesIcon,
   MoonIcon,
   SunIcon,
-  ArrowDownTrayIcon,
-  SparklesIcon,
   ShareIcon,
   EllipsisVerticalIcon,
+  UserGroupIcon,
+  ClipboardDocumentListIcon,
+  ChartPieIcon,
+  ShieldExclamationIcon,
 } from "@heroicons/react/24/outline";
 import {
   MoonIcon as MoonSolid,
@@ -36,13 +37,11 @@ interface MaisPageProps {
 export default function MaisPage({ onNavigate }: MaisPageProps) {
   const { theme, setTheme } = useTheme();
 
-  // Criando o próprio estado de "mounted" para evitar erro de tipagem do next-themes
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => {
     setMounted(true);
   }, []);
 
-  // --- ESTADOS DO PWA (Reintegrados aqui) ---
   const [promptInstall, setPromptInstall] = React.useState<any>(null);
   const [isStandalone, setIsStandalone] = React.useState(true);
   const [showInstructions, setShowInstructions] = React.useState(false);
@@ -52,17 +51,13 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
     const checkStandalone = () =>
       window.matchMedia("(display-mode: standalone)").matches ||
       (window.navigator as any).standalone === true;
-
     setIsStandalone(checkStandalone());
-
     const userAgent = window.navigator.userAgent.toLowerCase();
     setIsIOS(/iphone|ipad|ipod/.test(userAgent));
-
     const handler = (e: any) => {
       e.preventDefault();
       setPromptInstall(e);
     };
-
     window.addEventListener("beforeinstallprompt", handler);
     return () => window.removeEventListener("beforeinstallprompt", handler);
   }, []);
@@ -78,16 +73,33 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
     }
   };
 
-  // --- DADOS DAS SEÇÕES ---
   const sections = [
     {
       title: "Ferramentas",
       items: [
         {
-          id: "balanco",
-          label: "Balanço Financeiro",
-          icon: BanknotesIcon,
-          action: () => onNavigate("receitas"),
+          id: "grupos",
+          label: "Grupos",
+          icon: UserGroupIcon,
+          action: () => onNavigate("grupos"),
+        },
+        {
+          id: "planejador",
+          label: "Planejador",
+          icon: ClipboardDocumentListIcon,
+          action: () => onNavigate("planejador"),
+        },
+        {
+          id: "analise",
+          label: "Análise 50/30/20",
+          icon: ChartPieIcon,
+          action: () => onNavigate("analise-50-30-20"),
+        },
+        {
+          id: "limites",
+          label: "Limites e Margens",
+          icon: ShieldExclamationIcon,
+          action: () => onNavigate("limites-margens"),
         },
       ],
     },
@@ -118,7 +130,6 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
 
   return (
     <div className="min-h-screen bg-background pb-24">
-      {/* Header */}
       <header className="sticky top-0 z-30 bg-background/95 backdrop-blur-lg">
         <div className="pt-[max(22px,env(safe-area-inset-top))]" />
         <div className="flex items-center justify-between px-6 h-16">
@@ -129,11 +140,10 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
             <ChevronLeftIcon className="w-6 h-6 text-foreground" />
           </button>
           <h1 className="text-xl font-semibold text-foreground">Mais</h1>
-          <div className="w-11" /> {/* Espaçador para centralizar o título */}
+          <div className="w-11" />
         </div>
       </header>
 
-      {/* Conteúdo */}
       <div className="px-6 pt-6 space-y-6">
         {sections.map((section) => (
           <div key={section.title}>
@@ -185,7 +195,6 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
         ))}
       </div>
 
-      {/* MODAL DE INSTRUÇÕES DE INSTALAÇÃO (PWA) */}
       <Dialog open={showInstructions} onOpenChange={setShowInstructions}>
         <DialogContent className="sm:max-w-md w-[90vw] rounded-3xl">
           <DialogHeader>
@@ -194,17 +203,15 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
               Instalar Zibee
             </DialogTitle>
             <DialogDescription className="pt-2">
-              Tenha a experiência completa, rápida e sem distrações direto na
-              tela inicial do seu celular.
+              Tenha a experiência completa direto na tela inicial do seu
+              celular.
             </DialogDescription>
           </DialogHeader>
-
           <div className="space-y-4 py-2">
             {promptInstall ? (
               <div className="bg-primary/10 border border-primary/20 p-4 rounded-2xl">
                 <p className="text-sm font-medium text-foreground mb-4">
-                  Seu dispositivo é totalmente compatível! Clique no botão
-                  abaixo para instalar automaticamente.
+                  Seu dispositivo é compatível! Clique abaixo para instalar.
                 </p>
                 <Button
                   onClick={triggerNativeInstall}
@@ -217,19 +224,16 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
               <div className="space-y-4">
                 <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-xl">
                   <p className="text-xs font-medium text-destructive">
-                    Instalação automática bloqueada pelo seu navegador atual.
-                    Siga o passo a passo manual:
+                    Instalação automática bloqueada. Siga o passo a passo:
                   </p>
                 </div>
-
                 {isIOS ? (
                   <div className="flex items-center gap-4 bg-muted/50 border border-border/50 p-4 rounded-2xl">
                     <div className="bg-background p-2 rounded-xl shadow-sm shrink-0">
                       <ShareIcon className="w-6 h-6 text-blue-500" />
                     </div>
                     <p className="text-sm leading-relaxed">
-                      Toque no botão <strong>Compartilhar</strong> na barra do
-                      Safari e selecione{" "}
+                      Toque em <strong>Compartilhar</strong> e selecione{" "}
                       <strong>"Adicionar à Tela de Início"</strong>.
                     </p>
                   </div>
@@ -239,19 +243,17 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
                       <EllipsisVerticalIcon className="w-6 h-6 text-foreground" />
                     </div>
                     <p className="text-sm leading-relaxed">
-                      Toque nos <strong>3 pontinhos</strong> do navegador e
-                      selecione <strong>"Instalar Aplicativo"</strong> ou{" "}
-                      <strong>"Adicionar à Tela Inicial"</strong>.
+                      Toque nos <strong>3 pontinhos</strong> e selecione{" "}
+                      <strong>"Instalar Aplicativo"</strong>.
                     </p>
                   </div>
                 )}
-
                 <Button
                   variant="outline"
                   onClick={() => setShowInstructions(false)}
                   className="w-full rounded-xl h-12 text-md font-bold"
                 >
-                  Entendi, vou fazer isso
+                  Entendi
                 </Button>
               </div>
             )}

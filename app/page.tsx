@@ -1,3 +1,4 @@
+// app/page.tsx
 "use client";
 
 import { useState, useEffect } from "react";
@@ -10,17 +11,10 @@ import GoalsClient from "@/app/(private)/goals/_components/GoalsClient";
 import FixedExpenses from "@/app/(private)/fixed-expenses/_components/FixedExpenses";
 import ReceitasView from "@/app/(private)/receitas/_components/ReceitasView";
 import GroupManagerView from "@/app/(private)/groups/_components/GroupManagerView";
-import InvestmentsClient from "@/app/(private)/investments/_components/InvestmentsClient";
 import CreditCardsClient from "@/app/(private)/credit-cards/_components/CreditCardsClient";
 import SettingsClient from "@/app/(private)/settings/_components/SettingsClient";
 
-const MAIN_TABS = [
-  "dashboard",
-  "lancamentos",
-  "grupos",
-  "investimentos",
-  "metas",
-];
+const MAIN_TABS = ["dashboard", "lancamentos", "metas"];
 
 export default function Home() {
   const [activeTab, setActiveTab] = useState("dashboard");
@@ -99,7 +93,6 @@ export default function Home() {
               <DashboardClient onNavigate={handleNavigate} />
             )}
             {activeTab === "lancamentos" && <ReleasesClient />}
-            {activeTab === "receitas" && <ReceitasView />}
             {activeTab === "cartoes" && <CreditCardsClient />}
             {activeTab === "metas" && <GoalsClient />}
             {activeTab === "configuracoes" && (
@@ -107,7 +100,17 @@ export default function Home() {
             )}
             {activeTab === "despesas_fixas" && <FixedExpenses />}
             {activeTab === "grupos" && <GroupManagerView />}
-            {activeTab === "investimentos" && <InvestmentsClient />}
+
+            {/* NOVAS ROTAS INDEPENDENTES */}
+            {activeTab === "planejador" && (
+              <ReceitasView defaultTab="planejador" hideTabs />
+            )}
+            {activeTab === "analise-50-30-20" && (
+              <ReceitasView defaultTab="analise" hideTabs />
+            )}
+            {activeTab === "limites-margens" && (
+              <ReceitasView defaultTab="limites" hideTabs />
+            )}
           </motion.main>
         </AnimatePresence>
       </div>

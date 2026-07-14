@@ -34,7 +34,7 @@ import { useToast } from "@/hooks/use-toast";
 import { MonthSelector } from "@/components/shared/MonthSelector";
 import { LancamentoItem } from "./LancamentoItem";
 import { LancamentosFilters } from ".//LancamentosFilters";
-import { LancamentoFormDialog } from ".//LancamentoFormDialog";
+import { LancamentoFormDialog } from "./LancamentoFormDialog";
 import {
   AlertDialog,
   AlertDialogAction,

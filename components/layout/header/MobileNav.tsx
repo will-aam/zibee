@@ -7,13 +7,13 @@ import {
   HomeIcon,
   DocumentTextIcon,
   FireIcon,
-  QueueListIcon,
+  BeakerIcon,
 } from "@heroicons/react/24/outline";
 import {
   HomeIcon as HomeSolid,
   DocumentTextIcon as DocumentTextSolid,
   FireIcon as FireSolid,
-  QueueListIcon as QueueListSolid,
+  BeakerIcon as BeakerIconSolid,
   PlusIcon,
 } from "@heroicons/react/24/solid";
 import { supabase } from "@/lib/supabase";
@@ -115,8 +115,8 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
     {
       id: "mais",
       label: "Mais",
-      Icon: QueueListIcon,
-      IconActive: QueueListSolid,
+      Icon: BeakerIcon,
+      IconActive: BeakerIconSolid,
     },
   ];
 

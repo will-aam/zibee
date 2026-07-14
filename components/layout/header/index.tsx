@@ -22,6 +22,7 @@ import DateRangeFilterDrawer, {
   STORAGE_PRESET_KEY,
   FILTER_EVENT,
 } from "@/components/layout/DateRangeFilterDrawer";
+import MaisPage from "@/app/(private)/plus/page"; // <-- IMPORT ADICIONADO
 
 export default function Header({
   activeTab = "dashboard",
@@ -143,6 +144,13 @@ export default function Header({
         onOpenProfile={() => setOpenProfileDrawer(true)}
         onOpenFilter={() => setOpenFilterDrawer(true)}
       />
+
+      {/* RENDERIZAÇÃO DA PÁGINA "MAIS" */}
+      {activeTab === "mais" && (
+        <div className="md:hidden">
+          <MaisPage onNavigate={onNavigate!} />
+        </div>
+      )}
 
       <MobileNav activeTab={activeTab} onNavigate={onNavigate!} />
 

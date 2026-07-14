@@ -143,7 +143,7 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
                     <span
                       className={`overflow-hidden whitespace-nowrap text-xs font-bold transition-all duration-300 ${
                         isActive
-                          ? "max-w-[90px] ml-1.5 opacity-100" // Ajustado de 80px para 90px
+                          ? "max-w-[90px] ml-1.5 opacity-100"
                           : "max-w-0 ml-0 opacity-0"
                       }`}
                     >
@@ -157,7 +157,6 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
             <div className="w-20 flex items-start justify-center -mt-7">
               <button
                 onClick={() => setIsDialogOpen(true)}
-                // Removido: border-4 border-background
                 className="relative z-10 flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-all duration-200 active:scale-90 hover:scale-105 hover:shadow-xl hover:shadow-primary/40"
                 aria-label="Novo Lançamento"
               >
@@ -183,7 +182,7 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
                     <span
                       className={`overflow-hidden whitespace-nowrap text-xs font-bold transition-all duration-300 ${
                         isActive
-                          ? "max-w-[90px] ml-1.5 opacity-100" // Ajustado de 80px para 90px
+                          ? "max-w-[90px] ml-1.5 opacity-100"
                           : "max-w-0 ml-0 opacity-0"
                       }`}
                     >

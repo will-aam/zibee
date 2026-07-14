@@ -1,3 +1,4 @@
+// app/(private)/fixed-expenses/_components/ExpenseCard.tsx
 import { Button } from "@/components/ui/button";
 import {
   PencilIcon,

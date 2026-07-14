@@ -1,3 +1,4 @@
+// app/(private)/fixed-expenses/_components/SummaryCard.tsx
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { WalletIcon, ArrowTrendingDownIcon } from "@heroicons/react/24/solid";

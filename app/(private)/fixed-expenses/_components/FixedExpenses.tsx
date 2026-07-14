@@ -1,3 +1,5 @@
+// app/(private)/fixed-expenses/_components/FixedExpenses.tsx
+
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
@@ -50,6 +52,16 @@ export default function DespesasFixas() {
   const session = authClient.useSession();
   const userId = session.data?.user.id;
   const { activeContext } = useWorkspace();
+
+  // ADICIONE ESTES CONSOLE.LOG AQUI:
+  console.log("--- DEBUG TYPE OF COMPONENTS ---");
+  console.log("SummaryCard:", typeof SummaryCard);
+  console.log("ExpenseCard:", typeof ExpenseCard);
+  console.log("EditFixedExpenseDialog:", typeof EditFixedExpenseDialog);
+  console.log("AlertDialog:", typeof AlertDialog);
+  console.log("Button:", typeof Button);
+  console.log("ArrowPathIcon:", typeof ArrowPathIcon);
+  console.log("--------------------------------");
 
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [modoQuinzenal, setModoQuinzenal] = useState(false);

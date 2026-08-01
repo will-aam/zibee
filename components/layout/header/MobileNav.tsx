@@ -94,10 +94,8 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
   }, [isDialogOpen, userId, activeContext]);
 
   const navButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-90 ${
-      isActive
-        ? "text-primary bg-primary/10 px-3.5 py-2"
-        : "text-muted-foreground px-2 py-2 hover:text-foreground"
+    `flex items-center justify-center p-2 transition-colors duration-200 active:scale-90 ${
+      isActive ? "text-primary" : "text-muted-foreground"
     }`;
 
   const tabs = [
@@ -136,19 +134,10 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
                     aria-label={label}
                   >
                     {isActive ? (
-                      <IconActive className="h-6 w-6 shrink-0" />
+                      <IconActive className="h-6 w-6" />
                     ) : (
-                      <Icon className="h-6 w-6 shrink-0" />
+                      <Icon className="h-6 w-6" />
                     )}
-                    <span
-                      className={`overflow-hidden whitespace-nowrap text-xs font-bold transition-all duration-300 ${
-                        isActive
-                          ? "max-w-[90px] ml-1.5 opacity-100"
-                          : "max-w-0 ml-0 opacity-0"
-                      }`}
-                    >
-                      {label}
-                    </span>
                   </button>
                 );
               })}
@@ -175,19 +164,10 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
                     aria-label={label}
                   >
                     {isActive ? (
-                      <IconActive className="h-6 w-6 shrink-0" />
+                      <IconActive className="h-6 w-6" />
                     ) : (
-                      <Icon className="h-6 w-6 shrink-0" />
+                      <Icon className="h-6 w-6" />
                     )}
-                    <span
-                      className={`overflow-hidden whitespace-nowrap text-xs font-bold transition-all duration-300 ${
-                        isActive
-                          ? "max-w-[90px] ml-1.5 opacity-100"
-                          : "max-w-0 ml-0 opacity-0"
-                      }`}
-                    >
-                      {label}
-                    </span>
                   </button>
                 );
               })}

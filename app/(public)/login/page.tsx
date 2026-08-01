@@ -30,6 +30,7 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // <--- NOVO ESTADO PARA VER SENHA
   const [showPassword, setShowPassword] = useState(false);
@@ -37,10 +38,18 @@ export default function LoginPage() {
   const router = useRouter();
   const { toast } = useToast();
 
-  // <--- RECEBE O EVENTO DO FORMULÁRIO (e: React.FormEvent)
-  const handleSubmit = async (e?: React.FormEvent) => {
-    if (e) e.preventDefault(); // Evita o recarregamento padrão da página ao dar Enter
+  const translateError = (msg: string): string => {
+    if (msg.toLowerCase().includes("user not found")) return "E-mail não encontrado. Verifique o endereço digitado.";
+    if (msg.toLowerCase().includes("invalid password") || msg.toLowerCase().includes("invalid credentials")) return "Senha incorreta. Tente novamente.";
+    if (msg.toLowerCase().includes("email already") || msg.toLowerCase().includes("already exists")) return "Este e-mail já está cadastrado.";
+    if (msg.toLowerCase().includes("password") && msg.toLowerCase().includes("short")) return "A senha precisa ter pelo menos 8 caracteres.";
+    return msg;
+  };
 
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+
+    setErrorMsg(null);
     setLoading(true);
     try {
       if (isLogin) {
@@ -48,13 +57,14 @@ export default function LoginPage() {
         await authClient.signIn.email(
           { email, password },
           {
-            onSuccess: () => router.push("/"),
+            onSuccess: () => {
+              setLoading(false);
+              router.push("/");
+            },
             onError: (ctx) => {
-              toast({
-                title: "Erro ao entrar",
-                description: ctx.error.message,
-                variant: "destructive",
-              });
+              const msg = translateError(ctx.error.message);
+              setErrorMsg(msg);
+              toast({ title: "Erro ao entrar", description: msg, variant: "destructive" });
               setLoading(false);
             },
           },
@@ -62,6 +72,7 @@ export default function LoginPage() {
       } else {
         // --- CADASTRO ---
         if (!name) {
+          setErrorMsg("Informe como deseja ser chamado.");
           toast({ title: "Nome obrigatório", variant: "destructive" });
           setLoading(false);
           return;
@@ -70,24 +81,21 @@ export default function LoginPage() {
           { email, password, name },
           {
             onSuccess: () => {
-              toast({
-                title: "Conta criada!",
-                description: "Você já está logado.",
-              });
+              setLoading(false);
+              toast({ title: "Conta criada!", description: "Você já está logado." });
               router.push("/");
             },
             onError: (ctx) => {
-              toast({
-                title: "Erro ao cadastrar",
-                description: ctx.error.message,
-                variant: "destructive",
-              });
+              const msg = translateError(ctx.error.message);
+              setErrorMsg(msg);
+              toast({ title: "Erro ao cadastrar", description: msg, variant: "destructive" });
               setLoading(false);
             },
           },
         );
       }
     } catch (error) {
+      setErrorMsg("Ocorreu um erro inesperado. Tente novamente.");
       setLoading(false);
     }
   };
@@ -236,6 +244,14 @@ export default function LoginPage() {
                 "Criar Conta"
               )}
             </Button>
+
+            {/* Mensagem de erro visível na tela — garante feedback no mobile */}
+            {errorMsg && (
+              <div className="flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/10 px-4 py-3 text-sm text-destructive">
+                <span className="mt-0.5 shrink-0">⚠️</span>
+                <span>{errorMsg}</span>
+              </div>
+            )}
           </form>
         </CardContent>
         <CardFooter className="flex justify-center pb-8 sm:pb-6">

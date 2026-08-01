@@ -97,24 +97,16 @@ export default function MobileDashboardSummary({
 
   return (
     <>
-      <section className="-mt-[76px] px-4 md:hidden relative z-10">
-        <div
-          className="rounded-3xl 
-bg-card/80 
-backdrop-blur-xl 
-shadow-lg 
-border border-white/10 
-ring-1 ring-black/5 dark:ring-white/10
-overflow-hidden"
-        >
+      <section className="md:hidden relative z-10">
+        <div className="w-full">
           {/* TOPO: O CARD MUTANTE */}
-          <div className="px-5 pt-5 pb-4">
+          <div className="px-5 pt-2 pb-1">
             <div className="flex items-start justify-between gap-3">
               <div className="flex-1 min-w-0">
                 {/* Título Dinâmico */}
                 <div
                   className={`flex items-center gap-1.5 text-sm font-semibold mb-1 ${
-                    isSemReceita ? "text-orange-500" : "text-emerald-500"
+                    isSemReceita ? "text-orange-400" : "text-emerald-400"
                   }`}
                 >
                   {isSemReceita ? (
@@ -129,20 +121,12 @@ overflow-hidden"
                   )}
                 </div>
 
-                {/* Valor Dinâmico */}
-                <p
-                  className={cn(
-                    "text-3xl font-bold tracking-tight mt-0.5",
-                    !isSemReceita && saldoDinheiroEmMaos < 0
-                      ? "text-destructive"
-                      : "text-foreground",
-                  )}
-                >
+                <p className="text-3xl font-bold tracking-tight mt-0.5 text-white">
                   {displayValorPrincipal}
                 </p>
 
                 {/* Subtítulo Dinâmico */}
-                <p className="text-xs text-foreground/80 mt-1.5 font-medium">
+                <p className="text-xs text-white/70 mt-1.5 font-medium">
                   {isSemReceita
                     ? "Soma de Variáveis + Contas Fixas"
                     : "Dinheiro livre (ignora fixas não pagas)"}
@@ -153,7 +137,7 @@ overflow-hidden"
               <button
                 type="button"
                 onClick={toggleHidden}
-                className="shrink-0 h-12 w-12 rounded-full hover:bg-muted/50 active:bg-muted transition flex items-center justify-center text-muted-foreground bg-background/50"
+                className="shrink-0 h-12 w-12 rounded-full hover:bg-white/10 active:bg-white/20 transition flex items-center justify-center text-white/80 bg-white/5"
                 aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
               >
                 {hidden ? (
@@ -165,75 +149,64 @@ overflow-hidden"
             </div>
           </div>
 
-          <div
-            className="h-px mx-4 bg-linear-to-r 
-from-transparent 
-via-foreground/10 
-to-transparent"
-          />
+          <div className="px-2 pb-2">
+            <div className="flex flex-col">
+              {/* Entradas confirmadas */}
+              <div className="w-full text-left px-3 py-2 flex items-center gap-3">
+                <ArrowTrendingUpIcon className="h-5 w-5 shrink-0 text-emerald-400" />
 
-          <div className="px-2 py-2">
-            {/* Entradas confirmadas */}
-            <div className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-green-500/10 text-green-600 dark:text-green-500 flex items-center justify-center">
-                <ArrowTrendingUpIcon className="h-5 w-5" />
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white">
+                    Entradas Confirmadas
+                  </p>
+                  <p className="text-xs text-white/60">
+                    Já recebido em conta
+                  </p>
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  Entradas Confirmadas
-                </p>
-                <p className="text-xs text-foreground/80">
-                  Já recebido em conta
+                <p className="text-sm font-bold text-emerald-400 tracking-tight shrink-0">
+                  {displayEntradas}
                 </p>
               </div>
 
-              <p className="text-sm font-bold text-green-600 dark:text-green-500 tracking-tight shrink-0">
-                {displayEntradas}
-              </p>
-            </div>
+              {/* Gastos variáveis */}
+              <div className="w-full text-left px-3 py-2 flex items-center gap-3">
+                <ArrowTrendingDownIcon className="h-5 w-5 shrink-0 text-red-400" />
 
-            {/* Gastos variáveis */}
-            <div className="w-full text-left px-3 py-3 rounded-2xl flex items-center gap-3">
-              <div className="h-10 w-10 shrink-0 rounded-full bg-red-500/10 text-destructive flex items-center justify-center">
-                <ArrowTrendingDownIcon className="h-5 w-5" />
-              </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white">
+                    Gastos Variáveis
+                  </p>
+                  <p className="text-xs text-white/60">Total acumulado</p>
+                </div>
 
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground">
-                  Gastos Variáveis
-                </p>
-                <p className="text-xs text-foreground/80">Total acumulado</p>
-              </div>
-
-              <p className="text-sm font-bold text-destructive tracking-tight shrink-0">
-                {displayGastos}
-              </p>
-            </div>
-
-            {/* Contas fixas mensais - ABRE O MODAL */}
-            <div
-              role="button"
-              onClick={() => setIsFixasModalOpen(true)}
-              className="w-full text-left px-3 py-3 rounded-2xl hover:bg-muted/50 active:bg-muted/80 transition flex items-center gap-3 cursor-pointer group"
-            >
-              <div className="h-10 w-10 shrink-0 rounded-full bg-blue-500/10 text-blue-600 dark:text-blue-400 flex items-center justify-center transition-colors group-hover:bg-blue-500/20">
-                <WalletIcon className="h-5 w-5" />
-              </div>
-
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium text-foreground group-hover:text-blue-600 dark:group-hover:text-blue-400 transition-colors">
-                  Contas Fixas
-                </p>
-                <p className="text-xs text-foreground/80 flex items-center gap-1 mt-0.5">
-                  Ver lista
-                  <ArrowRightIcon className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                <p className="text-sm font-bold text-red-400 tracking-tight shrink-0">
+                  {displayGastos}
                 </p>
               </div>
 
-              <p className="text-sm font-bold text-blue-600 dark:text-blue-400 tracking-tight shrink-0">
-                {displayFixas}
-              </p>
+              {/* Contas fixas mensais - ABRE O MODAL */}
+              <div
+                role="button"
+                onClick={() => setIsFixasModalOpen(true)}
+                className="w-full text-left px-3 py-2 hover:bg-white/5 active:bg-white/10 rounded-2xl transition flex items-center gap-3 cursor-pointer group"
+              >
+                <WalletIcon className="h-5 w-5 shrink-0 text-blue-400 transition-colors group-hover:text-blue-300" />
+
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
+                    Contas Fixas
+                  </p>
+                  <p className="text-xs text-white/60 flex items-center gap-1 mt-0.5">
+                    Ver lista
+                    <ArrowRightIcon className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                  </p>
+                </div>
+
+                <p className="text-sm font-bold text-blue-400 tracking-tight shrink-0">
+                  {displayFixas}
+                </p>
+              </div>
             </div>
           </div>
         </div>

@@ -49,8 +49,8 @@ function getGreeting(): string {
 
 function MobileDashboardSummarySkeleton() {
   return (
-    <section className="-mt-12 px-4 md:hidden">
-      <div className="rounded-3xl bg-background/80 backdrop-blur-xl shadow-sm border border-border/50 overflow-hidden">
+    <section className="md:hidden">
+      <div className="w-full">
         <div className="animate-pulse">
           <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3">
             <div className="flex-1">
@@ -123,87 +123,81 @@ export function MobileHeader({
   if (activeTab !== "dashboard") return null;
 
   return (
-    <section className={`md:hidden relative min-h-[500px] ${sora.className}`}>
-      {/* CAMADA DE FUNDO GLOBAL DO COMPONENTE */}
-      <div
-        className="absolute top-0 left-0 right-0 h-[460px] z-0 bg-linear-to-b from-primary via-primary/95 to-transparent backdrop-blur-xl"
-        style={{
-          maskImage: "linear-gradient(to bottom, black 35%, transparent 100%)",
-          WebkitMaskImage:
-            "linear-gradient(to bottom, black 35%, transparent 100%)",
-        }}
-      />
-
-      {/* CONTEÚDO DO HEADER */}
-      <header
-        id="mobile-header-top"
-        className="relative z-10 bg-transparent text-primary-foreground px-4 pt-[max(22px,env(safe-area-inset-top))] pb-16"
-      >
-        <div className="flex items-center gap-4 mb-2">
-          <button
-            onClick={onOpenProfile}
-            className="relative shrink-0 h-16 w-16 rounded-full flex items-center justify-center ring-2 ring-white/80 ring-offset-2 ring-offset-primary hover:scale-105 active:scale-95 transition"
-          >
-            <img
-              src={avatarUrl}
-              alt="Avatar"
-              className="h-full w-full rounded-full object-cover"
-            />
-            {pendingInvite && (
-              <span className="absolute top-0 right-0 w-4 h-4 bg-blue-500 border-2 border-primary rounded-full" />
-            )}
-          </button>
-
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-white/85">{getGreeting()},</p>
-            <p className="font-semibold text-xl leading-tight truncate text-white">
-              {userName}!
-            </p>
-          </div>
-
-          <div className="flex items-center gap-1">
-            {/* Botão Notificação - sem background, apenas ícone */}
+    <section className={`md:hidden relative pb-6 ${sora.className}`}>
+      {/* WALLET CARD CONTAINER (Tema Escuro Fixo) */}
+      <div className="bg-zinc-950 text-white rounded-b-[60px] relative z-0 pb-0 overflow-hidden">
+        
+        {/* CONTEÚDO DO HEADER */}
+        <header
+          id="mobile-header-top"
+          className="relative z-10 px-5 pt-[max(16px,env(safe-area-inset-top))] pb-1"
+        >
+          <div className="flex items-center gap-4">
             <button
-              onClick={handleOpenUpdates}
-              className="relative shrink-0 p-2.5 rounded-2xl active:scale-90 hover:scale-105 transition-all duration-150"
-              title="Novidades"
+              onClick={onOpenProfile}
+              className="relative shrink-0 h-14 w-14 rounded-full flex items-center justify-center ring-2 ring-white/20 hover:scale-105 active:scale-95 transition"
             >
-              <BellIcon className="h-6 w-6 text-white" />
-              {hasNewUpdates && (
-                <span className="absolute top-2 right-2 flex h-2.5 w-2.5">
-                  <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
-                  <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-red-500 border border-primary" />
-                </span>
+              <img
+                src={avatarUrl}
+                alt="Avatar"
+                className="h-full w-full rounded-full object-cover"
+              />
+              {pendingInvite && (
+                <span className="absolute top-0 right-0 w-3.5 h-3.5 bg-blue-500 border-2 border-primary rounded-full" />
               )}
             </button>
 
-            {/* Botão Filtro - sem background, apenas ícone */}
-            <button
-              onClick={onOpenFilter}
-              className="shrink-0 p-2.5 rounded-2xl active:scale-90 hover:scale-105 transition-all duration-150"
-              title="Filtrar Período"
-            >
-              <FunnelIcon className="h-6 w-6 text-white" />
-            </button>
-          </div>
-        </div>
-      </header>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-white/70 uppercase tracking-wider font-medium">{getGreeting()},</p>
+              <p className="font-semibold text-lg leading-tight truncate text-white">
+                {userName}
+              </p>
+            </div>
 
-      {/* CAMADA DOS CARDS DE CONTEÚDO */}
-      <div className="relative z-10 mt-8 px-4">
-        {loadingTotals ? (
-          <MobileDashboardSummarySkeleton />
-        ) : (
-          <MobileDashboardSummary
-            saldoGeral={saldoGeral}
-            entradasConfirmadas={totalReceitas}
-            gastosVariaveis={totalDespesas}
-            contasFixasMensais={totalDespesasFixas}
-            listaFixas={listaFixas}
-            totalFixasPagas={totalFixasPagas}
-            onNavigate={onNavigate}
-          />
-        )}
+            <div className="flex items-center gap-1">
+              {/* Botão Notificação */}
+              <button
+                onClick={handleOpenUpdates}
+                className="relative shrink-0 p-2 rounded-xl bg-white/10 active:scale-90 hover:scale-105 transition-all duration-150"
+                title="Novidades"
+              >
+                <BellIcon className="h-5 w-5 text-white" />
+                {hasNewUpdates && (
+                  <span className="absolute -top-1 -right-1 flex h-3 w-3">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75" />
+                    <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500 border-2 border-primary" />
+                  </span>
+                )}
+              </button>
+
+              {/* Botão Filtro */}
+              <button
+                onClick={onOpenFilter}
+                className="shrink-0 p-2 rounded-xl bg-white/10 active:scale-90 hover:scale-105 transition-all duration-150 ml-2"
+                title="Filtrar Período"
+              >
+                <FunnelIcon className="h-5 w-5 text-white" />
+              </button>
+            </div>
+          </div>
+        </header>
+
+        {/* CAMADA DOS CARDS DE CONTEÚDO (DENTRO DA CARTEIRA) */}
+        <div className="relative z-10 px-1 mt-0 pb-2">
+          {loadingTotals ? (
+            <MobileDashboardSummarySkeleton />
+          ) : (
+            <MobileDashboardSummary
+              saldoGeral={saldoGeral}
+              entradasConfirmadas={totalReceitas}
+              gastosVariaveis={totalDespesas}
+              contasFixasMensais={totalDespesasFixas}
+              listaFixas={listaFixas}
+              totalFixasPagas={totalFixasPagas}
+              onNavigate={onNavigate}
+            />
+          )}
+        </div>
       </div>
     </section>
   );

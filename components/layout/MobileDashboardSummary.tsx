@@ -40,6 +40,8 @@ interface MobileDashboardSummaryProps {
   listaFixas?: any[];
   totalFixasPagas?: number; // NOVO: Prop para receber as fixas já pagas do Dashboard
   onNavigate?: (target: NavigateTarget) => void;
+  forceDesktop?: boolean;
+  userName?: string;
 }
 
 const STORAGE_KEY = "mobile-dashboard-values-hidden";
@@ -52,6 +54,8 @@ export default function MobileDashboardSummary({
   listaFixas = [],
   totalFixasPagas = 0, // Inicia em 0 caso o pai ainda não passe
   onNavigate,
+  forceDesktop = false,
+  userName = "Usuário",
 }: MobileDashboardSummaryProps) {
   const [hidden, setHidden] = React.useState(false);
   const [isFixasModalOpen, setIsFixasModalOpen] = React.useState(false);
@@ -97,8 +101,9 @@ export default function MobileDashboardSummary({
 
   return (
     <>
-      <section className="md:hidden relative z-10">
-        <div className="w-full">
+      <section className={cn("relative z-10", forceDesktop ? "hidden md:flex flex-col justify-center bg-zinc-950 rounded-[32px] p-6 text-white shadow-xl h-full" : "md:hidden")}>
+        <div className="w-full flex flex-col gap-6">
+
           {/* TOPO: O CARD MUTANTE */}
           <div className="px-5 pt-3 pb-2 relative flex flex-col items-center text-center">
             {/* Botão de Olho Removido (Movido para o MobileHeader) */}
@@ -145,9 +150,11 @@ export default function MobileDashboardSummary({
                   <p className="text-sm font-medium text-white">
                     Entradas Confirmadas
                   </p>
-                  <p className="text-xs text-white/60">
-                    Já recebido em conta
-                  </p>
+                  {!forceDesktop && (
+                    <p className="text-xs text-white/60">
+                      Já recebido em conta
+                    </p>
+                  )}
                 </div>
 
                 <p className="text-sm font-bold text-emerald-400 tracking-tight shrink-0">
@@ -163,7 +170,9 @@ export default function MobileDashboardSummary({
                   <p className="text-sm font-medium text-white">
                     Gastos Variáveis
                   </p>
-                  <p className="text-xs text-white/60">Total acumulado</p>
+                  {!forceDesktop && (
+                    <p className="text-xs text-white/60">Total acumulado</p>
+                  )}
                 </div>
 
                 <p className="text-sm font-bold text-red-400 tracking-tight shrink-0">
@@ -183,10 +192,12 @@ export default function MobileDashboardSummary({
                   <p className="text-sm font-medium text-white group-hover:text-blue-300 transition-colors">
                     Contas Fixas
                   </p>
-                  <p className="text-xs text-white/60 flex items-center gap-1 mt-0.5">
-                    Ver lista
-                    <ArrowRightIcon className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
-                  </p>
+                  {!forceDesktop && (
+                    <p className="text-xs text-white/60 flex items-center gap-1 mt-0.5">
+                      Ver lista
+                      <ArrowRightIcon className="h-3 w-3 opacity-50 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all" />
+                    </p>
+                  )}
                 </div>
 
                 <p className="text-sm font-bold text-blue-400 tracking-tight shrink-0">

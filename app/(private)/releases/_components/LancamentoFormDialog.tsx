@@ -61,6 +61,7 @@ interface LancamentoFormDialogProps {
   }[];
   activeContext: string;
   groupId: string | null;
+  isInline?: boolean;
 }
 
 // ==========================================
@@ -77,6 +78,7 @@ export function LancamentoFormDialog({
   cartoesDB,
   activeContext,
   groupId,
+  isInline = false,
 }: LancamentoFormDialogProps) {
   const { toast } = useToast();
 
@@ -430,15 +432,18 @@ export function LancamentoFormDialog({
     }
   };
 
-  return (
-    <Dialog
-      open={isOpen}
-      onOpenChange={(open) => !open && !isSubmitting && onClose()}
-    >
-      <DialogContent
-        className="w-screen h-dvh max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0"
-        onInteractOutside={(e) => e.preventDefault()}
-      >
+  const formInner = (
+    <div className={cn("flex flex-col h-full", isInline ? "bg-card border-l border-border/50" : "")}>
+      {isInline ? (
+        <div className="p-6 pb-2 border-b">
+          <h2 className="text-lg font-semibold leading-none tracking-tight">
+            {lancamentoToEdit ? "Editar" : "Novo"} Lançamento{" "}
+            {activeContext === "grupo" && (
+              <span className="text-primary">(Grupo)</span>
+            )}
+          </h2>
+        </div>
+      ) : (
         <DialogHeader className="p-6 pb-2 border-b">
           <DialogTitle>
             {lancamentoToEdit ? "Editar" : "Novo"} Lançamento{" "}
@@ -447,13 +452,14 @@ export function LancamentoFormDialog({
             )}
           </DialogTitle>
         </DialogHeader>
+      )}
 
-        <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
-          <form
-            id="lancamento-form"
-            onSubmit={handleSubmit}
-            className="space-y-6"
-          >
+      <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
+        <form
+          id="lancamento-form"
+          onSubmit={handleSubmit}
+          className="space-y-6"
+        >
             {/* SEÇÃO 1: INFORMAÇÕES BÁSICAS */}
             <div className="space-y-2">
               <Label>Descrição</Label>
@@ -942,10 +948,11 @@ export function LancamentoFormDialog({
               )}
             <div className="h-4"></div>
           </form>
-        </div>
+      </div>
 
-        {/* RODAPÉ E BOTÕES DE AÇÃO */}
-        <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t bg-background/95 backdrop-blur z-10 flex gap-3">
+      {/* RODAPÉ E BOTÕES DE AÇÃO */}
+      <div className="p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t bg-background/95 backdrop-blur z-10 flex gap-3 mt-auto">
+        {!isInline && (
           <Button
             variant="outline"
             className="flex-1 rounded-xl"
@@ -955,22 +962,40 @@ export function LancamentoFormDialog({
           >
             Cancelar
           </Button>
-          <Button
-            className="flex-1 rounded-xl"
-            type="submit"
-            form="lancamento-form"
-            disabled={isSubmitting}
-          >
-            {isSubmitting ? (
-              <>
-                <ArrowPathIcon className="h-5 w-5 mr-2 animate-spin" />{" "}
-                Salvando...
-              </>
-            ) : (
-              "Salvar Lançamento"
-            )}
-          </Button>
-        </div>
+        )}
+        <Button
+          className="flex-1 rounded-xl"
+          type="submit"
+          form="lancamento-form"
+          disabled={isSubmitting}
+        >
+          {isSubmitting ? (
+            <>
+              <ArrowPathIcon className="h-5 w-5 mr-2 animate-spin" />{" "}
+              Salvando...
+            </>
+          ) : (
+            "Salvar Lançamento"
+          )}
+        </Button>
+      </div>
+    </div>
+  );
+
+  if (isInline) {
+    return formInner;
+  }
+
+  return (
+    <Dialog
+      open={isOpen}
+      onOpenChange={(open) => !open && !isSubmitting && onClose()}
+    >
+      <DialogContent
+        className="w-screen h-dvh max-w-none rounded-none sm:rounded-lg sm:h-auto sm:max-h-[85vh] sm:max-w-lg flex flex-col p-0 gap-0"
+        onInteractOutside={(e) => e.preventDefault()}
+      >
+        {formInner}
       </DialogContent>
     </Dialog>
   );

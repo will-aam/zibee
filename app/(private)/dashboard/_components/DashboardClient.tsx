@@ -11,14 +11,15 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useResumoMensal } from "@/hooks/useResumoMensal";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
-// IMPORTANDO OS COMPONENTES
-import { DashboardSummaryCards } from "@/app/(private)/dashboard/_components/DashboardSummaryCards";
+import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
 import { SpendingPaceChart } from "@/app/(private)/dashboard/_components/SpendingPaceChart";
 import { ExpenseEvolutionChart } from "@/app/(private)/dashboard/_components/ExpenseEvolutionChart";
 import { ExpenseCategories } from "@/app/(private)/dashboard/_components/ExpenseCategories";
 import { UpcomingBills } from "@/app/(private)/dashboard/_components/UpcomingBills";
 import { PaymentMethodsChart } from "@/app/(private)/dashboard/_components/PaymentMethodsChart";
 import { MonthTurnoverModal } from "@/app/(private)/dashboard/_components/MonthTurnoverModal";
+import { RecentTransactions } from "@/app/(private)/dashboard/_components/RecentTransactions";
+import { LancamentoFormInlineWrapper } from "@/app/(private)/dashboard/_components/LancamentoFormInlineWrapper";
 
 import {
   FireIcon,
@@ -570,36 +571,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     <div className="space-y-10 p-4 md:p-8 max-w-7xl mx-auto animate-in fade-in slide-in-from-bottom-4">
       <MonthTurnoverModal />
 
-      {/* DESKTOP RESUMO */}
-      <section className="hidden md:block">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-semibold text-foreground/80">
-            Visão Geral {activeContext === "grupo" && "(Grupo)"}
-          </h2>
-          <button
-            onClick={toggleHidden}
-            className="p-2 rounded-full hover:bg-muted/80 transition-colors text-muted-foreground active:scale-95"
-          >
-            {hidden ? (
-              <EyeSlashIcon className="h-5 w-5" />
-            ) : (
-              <EyeIcon className="h-5 w-5" />
-            )}
-          </button>
-        </div>
 
-        <DashboardSummaryCards
-          totalReceitas={resumo?.totalReceitas || 0}
-          totalVariaveis={resumo?.totalDespesas || 0}
-          totalFixas={resumo?.totalDespesasFixas || 0}
-          listaFixas={resumo?.listaFixas || []}
-          saldoGeral={resumo?.saldoGeral || 0}
-          hidden={hidden}
-          formatMoney={formatMoney}
-          activeContext={activeContext}
-          totalFixasPagas={resumo?.totalFixasPagas || 0}
-        />
-      </section>
 
       {/* MOBILE */}
       <div className="space-y-8 md:hidden">
@@ -683,16 +655,101 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {renderCategoryBudgets()}
       </div>
 
-      {/* DESKTOP GRÁFICOS */}
-      <div className="hidden md:block space-y-12">
-        <div className="pt-4">
-          {hasLastMonthData ? (
-            <SpendingPaceChart
-              currentMonthExpenses={resumo?.despesasBrutas || []}
-              lastMonthExpenses={resumoPassado?.despesasBrutas || []}
+      {/* DESKTOP GRÁFICOS E NOVO LAYOUT GRID */}
+      <div className="hidden md:flex gap-6 items-stretch min-h-[calc(100vh-80px)]">
+        {/* COLUNA PRINCIPAL (Centro) */}
+        <div className="flex-1 space-y-6 pr-2 custom-scrollbar pb-10">
+          
+          {/* LINHA 1: SAUDAÇÃO E TOGGLE */}
+          <div className="flex items-center justify-between mb-2">
+            <h2 className="text-3xl font-bold text-foreground tracking-tight">
+              {(() => {
+                const hour = new Date().getHours();
+                if (hour >= 5 && hour < 12) return "Bom dia";
+                if (hour >= 12 && hour < 18) return "Boa tarde";
+                return "Boa noite";
+              })()}, {session.data?.user?.name || "Usuário"}!
+            </h2>
+            <button
+              onClick={toggleHidden}
+              className="p-2 rounded-full hover:bg-muted/80 transition-colors text-muted-foreground active:scale-95 bg-card border border-border/50 shadow-sm"
+              title="Ocultar valores"
+            >
+              {hidden ? (
+                <EyeSlashIcon className="h-5 w-5" />
+              ) : (
+                <EyeIcon className="h-5 w-5" />
+              )}
+            </button>
+          </div>
+
+          {/* LINHA 2: RESUMO + TRANSAÇÕES */}
+          <div className="grid grid-cols-12 gap-6">
+            <div className="col-span-5 flex flex-col">
+              <MobileDashboardSummary
+                saldoGeral={resumo?.saldoGeral || 0}
+                entradasConfirmadas={resumo?.totalReceitas || 0}
+                gastosVariaveis={resumo?.totalDespesas || 0}
+                contasFixasMensais={resumo?.totalDespesasFixas || 0}
+                listaFixas={resumo?.listaFixas || []}
+                totalFixasPagas={resumo?.totalFixasPagas || 0}
+                forceDesktop={true}
+                onNavigate={onNavigate as any}
+              />
+            </div>
+            <div className="col-span-7 flex flex-col">
+              <RecentTransactions
+                despesas={despesasBrutas}
+                fixas={listaFixas}
+                receitas={resumo?.receitasBrutas || []}
+                formatMoney={formatMoney}
+                hidden={hidden}
+                onNavigate={onNavigate}
+              />
+            </div>
+          </div>
+
+          {/* LINHA 3: RITMO DE GASTOS */}
+          <div className="w-full">
+            {hasLastMonthData && (
+              <SpendingPaceChart
+                currentMonthExpenses={resumo?.despesasBrutas || []}
+                lastMonthExpenses={resumoPassado?.despesasBrutas || []}
+                formatMoney={formatMoney}
+                forceExpandedDesktop={true}
+              />
+            )}
+          </div>
+
+          {/* LINHA 4: CATEGORIAS + FORMAS DE PAGAMENTO */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <ExpenseCategories
+              categoriasChart={categoriasChart}
+              expandedCategory={expandedCategory}
+              setExpandedCategory={setExpandedCategory}
+              totalDespesas={resumo?.totalDespesas || 0}
+              totalDespesasFixas={resumo?.totalDespesasFixas || 0}
+              formatMoney={formatMoney}
+              togglePagoLancamento={togglePagoLancamento}
+            />
+            <PaymentMethodsChart
+              despesas={despesasBrutas}
+              fixas={listaFixas}
+              formatMoney={formatMoney}
+              hidden={hidden}
+            />
+          </div>
+
+          {/* LINHA 5: PRÓXIMOS VENCIMENTOS */}
+          <div className="w-full">
+            <UpcomingBills
+              proximosVencimentos={proximosVencimentos}
               formatMoney={formatMoney}
             />
-          ) : (
+          </div>
+
+          {/* LINHA 6: EVOLUÇÃO (CASO NÃO EXIBA RITMO OU PARA COMPLEMENTAR) */}
+          <div className="w-full">
             <ExpenseEvolutionChart
               dadosGraficoEvolucao={dadosGraficoEvolucao}
               periodoGrafico={periodoGrafico}
@@ -700,73 +757,53 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
               formatMoney={formatMoney}
               hidden={hidden}
             />
+          </div>
+          
+          {activeContext === "pessoal" && metaFixada && (
+            <section
+              onClick={() => onNavigate && onNavigate("metas")}
+              className="mt-6 p-6 border bg-card border-border/50 rounded-3xl cursor-pointer group shadow-sm hover:shadow-md transition-shadow"
+            >
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-base font-bold flex items-center gap-2 text-foreground group-hover:text-primary transition-colors">
+                  <FireIcon className="h-5 w-5 text-primary" /> Meta:{" "}
+                  {metaFixada.nome}
+                </h2>
+                <span className="text-lg font-bold text-foreground">
+                  {progressoMeta.toFixed(1)}%
+                </span>
+              </div>
+              <Progress
+                value={progressoMeta}
+                className="h-3 mb-3 bg-secondary"
+              />
+              <div className="flex justify-between text-sm text-muted-foreground font-medium">
+                <span>
+                  {formatMoney(
+                    Number(
+                      metaFixada.valor_atual || metaFixada.valor_depositado || 0,
+                    ),
+                  )}
+                </span>
+                <span>
+                  Objetivo:{" "}
+                  {formatMoney(
+                    Number(
+                      metaFixada.valor_objetivo || metaFixada.valor_total || 0,
+                    ),
+                  )}
+                </span>
+              </div>
+            </section>
           )}
+
+          {renderCategoryBudgets()}
         </div>
 
-        <div className="grid gap-12 md:grid-cols-2 pt-2">
-          <ExpenseCategories
-            categoriasChart={categoriasChart}
-            expandedCategory={expandedCategory}
-            setExpandedCategory={setExpandedCategory}
-            totalDespesas={resumo?.totalDespesas || 0}
-            totalDespesasFixas={resumo?.totalDespesasFixas || 0}
-            formatMoney={formatMoney}
-            togglePagoLancamento={togglePagoLancamento}
-          />
-          <PaymentMethodsChart
-            despesas={despesasBrutas}
-            fixas={listaFixas}
-            formatMoney={formatMoney}
-            hidden={hidden}
-          />
+        {/* COLUNA DIREITA (Painel Fixo Lançamento) */}
+        <div className="w-[400px] shrink-0 border-l border-border/50 overflow-hidden hidden xl:block bg-card fixed right-0 top-0 bottom-0 z-40 shadow-2xl">
+           <LancamentoFormInlineWrapper />
         </div>
-
-        <div className="pt-2">
-          <UpcomingBills
-            proximosVencimentos={proximosVencimentos}
-            formatMoney={formatMoney}
-          />
-        </div>
-
-        {activeContext === "pessoal" && metaFixada && (
-          <section
-            onClick={() => onNavigate && onNavigate("metas")}
-            className="mt-2 pt-6 border-t border-border/50 cursor-pointer group"
-          >
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="text-sm font-semibold flex items-center gap-2 text-foreground/80 group-hover:text-primary transition-colors">
-                <FireIcon className="h-4 w-4 text-primary" /> Meta:{" "}
-                {metaFixada.nome}
-              </h2>
-              <span className="text-sm font-bold text-foreground">
-                {progressoMeta.toFixed(1)}%
-              </span>
-            </div>
-            <Progress
-              value={progressoMeta}
-              className="h-2.5 mb-3 bg-secondary"
-            />
-            <div className="flex justify-between text-xs text-muted-foreground font-medium">
-              <span>
-                {formatMoney(
-                  Number(
-                    metaFixada.valor_atual || metaFixada.valor_depositado || 0,
-                  ),
-                )}
-              </span>
-              <span>
-                Objetivo:{" "}
-                {formatMoney(
-                  Number(
-                    metaFixada.valor_objetivo || metaFixada.valor_total || 0,
-                  ),
-                )}
-              </span>
-            </div>
-          </section>
-        )}
-
-        {renderCategoryBudgets()}
       </div>
     </div>
   );

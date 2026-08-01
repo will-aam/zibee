@@ -9,6 +9,7 @@ import { useQueryClient } from "@tanstack/react-query";
 import { useResumoMensal } from "@/hooks/useResumoMensal";
 
 import { DesktopHeader } from "./DesktopHeader";
+import { DesktopSidebar } from "../sidebar/DesktopSidebar";
 import { MobileHeader } from "./MobileHeader";
 import { MobileNav } from "./MobileNav";
 import { UpdatesModal } from "../UpdatesModal";
@@ -117,7 +118,7 @@ export default function Header({
 
   return (
     <>
-      <DesktopHeader
+      <DesktopSidebar
         activeTab={activeTab}
         onNavigate={onNavigate ?? (() => {})}
         userName={userName}
@@ -126,6 +127,12 @@ export default function Header({
         isLoggingOut={isLoggingOut}
         onLogout={handleLogout}
         onOpenAvatarModal={() => setOpenProfileDrawer(true)}
+      />
+
+      <DesktopHeader
+        activeTab={activeTab}
+        onNavigate={onNavigate ?? (() => {})}
+        userName={userName}
         onOpenFilter={() => setOpenFilterDrawer(true)}
       />
 

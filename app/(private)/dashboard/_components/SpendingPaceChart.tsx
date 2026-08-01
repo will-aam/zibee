@@ -16,8 +16,10 @@ import {
   ArrowTrendingDownIcon,
   CheckCircleIcon,
   ChevronDownIcon,
+  ChevronUpIcon,
 } from "@heroicons/react/24/solid";
 import { motion, AnimatePresence } from "framer-motion";
+import { cn } from "@/lib/utils";
 
 interface SpendingPaceProps {
   currentMonthExpenses?: any[];
@@ -25,6 +27,7 @@ interface SpendingPaceProps {
   currentMonthFixed?: any[];
   lastMonthFixed?: any[];
   formatMoney: (val: number) => string;
+  forceExpandedDesktop?: boolean;
 }
 
 const STORAGE_EXPANDED_KEY = "zibee:spending-pace-expanded";
@@ -35,6 +38,7 @@ export function SpendingPaceChart({
   currentMonthFixed = [],
   lastMonthFixed = [],
   formatMoney,
+  forceExpandedDesktop = false,
 }: SpendingPaceProps) {
   const [isMounted, setIsMounted] = useState(false);
   const [isExpanded, setIsExpanded] = useState(true); // Default expandido
@@ -120,6 +124,7 @@ export function SpendingPaceChart({
 
     return {
       diff: Math.abs(diff).toFixed(0),
+      diffValue: atualHoje - passadoHoje,
       isBad: diff > 5,
       isGood: diff < -5,
       label:
@@ -140,8 +145,8 @@ export function SpendingPaceChart({
     <div className="w-full overflow-hidden transition-all duration-300">
       {/* HEADER DO CARD (Sempre Visível) */}
       <div
-        onClick={toggleExpand}
-        className="flex items-center justify-between p-4 sm:p-5 cursor-pointer hover:bg-muted/30 rounded-2xl transition-colors"
+        className={cn("flex items-center justify-between p-4 sm:p-5 rounded-2xl transition-colors", forceExpandedDesktop ? "" : "cursor-pointer hover:bg-muted/30")}
+        onClick={() => !forceExpandedDesktop && toggleExpand()}
       >
         <div className="flex items-center gap-3">
           <div>
@@ -154,38 +159,39 @@ export function SpendingPaceChart({
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className={cn("flex items-center gap-3", forceExpandedDesktop ? "md:hidden" : "")}>
           {/* Badge de resumo quando está fechado */}
           {!isExpanded && (
             <div
               className={`hidden sm:flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-[10px] font-bold border ${
-                metrics.isBad
-                  ? "bg-red-500/10 border-red-500/20 text-red-600"
-                  : metrics.isGood
-                    ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-600"
-                    : "bg-blue-500/10 border-blue-500/20 text-blue-600"
+                metrics.diffValue > 0
+                  ? "bg-red-500/10 text-red-600 border-red-500/20"
+                  : "bg-emerald-500/10 text-emerald-600 border-emerald-500/20"
               }`}
             >
-              {metrics.diff}% {metrics.label}
+              {metrics.diffValue > 0 ? "+" : ""}
+              {formatMoney(metrics.diffValue)}
             </div>
           )}
-          <motion.div
-            animate={{ rotate: isExpanded ? 180 : 0 }}
-            transition={{ type: "spring", stiffness: 300, damping: 20 }}
+          <button
+            onClick={() => !forceExpandedDesktop && toggleExpand()}
+            className="p-1.5 hover:bg-muted/50 rounded-full transition-transform text-muted-foreground active:scale-95"
           >
-            <ChevronDownIcon className="h-5 w-5 text-muted-foreground" />
-          </motion.div>
+            <ChevronDownIcon
+              className={`h-5 w-5 transition-transform duration-300 ${isExpanded ? "rotate-180" : ""}`}
+            />
+          </button>
         </div>
       </div>
 
-      {/* CONTEÚDO RECOLHÍVEL */}
-      <AnimatePresence>
-        {isExpanded && (
+      {/* CONTEÚDO EXPANSÍVEL */}
+      <AnimatePresence initial={false}>
+        {(isExpanded || forceExpandedDesktop) && (
           <motion.div
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
-            exit={{ height: 0, opacity: 0 }}
-            transition={{ duration: 0.3, ease: "easeInOut" }}
+            exit={{ height: forceExpandedDesktop ? "auto" : 0, opacity: forceExpandedDesktop ? 1 : 0 }}
+            className={cn("overflow-hidden", forceExpandedDesktop ? "md:!h-auto md:!opacity-100" : "")}
           >
             <div className="px-5 pb-6 sm:px-6">
               {/* Badge de métrica (agora dentro do conteúdo) */}

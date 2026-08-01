@@ -66,7 +66,7 @@ export default function Home() {
   };
 
   return (
-    <div className="min-h-screen bg-background pb-24 md:pb-0 flex flex-col overflow-x-hidden relative">
+    <div className={`min-h-screen bg-background pb-24 md:pb-0 flex flex-col overflow-x-hidden relative md:pl-[90px] ${activeTab === "dashboard" ? "xl:pr-[400px]" : ""}`}>
       <Header activeTab={activeTab} onNavigate={handleNavigate} />
 
       <div className="flex-1 w-full max-w-7xl mx-auto sm:px-6 lg:px-8 relative z-10">

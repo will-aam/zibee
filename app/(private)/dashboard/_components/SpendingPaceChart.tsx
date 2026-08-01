@@ -137,11 +137,11 @@ export function SpendingPaceChart({
     );
 
   return (
-    <div className="bg-card border border-border/50 rounded-3xl shadow-sm overflow-hidden transition-all duration-300">
+    <div className="w-full overflow-hidden transition-all duration-300">
       {/* HEADER DO CARD (Sempre Visível) */}
       <div
         onClick={toggleExpand}
-        className="flex items-center justify-between p-5 sm:p-6 cursor-pointer hover:bg-muted/10 transition-colors"
+        className="flex items-center justify-between p-4 sm:p-5 cursor-pointer hover:bg-muted/30 rounded-2xl transition-colors"
       >
         <div className="flex items-center gap-3">
           <div>

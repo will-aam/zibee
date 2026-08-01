@@ -100,52 +100,38 @@ export default function MobileDashboardSummary({
       <section className="md:hidden relative z-10">
         <div className="w-full">
           {/* TOPO: O CARD MUTANTE */}
-          <div className="px-5 pt-2 pb-1">
-            <div className="flex items-start justify-between gap-3">
-              <div className="flex-1 min-w-0">
-                {/* Título Dinâmico */}
-                <div
-                  className={`flex items-center gap-1.5 text-sm font-semibold mb-1 ${
-                    isSemReceita ? "text-orange-400" : "text-emerald-400"
-                  }`}
-                >
-                  {isSemReceita ? (
-                    <>
-                      <ArrowTrendingDownIcon className="h-4 w-4" /> Total Gasto
-                      no Mês
-                    </>
-                  ) : (
-                    <>
-                      <BanknotesIcon className="h-4 w-4" /> Saldo Atual
-                    </>
-                  )}
-                </div>
+          <div className="px-5 pt-3 pb-2 relative flex flex-col items-center text-center">
+            {/* Botão de Olho Removido (Movido para o MobileHeader) */}
 
-                <p className="text-3xl font-bold tracking-tight mt-0.5 text-white">
-                  {displayValorPrincipal}
-                </p>
-
-                {/* Subtítulo Dinâmico */}
-                <p className="text-xs text-white/70 mt-1.5 font-medium">
-                  {isSemReceita
-                    ? "Soma de Variáveis + Contas Fixas"
-                    : "Dinheiro livre (ignora fixas não pagas)"}
-                </p>
+            <div className="flex-1 min-w-0 flex flex-col items-center max-w-[80%]">
+              {/* Título Dinâmico */}
+              <div
+                className={`flex items-center gap-1.5 text-sm font-semibold mb-1 ${
+                  isSemReceita ? "text-orange-400" : "text-emerald-400"
+                }`}
+              >
+                {isSemReceita ? (
+                  <>
+                    <ArrowTrendingDownIcon className="h-4 w-4" /> Total Gasto
+                    no Mês
+                  </>
+                ) : (
+                  <>
+                    <BanknotesIcon className="h-4 w-4" /> Saldo Atual
+                  </>
+                )}
               </div>
 
-              {/* Botão de Olho */}
-              <button
-                type="button"
-                onClick={toggleHidden}
-                className="shrink-0 h-12 w-12 rounded-full hover:bg-white/10 active:bg-white/20 transition flex items-center justify-center text-white/80 bg-white/5"
-                aria-label={hidden ? "Mostrar valores" : "Ocultar valores"}
-              >
-                {hidden ? (
-                  <EyeSlashIcon className="h-5 w-5" />
-                ) : (
-                  <EyeIcon className="h-5 w-5" />
-                )}
-              </button>
+              <p className="text-4xl font-bold tracking-tight mt-1 text-white">
+                {displayValorPrincipal}
+              </p>
+
+              {/* Subtítulo Dinâmico */}
+              <p className="text-xs text-white/70 mt-2 font-medium">
+                {isSemReceita
+                  ? "Soma de Variáveis + Contas Fixas"
+                  : "Dinheiro livre (ignora fixas não pagas)"}
+              </p>
             </div>
           </div>
 

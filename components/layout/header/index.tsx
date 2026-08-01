@@ -112,7 +112,8 @@ export default function Header({
     load();
   }, [userId, userName]);
 
-  const avatarUrl = `https://api.dicebear.com/9.x/${avatar.style}/svg?seed=${avatar.seed}&size=96`;
+  const dicebearUrl = `https://api.dicebear.com/9.x/${avatar.style}/svg?seed=${avatar.seed}&size=96`;
+  const avatarUrl = session.data?.user?.image || dicebearUrl;
 
   return (
     <>

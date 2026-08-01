@@ -10,6 +10,8 @@ import {
   ArrowDownTrayIcon,
   ShareIcon,
   EllipsisVerticalIcon,
+  EyeIcon,
+  EyeSlashIcon,
 } from "@heroicons/react/24/outline";
 import { appUpdates } from "@/lib/changelog";
 
@@ -100,6 +102,33 @@ export function MobileHeader({
   onOpenFilter,
 }: MobileHeaderProps) {
   const [hasNewUpdates, setHasNewUpdates] = React.useState(false);
+  const [hidden, setHidden] = React.useState(false);
+
+  const STORAGE_KEY = "mobile-dashboard-values-hidden";
+
+  const loadPrivacyState = React.useCallback(() => {
+    try {
+      const saved = localStorage.getItem(STORAGE_KEY);
+      setHidden(saved === "true");
+    } catch {}
+  }, []);
+
+  React.useEffect(() => {
+    loadPrivacyState();
+    window.addEventListener("zibee:privacy-toggled", loadPrivacyState);
+    return () => {
+      window.removeEventListener("zibee:privacy-toggled", loadPrivacyState);
+    };
+  }, [loadPrivacyState]);
+
+  const toggleHidden = () => {
+    const newVal = !hidden;
+    setHidden(newVal);
+    try {
+      localStorage.setItem(STORAGE_KEY, String(newVal));
+      window.dispatchEvent(new Event("zibee:privacy-toggled"));
+    } catch {}
+  };
 
   React.useEffect(() => {
     if (appUpdates.length > 0) {
@@ -177,6 +206,19 @@ export function MobileHeader({
                 title="Filtrar Período"
               >
                 <FunnelIcon className="h-5 w-5 text-white" />
+              </button>
+              {/* Botão de Olho */}
+              <button
+                type="button"
+                onClick={toggleHidden}
+                className="shrink-0 p-2 rounded-xl bg-white/10 active:scale-90 hover:scale-105 transition-all duration-150 ml-2"
+                title={hidden ? "Mostrar valores" : "Ocultar valores"}
+              >
+                {hidden ? (
+                  <EyeSlashIcon className="h-5 w-5 text-white" />
+                ) : (
+                  <EyeIcon className="h-5 w-5 text-white" />
+                )}
               </button>
             </div>
           </div>

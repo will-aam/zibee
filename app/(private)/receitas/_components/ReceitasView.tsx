@@ -2,7 +2,8 @@
 
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { toPng } from "html-to-image";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
 import { useWorkspace } from "@/contexts/WorkspaceContext";
@@ -34,6 +35,12 @@ import {
 } from "@/components/ui/dialog";
 
 import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+
+import {
   PlusIcon as PlusSolid,
   TrashIcon as TrashSolid,
   ArrowTrendingUpIcon as TrendingUpSolid,
@@ -49,6 +56,11 @@ import {
   ChartPieIcon,
   ShieldExclamationIcon,
   CheckCircleIcon,
+  InformationCircleIcon,
+  ArrowDownTrayIcon,
+  ChevronUpIcon,
+  ChevronDownIcon,
+  BookmarkIcon,
 } from "@heroicons/react/24/outline";
 
 interface ReceitaFixa {
@@ -125,6 +137,108 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
     useState<CategoriaComLimite | null>(null);
   const [selectedCategoriaId, setSelectedCategoriaId] = useState<string>("");
   const [novoLimite, setNovoLimite] = useState("");
+
+  const [isComposicaoOpen, setIsComposicaoOpen] = useState(true);
+
+  // Planejador / Simulador
+  const [simulatedExpenses, setSimulatedExpenses] = useState<Array<{id: string, descricao: string, valor: number}>>([]);
+  const [selectedBaseIncomeIds, setSelectedBaseIncomeIds] = useState<string[]>([]);
+  const [simulatedDescricao, setSimulatedDescricao] = useState("");
+  const [simulatedValor, setSimulatedValor] = useState("");
+  const [simulatorLoaded, setSimulatorLoaded] = useState(false);
+  
+  // Rascunhos Salvos
+  const [savedDrafts, setSavedDrafts] = useState<Array<{ id: string, name: string, date: number, expenses: any[], bases: string[] }>>([]);
+  const [isDraftsListOpen, setIsDraftsListOpen] = useState(false);
+
+  const simulatorTableRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    try {
+      const activeExpenses = localStorage.getItem("@zibee:simulatedExpenses");
+      const activeBases = localStorage.getItem("@zibee:simulatedBases");
+      const draftsList = localStorage.getItem("@zibee:simulatedDrafts");
+      if (activeExpenses) setSimulatedExpenses(JSON.parse(activeExpenses));
+      if (activeBases) setSelectedBaseIncomeIds(JSON.parse(activeBases));
+      if (draftsList) setSavedDrafts(JSON.parse(draftsList));
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setSimulatorLoaded(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (simulatorLoaded) {
+      localStorage.setItem("@zibee:simulatedExpenses", JSON.stringify(simulatedExpenses));
+      localStorage.setItem("@zibee:simulatedBases", JSON.stringify(selectedBaseIncomeIds));
+      localStorage.setItem("@zibee:simulatedDrafts", JSON.stringify(savedDrafts));
+    }
+  }, [simulatedExpenses, selectedBaseIncomeIds, savedDrafts, simulatorLoaded]);
+
+  const handleSaveDraft = () => {
+    if (simulatedExpenses.length === 0) {
+      toast({ title: "Adicione despesas antes de salvar.", variant: "destructive" });
+      return;
+    }
+    const newDraft = {
+      id: Math.random().toString(36).substr(2, 9),
+      name: `Planejamento (${new Date().toLocaleDateString('pt-BR')} ${new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })})`,
+      date: Date.now(),
+      expenses: [...simulatedExpenses],
+      bases: [...selectedBaseIncomeIds]
+    };
+    setSavedDrafts(prev => [newDraft, ...prev]);
+    toast({ title: "Rascunho salvo!" });
+  };
+
+  const handleLoadDraft = (draft: any) => {
+    setSimulatedExpenses(draft.expenses);
+    setSelectedBaseIncomeIds(draft.bases);
+    toast({ title: "Rascunho carregado" });
+  };
+
+  const handleDeleteDraft = (id: string) => {
+    setSavedDrafts(prev => prev.filter(d => d.id !== id));
+  };
+
+  const handleDownloadImage = useCallback(() => {
+    if (simulatorTableRef.current === null) return;
+    toPng(simulatorTableRef.current, { cacheBust: true, backgroundColor: "hsl(var(--background))" })
+      .then((dataUrl) => {
+        const link = document.createElement("a");
+        link.download = "meu-planejamento.png";
+        link.href = dataUrl;
+        link.click();
+      })
+      .catch((err) => {
+        toast({ title: "Erro ao salvar imagem", description: err.message, variant: "destructive" });
+      });
+  }, [toast]);
+
+  const toggleBaseIncome = (id: string) => {
+    setSelectedBaseIncomeIds((prev) =>
+      prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id]
+    );
+  };
+
+  const handleAddSimulatedExpense = () => {
+    if (!simulatedDescricao || !simulatedValor) {
+      toast({ title: "Preencha a descrição e o valor", variant: "destructive" });
+      return;
+    }
+    setSimulatedExpenses(prev => [...prev, {
+      id: Math.random().toString(36).substr(2, 9),
+      descricao: simulatedDescricao,
+      valor: Number(simulatedValor)
+    }]);
+    setSimulatedDescricao("");
+    setSimulatedValor("");
+  };
+
+  const handleRemoveSimulatedExpense = (id: string) => {
+    setSimulatedExpenses(prev => prev.filter(e => e.id !== id));
+  };
 
   useEffect(() => {
     if (date) {
@@ -527,26 +641,38 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
 
           <section className="space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-border/50">
-              <h3 className="font-semibold text-lg tracking-tight">
+              <h3 className="font-semibold text-lg tracking-tight whitespace-nowrap overflow-hidden text-ellipsis mr-2">
                 Composição da Renda
               </h3>
-              {!isFormOpen ? (
-                <Button
-                  variant="ghost"
+              <div className="flex items-center gap-1 shrink-0">
+                {!isFormOpen ? (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => {
+                      resetForm();
+                      setIsFormOpen(true);
+                    }}
+                    className="h-8 w-8 p-0 text-primary hover:text-primary hover:bg-primary/10"
+                    title="Adicionar"
+                  >
+                    <PlusSolid className="h-4 w-4" />
+                  </Button>
+                ) : (
+                  <Button variant="ghost" size="sm" onClick={resetForm} className="h-8 w-8 p-0" title="Cancelar">
+                    <XSolid className="h-4 w-4" />
+                  </Button>
+                )}
+                <Button 
+                  variant="ghost" 
                   size="sm"
-                  onClick={() => {
-                    resetForm();
-                    setIsFormOpen(true);
-                  }}
-                  className="text-primary hover:text-primary hover:bg-primary/10"
+                  className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
+                  onClick={() => setIsComposicaoOpen(!isComposicaoOpen)}
+                  title={isComposicaoOpen ? "Recolher" : "Expandir"}
                 >
-                  <PlusSolid className="h-4 w-4 mr-1.5" /> Adicionar
+                  {isComposicaoOpen ? <ChevronUpIcon className="h-4 w-4" /> : <ChevronDownIcon className="h-4 w-4" />}
                 </Button>
-              ) : (
-                <Button variant="ghost" size="sm" onClick={resetForm}>
-                  <XSolid className="h-4 w-4 mr-1.5" /> Cancelar
-                </Button>
-              )}
+              </div>
             </div>
 
             {isFormOpen && (
@@ -589,71 +715,254 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
               </div>
             )}
 
-            <div className="max-h-[260px] overflow-y-auto scrollbar-hide pr-1">
-              <div className="flex flex-col">
-                {receitas.length === 0 ? (
-                  <div className="py-8 text-center text-sm text-muted-foreground bg-accent/30 rounded-xl border border-dashed">
-                    Nenhuma renda base cadastrada para os cálculos.
-                  </div>
-                ) : (
-                  receitas.map((item) => {
-                    const userSeed =
-                      activeContext === "grupo"
-                        ? avatarMap[item.user_id]
-                        : null;
-                    return (
-                      <div
-                        key={item.id}
-                        className="flex items-center justify-between py-3 border-b border-border/50 group last:border-0"
-                      >
-                        <div className="flex items-center gap-3">
-                          <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 shrink-0 overflow-hidden">
-                            {activeContext === "grupo" && userSeed ? (
-                              <img
-                                src={avatarUrl("bottts-neutral", userSeed)}
-                                alt="Avatar"
-                                className="w-full h-full object-cover"
-                              />
-                            ) : (
-                              <TrendingUpSolid className="h-4 w-4" />
-                            )}
+            {isComposicaoOpen && (
+              <div className="max-h-[260px] overflow-y-auto scrollbar-hide pr-1 animate-in fade-in slide-in-from-top-2">
+                <div className="flex flex-col">
+                  {receitas.length === 0 ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground bg-accent/30 rounded-xl border border-dashed">
+                      Nenhuma renda base cadastrada para os cálculos.
+                    </div>
+                  ) : (
+                    receitas.map((item, index) => {
+                      const userSeed =
+                        activeContext === "grupo"
+                          ? avatarMap[item.user_id]
+                          : null;
+                      return (
+                        <div
+                          key={item.id}
+                          className="flex items-center justify-between py-3 border-b border-border/50 group last:border-0"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-[10px] font-bold text-muted-foreground shrink-0">
+                              {index + 1}
+                            </div>
+                            <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 shrink-0 overflow-hidden">
+                              {activeContext === "grupo" && userSeed ? (
+                                <img
+                                  src={avatarUrl("bottts-neutral", userSeed)}
+                                  alt="Avatar"
+                                  className="w-full h-full object-cover"
+                                />
+                              ) : (
+                                <TrendingUpSolid className="h-4 w-4" />
+                              )}
+                            </div>
+                            <p className="font-medium text-sm sm:text-base">
+                              {item.nome}
+                            </p>
                           </div>
-                          <p className="font-medium text-sm sm:text-base">
-                            {item.nome}
-                          </p>
+                          <div className="flex items-center gap-3">
+                            <span className="font-semibold text-sm sm:text-base text-foreground">
+                              {formatMoney(item.valor)}
+                            </span>
+                            <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
+                              {(activeContext === "pessoal" ||
+                                item.user_id === userId) && (
+                                <>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                    onClick={() => handleEdit(item)}
+                                  >
+                                    <PencilSolid className="h-3.5 w-3.5" />
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                    onClick={() => handleExcluir(item.id)}
+                                  >
+                                    <TrashSolid className="h-3.5 w-3.5" />
+                                  </Button>
+                                </>
+                              )}
+                            </div>
+                          </div>
                         </div>
-                        <div className="flex items-center gap-3">
-                          <span className="font-semibold text-sm sm:text-base text-foreground">
-                            {formatMoney(item.valor)}
-                          </span>
-                          <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
-                            {(activeContext === "pessoal" ||
-                              item.user_id === userId) && (
-                              <>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                  onClick={() => handleEdit(item)}
-                                >
-                                  <PencilSolid className="h-3.5 w-3.5" />
-                                </Button>
-                                <Button
-                                  variant="ghost"
-                                  size="icon"
-                                  className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                  onClick={() => handleExcluir(item.id)}
-                                >
-                                  <TrashSolid className="h-3.5 w-3.5" />
-                                </Button>
-                              </>
-                            )}
-                          </div>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+            )}
+          </section>
+
+          {/* SIMULADOR DE PLANEJAMENTO */}
+          <section className="space-y-5 pt-6 border-t border-border/50">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex flex-col gap-1">
+                <h3 className="font-semibold text-lg tracking-tight">
+                  Simulador de Gastos
+                </h3>
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    Planeje como alocar sua renda criando despesas hipotéticas.
+                  </p>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <button className="flex items-center gap-1 bg-muted hover:bg-muted/80 transition-colors px-2 py-0.5 rounded-full cursor-pointer">
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rascunhos: {savedDrafts.length}</span>
+                        <InformationCircleIcon className="w-3.5 h-3.5 text-muted-foreground" />
+                      </button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-64 p-3 text-xs shadow-lg">
+                      <p>Os rascunhos são armazenados localmente e apagados caso o histórico ou dados do navegador sejam removidos.</p>
+                    </PopoverContent>
+                  </Popover>
+                </div>
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                <Button onClick={handleSaveDraft} variant="secondary" className="h-9 px-3 rounded-xl gap-2 text-xs font-semibold">
+                  <BookmarkIcon className="w-3.5 h-3.5" /> Salvar Rascunho
+                </Button>
+                <Button onClick={handleDownloadImage} variant="outline" className="h-9 w-9 p-0 rounded-xl text-primary border-primary/20 hover:bg-primary/5" title="Salvar como Imagem">
+                  <ArrowDownTrayIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* LISTA DE RASCUNHOS SALVOS */}
+            {savedDrafts.length > 0 && (
+              <div className="bg-muted/30 border rounded-xl overflow-hidden">
+                <button 
+                  onClick={() => setIsDraftsListOpen(!isDraftsListOpen)}
+                  className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-muted/50 transition-colors"
+                >
+                  <span className="flex items-center gap-2 text-muted-foreground">
+                    <BookmarkIcon className="w-4 h-4" /> Rascunhos Salvos ({savedDrafts.length})
+                  </span>
+                  {isDraftsListOpen ? <ChevronUpIcon className="w-4 h-4" /> : <ChevronDownIcon className="w-4 h-4" />}
+                </button>
+                {isDraftsListOpen && (
+                  <div className="divide-y border-t max-h-48 overflow-y-auto">
+                    {savedDrafts.map(draft => (
+                      <div key={draft.id} className="px-4 py-2.5 flex items-center justify-between group hover:bg-background transition-colors">
+                        <div className="flex flex-col">
+                          <span className="font-medium text-sm">{draft.name}</span>
+                          <span className="text-xs text-muted-foreground">{draft.expenses.length} despesas • Base: {draft.bases.length} rendas</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Button size="sm" variant="secondary" className="h-7 px-3 text-xs" onClick={() => handleLoadDraft(draft)}>
+                            Carregar
+                          </Button>
+                          <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive" onClick={() => handleDeleteDraft(draft.id)}>
+                            <TrashSolid className="w-3.5 h-3.5" />
+                          </Button>
                         </div>
                       </div>
-                    );
-                  })
+                    ))}
+                  </div>
                 )}
+              </div>
+            )}
+
+            <div className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-xs text-muted-foreground font-semibold uppercase tracking-wide">
+                  Selecione as Rendas para a Base da Simulação
+                </Label>
+                <div className="flex flex-wrap gap-2">
+                  {receitas.length === 0 && (
+                    <span className="text-sm text-muted-foreground">Adicione uma composição de renda primeiro.</span>
+                  )}
+                  {receitas.map((r, index) => {
+                    const isSelected = selectedBaseIncomeIds.includes(r.id.toString());
+                    return (
+                      <button
+                        key={r.id}
+                        onClick={() => toggleBaseIncome(r.id.toString())}
+                        title={`${r.nome} - ${formatMoney(r.valor)}`}
+                        className={cn(
+                          "w-10 h-10 rounded-full text-sm font-bold border transition-colors flex items-center justify-center shrink-0",
+                          isSelected
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-card text-muted-foreground hover:bg-muted"
+                        )}
+                      >
+                        {index + 1}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div className="grid gap-3 sm:grid-cols-3 items-end bg-accent/20 p-4 rounded-xl border border-dashed">
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Despesa (ex: Energia)</Label>
+                  <Input
+                    value={simulatedDescricao}
+                    onChange={(e) => setSimulatedDescricao(e.target.value)}
+                    placeholder="Descrição..."
+                    className="h-10 bg-background"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label className="text-xs font-semibold">Valor (R$)</Label>
+                  <Input
+                    type="number"
+                    value={simulatedValor}
+                    onChange={(e) => setSimulatedValor(e.target.value)}
+                    placeholder="0.00"
+                    className="h-10 bg-background"
+                  />
+                </div>
+                <Button onClick={handleAddSimulatedExpense} className="h-10 w-full sm:w-auto">
+                  <PlusSolid className="h-4 w-4 mr-1.5" /> Adicionar
+                </Button>
+              </div>
+
+              {/* TABELA DE SIMULAÇÃO (Sem rolagem interna e sem card) */}
+              <div className="border rounded-xl bg-background overflow-hidden" ref={simulatorTableRef}>
+                <div className="bg-muted/40 px-4 py-3 border-b text-xs font-semibold text-muted-foreground flex justify-between uppercase tracking-wider">
+                  <span>Descrição da Despesa</span>
+                  <span>Valor Deduzido</span>
+                </div>
+                <div className="divide-y">
+                  {simulatedExpenses.length === 0 ? (
+                    <div className="p-6 text-center text-sm text-muted-foreground">
+                      Nenhuma despesa adicionada ao simulador.
+                    </div>
+                  ) : (
+                    simulatedExpenses.map((exp) => (
+                      <div key={exp.id} className="flex justify-between items-center px-4 py-3 group">
+                        <span className="text-sm font-medium">{exp.descricao}</span>
+                        <div className="flex items-center gap-3">
+                          <span className="text-sm text-destructive font-semibold">- {formatMoney(exp.valor)}</span>
+                          <button onClick={() => handleRemoveSimulatedExpense(exp.id)} className="text-muted-foreground hover:text-destructive transition-colors">
+                            <XSolid className="h-4 w-4" />
+                          </button>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+                
+                {(() => {
+                  const valorBaseSimulador = receitas
+                    .filter((r) => selectedBaseIncomeIds.includes(r.id.toString()))
+                    .reduce((acc, curr) => acc + curr.valor, 0);
+                  const totalGastosSimulados = simulatedExpenses.reduce((acc, curr) => acc + curr.valor, 0);
+                  const saldoSimulacao = valorBaseSimulador - totalGastosSimulados;
+
+                  return (
+                    <div className="bg-muted/20 px-4 py-4 border-t flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                      <span className="text-sm font-semibold text-muted-foreground flex items-center gap-2">
+                        Base Selecionada: <span className="text-foreground">{formatMoney(valorBaseSimulador)}</span>
+                      </span>
+                      <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-lg border">
+                        <span className="text-sm font-bold uppercase tracking-wide">Restante:</span>
+                        <span className={cn(
+                          "text-xl font-black tracking-tight", 
+                          saldoSimulacao >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"
+                        )}>
+                          {formatMoney(saldoSimulacao)}
+                        </span>
+                      </div>
+                    </div>
+                  );
+                })()}
               </div>
             </div>
           </section>

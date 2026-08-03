@@ -12,6 +12,7 @@ import { useResumoMensal } from "@/hooks/useResumoMensal";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 
 import MobileDashboardSummary from "@/components/layout/MobileDashboardSummary";
+import { getInitialDateRange } from "@/components/layout/DateRangeFilterDrawer";
 import { SpendingPaceChart } from "@/app/(private)/dashboard/_components/SpendingPaceChart";
 import { ExpenseEvolutionChart } from "@/app/(private)/dashboard/_components/ExpenseEvolutionChart";
 import { ExpenseCategories } from "@/app/(private)/dashboard/_components/ExpenseCategories";
@@ -65,9 +66,10 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   // 1. LÓGICA DE DATAS REATIVA
   const readRange = useCallback(() => {
     if (typeof window === "undefined") return { from: null, to: null };
+    const initialState = getInitialDateRange();
     return {
-      from: localStorage.getItem(STORAGE_FROM_KEY),
-      to: localStorage.getItem(STORAGE_TO_KEY),
+      from: initialState.from,
+      to: initialState.to,
     };
   }, []);
 

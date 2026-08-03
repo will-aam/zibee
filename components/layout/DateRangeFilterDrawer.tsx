@@ -72,7 +72,11 @@ function getNextMonthRange() {
   return monthRange(nextDate.getFullYear(), nextDate.getMonth() + 1);
 }
 
-function readStored(): DateRangeValue {
+export function getInitialDateRange(): DateRangeValue {
+  if (typeof window === "undefined") {
+    return { preset: "this_month", from: null, to: null };
+  }
+
   const preset = localStorage.getItem(STORAGE_PRESET_KEY) as PresetKey;
   const from = localStorage.getItem(STORAGE_FROM_KEY);
   const to = localStorage.getItem(STORAGE_TO_KEY);
@@ -251,7 +255,7 @@ export default function DateRangeFilterDrawer({
   React.useEffect(() => {
     if (!open) return;
     setError(null);
-    const stored = readStored();
+    const stored = getInitialDateRange();
     setPreset(stored.preset);
     setFrom(stored.from);
     setTo(stored.to);

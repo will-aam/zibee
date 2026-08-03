@@ -118,17 +118,19 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
   return (
     <>
       <div className="fixed bottom-0 inset-x-0 w-full z-50 md:hidden pb-[env(safe-area-inset-bottom)]">
-        <div className="relative flex items-center justify-between h-16 px-2 drop-shadow-[0_-8px_16px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_-8px_16px_rgba(0,0,0,0.4)]">
+        <div className="relative flex items-center justify-between h-16 px-2">
           
-          <div className="absolute inset-0 bg-background -z-10"></div>
-
-          <div className="absolute top-[-30px] left-1/2 -translate-x-1/2 w-[120px] h-[40px] pointer-events-none -z-10">
-            <svg viewBox="0 0 120 40" className="w-full h-full">
-              <path 
-                d="M 0 40 L 0 30 L 15.5 30 A 14 14 0 0 0 28.48 21.25 A 34 34 0 0 1 91.52 21.25 A 14 14 0 0 0 104.5 30 L 120 30 L 120 40 Z" 
-                fill="var(--background)" 
-              />
-            </svg>
+          {/* BACKGROUND SHAPE COM OUTLINE (DROP-SHADOW) */}
+          <div className="absolute inset-x-0 top-0 bottom-0 pointer-events-none -z-10 drop-shadow-[0_-8px_16px_rgba(0,0,0,0.08)] dark:[filter:drop-shadow(0_-1px_0px_rgba(255,255,255,0.15))_drop-shadow(0_-8px_16px_rgba(0,0,0,0.4))]">
+            <div className="absolute inset-0 bg-background"></div>
+            <div className="absolute top-[-30px] left-1/2 -translate-x-1/2 w-[120px] h-[40px]">
+              <svg viewBox="0 0 120 40" className="w-full h-full">
+                <path 
+                  d="M 0 40 L 0 30 L 15.5 30 A 14 14 0 0 0 28.48 21.25 A 34 34 0 0 1 91.52 21.25 A 14 14 0 0 0 104.5 30 L 120 30 L 120 40 Z" 
+                  fill="var(--background)" 
+                />
+              </svg>
+            </div>
           </div>
 
           <div className="flex-1 flex justify-around items-center z-10">

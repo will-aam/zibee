@@ -28,6 +28,7 @@ export function useResumoMensal({
     // ele não bate no banco de dados à toa.
     queryKey: ["resumo-mensal", userId, activeContext, from, to],
     enabled: !!userId, // Só executa a busca se o usuário estiver logado
+    staleTime: 1000 * 60 * 2, // 2 minutos de cache em memória
 
     queryFn: async () => {
       let groupId = null;

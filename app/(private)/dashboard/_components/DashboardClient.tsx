@@ -112,6 +112,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
   const { data: extras, isLoading: isLoadingExtras } = useQuery({
     queryKey: ["dashboard-extras", userId, activeContext],
     enabled: !!userId,
+    staleTime: 1000 * 60 * 2,
     queryFn: async () => {
       let groupId = null;
       if (activeContext === "grupo") {
@@ -561,7 +562,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
     );
   };
 
-  if (isLoadingResumo || isLoadingExtras || isLoadingPassado) {
+  if (isLoadingResumo) {
     return (
       <div className="flex justify-center items-center h-[50vh]">
         <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />

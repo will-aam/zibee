@@ -20,6 +20,7 @@ import {
   ArrowDownTrayIcon as ArrowDownTraySolid,
   SparklesIcon as SparklesSolid,
 } from "@heroicons/react/24/solid";
+import { TrophyIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -29,6 +30,7 @@ import {
   DialogTitle,
   DialogDescription,
 } from "@/components/ui/dialog";
+import { FechamentosListModal } from "./_components/FechamentosListModal";
 
 interface MaisPageProps {
   onNavigate: (tab: string) => void;
@@ -45,6 +47,7 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
   const [promptInstall, setPromptInstall] = React.useState<any>(null);
   const [isStandalone, setIsStandalone] = React.useState(true);
   const [showInstructions, setShowInstructions] = React.useState(false);
+  const [isFechamentosModalOpen, setFechamentosModalOpen] = React.useState(false);
   const [isIOS, setIsIOS] = React.useState(false);
 
   React.useEffect(() => {
@@ -94,6 +97,12 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           label: "Análise 50/30/20",
           icon: ChartPieIcon,
           action: () => onNavigate("analise-50-30-20"),
+        },
+        {
+          id: "fechamentos",
+          label: "Revisar Fechamentos",
+          icon: TrophyIcon,
+          action: () => setFechamentosModalOpen(true),
         },
         {
           id: "limites",
@@ -260,6 +269,10 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           </div>
         </DialogContent>
       </Dialog>
+      <FechamentosListModal 
+        open={isFechamentosModalOpen} 
+        onClose={() => setFechamentosModalOpen(false)} 
+      />
     </div>
   );
 }

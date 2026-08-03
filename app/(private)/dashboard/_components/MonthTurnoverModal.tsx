@@ -30,7 +30,13 @@ interface MonthData {
   idFechamento: string | null;
 }
 
-export function MonthTurnoverModal() {
+export function MonthTurnoverModal({
+  forcedMesAno,
+  onClose,
+}: {
+  forcedMesAno?: string;
+  onClose?: () => void;
+}) {
   const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user?.id;
@@ -46,8 +52,15 @@ export function MonthTurnoverModal() {
 
     try {
       const today = new Date();
-      const lastMonthDate = subMonths(today, 1);
-      const mesAno = format(lastMonthDate, "yyyy-MM");
+      
+      let lastMonthDate = subMonths(today, 1);
+      let mesAno = format(lastMonthDate, "yyyy-MM");
+
+      if (forcedMesAno) {
+        mesAno = forcedMesAno;
+        const [year, month] = forcedMesAno.split("-");
+        lastMonthDate = new Date(Number(year), Number(month) - 1, 1);
+      }
 
       const { data: fechamento, error: fetchError } = await supabase
         .from("fechamentos_mes")
@@ -58,7 +71,7 @@ export function MonthTurnoverModal() {
 
       if (fetchError) throw fetchError;
 
-      if (fechamento?.resolvido) {
+      if (fechamento?.resolvido && !forcedMesAno) {
         setIsLoading(false);
         return;
       }
@@ -162,6 +175,7 @@ export function MonthTurnoverModal() {
 
         setIsOpen(false);
         setActionLoading(null);
+        if (onClose) onClose();
         return;
       }
 
@@ -205,6 +219,7 @@ export function MonthTurnoverModal() {
 
       setIsOpen(false);
       window.dispatchEvent(new Event("zibee:transaction-changed"));
+      if (onClose) onClose();
       toast({
         title: "Mês fechado com sucesso!",
         description: "Seu orçamento foi atualizado.",
@@ -230,10 +245,13 @@ export function MonthTurnoverModal() {
   });
 
   return (
-    <Dialog open={isOpen} onOpenChange={() => {}}>
+    <Dialog open={isOpen} onOpenChange={(open) => {
+      if (!open && onClose) onClose();
+    }}>
       <DialogContent
-        className="sm:max-w-md w-[90vw] max-h-[85vh] overflow-y-auto custom-scrollbar rounded-3xl z-9999 p-0 gap-0"
+        className="sm:max-w-md w-[90vw] max-h-[85vh] overflow-y-auto custom-scrollbar rounded-3xl z-[9999] p-0 gap-0 [&>button]:hidden"
         onInteractOutside={(e) => e.preventDefault()}
+        onEscapeKeyDown={(e) => e.preventDefault()}
       >
         <div
           className={`p-5 sm:p-6 text-center text-white shrink-0 ${

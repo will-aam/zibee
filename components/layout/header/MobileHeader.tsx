@@ -154,7 +154,7 @@ export function MobileHeader({
   return (
     <section className={`md:hidden relative pb-6 ${sora.className}`}>
       {/* WALLET CARD CONTAINER (Tema Escuro Fixo) */}
-      <div className="bg-zinc-950 text-white rounded-b-[60px] relative z-0 pb-0 overflow-hidden">
+      <div className="bg-zinc-950 dark:bg-background text-white rounded-b-[60px] relative z-0 pb-0 overflow-hidden dark:border-b dark:border-white/20">
         
         {/* CONTEÚDO DO HEADER */}
         <header

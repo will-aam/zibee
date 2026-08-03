@@ -101,7 +101,7 @@ export default function MobileDashboardSummary({
 
   return (
     <>
-      <section className={cn("relative z-10", forceDesktop ? "hidden md:flex flex-col justify-center bg-zinc-950 rounded-[32px] p-6 text-white shadow-xl h-full" : "md:hidden")}>
+      <section className={cn("relative z-10", forceDesktop ? "hidden md:flex flex-col justify-center bg-zinc-950 dark:bg-background rounded-[32px] p-6 text-white shadow-xl h-full dark:border dark:border-white/20" : "md:hidden")}>
         <div className="w-full flex flex-col gap-6">
 
           {/* TOPO: O CARD MUTANTE */}

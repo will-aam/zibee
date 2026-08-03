@@ -93,10 +93,7 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
     fetchDialogData();
   }, [isDialogOpen, userId, activeContext]);
 
-  const navButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center p-2 transition-colors duration-200 active:scale-90 ${
-      isActive ? "text-primary" : "text-muted-foreground"
-    }`;
+
 
   const tabs = [
     { id: "dashboard", label: "Início", Icon: HomeIcon, IconActive: HomeSolid },
@@ -120,58 +117,66 @@ export function MobileNav({ activeTab, onNavigate }: MobileNavProps) {
 
   return (
     <>
-      <div className="fixed bottom-0 left-0 w-full z-50 md:hidden">
-        <div className="bg-background pb-[env(safe-area-inset-bottom)]">
-          <div className="flex items-center h-16 sm:h-20">
-            <div className="flex-1 flex items-center justify-around px-2">
-              {tabs.map(({ id, label, Icon, IconActive }) => {
-                const isActive = activeTab === id;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => onNavigate(id)}
-                    className={navButtonClass(isActive)}
-                    aria-label={label}
-                  >
-                    {isActive ? (
-                      <IconActive className="h-6 w-6" />
-                    ) : (
-                      <Icon className="h-6 w-6" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+      <div className="fixed bottom-0 inset-x-0 w-full z-50 md:hidden pb-[env(safe-area-inset-bottom)]">
+        <div className="relative flex items-center justify-between h-16 px-2 drop-shadow-[0_-8px_16px_rgba(0,0,0,0.08)] dark:drop-shadow-[0_-8px_16px_rgba(0,0,0,0.4)]">
+          
+          <div className="absolute inset-0 bg-background -z-10"></div>
 
-            <div className="w-20 flex items-start justify-center -mt-7">
-              <button
-                onClick={() => setIsDialogOpen(true)}
-                className="relative z-10 flex items-center justify-center h-14 w-14 rounded-full bg-primary text-primary-foreground shadow-lg shadow-primary/30 transition-all duration-200 active:scale-90 hover:scale-105 hover:shadow-xl hover:shadow-primary/40"
-                aria-label="Novo Lançamento"
-              >
-                <PlusIcon className="h-7 w-7" />
-              </button>
-            </div>
+          <div className="absolute top-[-30px] left-1/2 -translate-x-1/2 w-[120px] h-[40px] pointer-events-none -z-10">
+            <svg viewBox="0 0 120 40" className="w-full h-full">
+              <path 
+                d="M 0 40 L 0 30 L 15.5 30 A 14 14 0 0 0 28.48 21.25 A 34 34 0 0 1 91.52 21.25 A 14 14 0 0 0 104.5 30 L 120 30 L 120 40 Z" 
+                fill="var(--background)" 
+              />
+            </svg>
+          </div>
 
-            <div className="flex-1 flex items-center justify-around px-2">
-              {tabsRight.map(({ id, label, Icon, IconActive }) => {
-                const isActive = activeTab === id;
-                return (
-                  <button
-                    key={id}
-                    onClick={() => onNavigate(id)}
-                    className={navButtonClass(isActive)}
-                    aria-label={label}
-                  >
-                    {isActive ? (
-                      <IconActive className="h-6 w-6" />
-                    ) : (
-                      <Icon className="h-6 w-6" />
-                    )}
-                  </button>
-                );
-              })}
-            </div>
+          <div className="flex-1 flex justify-around items-center z-10">
+            {tabs.map(({ id, label, Icon, IconActive }) => {
+              const isActive = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => onNavigate(id)}
+                  className={`flex flex-col items-center justify-center w-16 h-full transition-all duration-300 ${
+                    isActive ? "text-primary translate-y-[-2px]" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-label={label}
+                >
+                  {isActive ? <IconActive className="h-6 w-6 mb-1" /> : <Icon className="h-6 w-6" />}
+                  {isActive && <span className="text-[10px] font-medium leading-none">{label}</span>}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="relative w-20 h-full flex justify-center pointer-events-none z-20">
+            <button 
+              onClick={() => setIsDialogOpen(true)}
+              className="absolute -top-6 w-14 h-14 bg-primary text-primary-foreground rounded-full flex items-center justify-center shadow-md hover:scale-105 active:scale-95 transition-all duration-200 pointer-events-auto"
+              aria-label="Novo Lançamento"
+            >
+              <PlusIcon className="w-7 h-7" />
+            </button>
+          </div>
+
+          <div className="flex-1 flex justify-around items-center z-10">
+            {tabsRight.map(({ id, label, Icon, IconActive }) => {
+              const isActive = activeTab === id;
+              return (
+                <button
+                  key={id}
+                  onClick={() => onNavigate(id)}
+                  className={`flex flex-col items-center justify-center w-16 h-full transition-all duration-300 ${
+                    isActive ? "text-primary translate-y-[-2px]" : "text-muted-foreground hover:text-foreground"
+                  }`}
+                  aria-label={label}
+                >
+                  {isActive ? <IconActive className="h-6 w-6 mb-1" /> : <Icon className="h-6 w-6" />}
+                  {isActive && <span className="text-[10px] font-medium leading-none">{label}</span>}
+                </button>
+              );
+            })}
           </div>
         </div>
       </div>

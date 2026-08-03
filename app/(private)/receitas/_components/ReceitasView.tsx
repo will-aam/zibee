@@ -204,7 +204,32 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
 
   const handleDownloadImage = useCallback(() => {
     if (simulatorTableRef.current === null) return;
-    toPng(simulatorTableRef.current, { cacheBust: true, backgroundColor: "hsl(var(--background))" })
+    
+    const lightModeVariables = {
+      "--background": "oklch(0.98 0 0)",
+      "--foreground": "oklch(0.145 0 0)",
+      "--card": "oklch(1 0 0)",
+      "--card-foreground": "oklch(0.145 0 0)",
+      "--popover": "oklch(1 0 0)",
+      "--popover-foreground": "oklch(0.145 0 0)",
+      "--primary": "oklch(0.12 0 0)",
+      "--primary-foreground": "oklch(0.98 0 0)",
+      "--secondary": "oklch(0.94 0 0)",
+      "--secondary-foreground": "oklch(0.205 0 0)",
+      "--muted": "oklch(0.94 0 0)",
+      "--muted-foreground": "oklch(0.5 0 0)",
+      "--border": "oklch(0.88 0 0)",
+      "--destructive": "oklch(0.55 0.22 25)",
+      "--destructive-foreground": "oklch(0.98 0 0)",
+      "--success": "oklch(0.55 0.18 145)",
+      "--success-foreground": "oklch(0.98 0 0)",
+    } as any;
+
+    toPng(simulatorTableRef.current, { 
+      cacheBust: true, 
+      backgroundColor: "#ffffff",
+      style: lightModeVariables
+    })
       .then((dataUrl) => {
         const link = document.createElement("a");
         link.download = "meu-planejamento.png";
@@ -737,17 +762,6 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                             <div className="flex items-center justify-center w-6 h-6 rounded-full bg-muted text-[10px] font-bold text-muted-foreground shrink-0">
                               {index + 1}
                             </div>
-                            <div className="h-9 w-9 rounded-full bg-green-500/10 flex items-center justify-center text-green-600 shrink-0 overflow-hidden">
-                              {activeContext === "grupo" && userSeed ? (
-                                <img
-                                  src={avatarUrl("bottts-neutral", userSeed)}
-                                  alt="Avatar"
-                                  className="w-full h-full object-cover"
-                                />
-                              ) : (
-                                <TrendingUpSolid className="h-4 w-4" />
-                              )}
-                            </div>
                             <p className="font-medium text-sm sm:text-base">
                               {item.nome}
                             </p>
@@ -803,7 +817,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                   <Popover>
                     <PopoverTrigger asChild>
                       <button className="flex items-center gap-1 bg-muted hover:bg-muted/80 transition-colors px-2 py-0.5 rounded-full cursor-pointer">
-                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Rascunhos: {savedDrafts.length}</span>
+                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">{savedDrafts.length}</span>
                         <InformationCircleIcon className="w-3.5 h-3.5 text-muted-foreground" />
                       </button>
                     </PopoverTrigger>

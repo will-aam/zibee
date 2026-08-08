@@ -1,8 +1,8 @@
 // app/api/push/subscribe/route.ts
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import { auth } from "@/lib/auth"; // <-- Importe a configuração do seu servidor Better-Auth
 import { headers } from "next/headers";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 export async function POST(request: Request) {
   try {
@@ -25,11 +25,7 @@ export async function POST(request: Request) {
       );
     }
 
-    // 2. Conecta ao Supabase usando a chave Admin (bypassa o RLS)
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
+    // 2. Salva a assinatura no banco de dados (bypassa RLS se service role key estiver presente)
 
     // 3. Salva a assinatura com o ID em texto do Better-Auth
     const { error } = await supabaseAdmin.from("push_subscriptions").upsert(

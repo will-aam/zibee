@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
-import { createClient } from "@supabase/supabase-js";
 import webpush from "web-push";
+import { supabaseAdmin } from "@/lib/supabase-admin";
 
 // Configuração do Web Push
 webpush.setVapidDetails(
@@ -17,13 +17,7 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Não autorizado" }, { status: 401 });
     }
 
-    // Instancia o Supabase Admin
-    const supabaseAdmin = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    );
-
-    // 2. BUSCA USUÁRIOS QUE QUEREM SER AVISADOS
+// 2. BUSCA USUÁRIOS QUE QUEREM SER AVISADOS
     // Pegamos nome, ID e a preferência de dias (que adicionamos hoje)
     const { data: usuarios, error: userError } = await supabaseAdmin
       .from("user")

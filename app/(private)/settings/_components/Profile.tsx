@@ -172,11 +172,12 @@ export default function Profile() {
     <div className="animate-in fade-in duration-300 flex flex-col">
       {/* SESSÃO: CABEÇALHO DO PERFIL */}
       <section className="px-5 py-6 border-b border-border/30 flex items-center gap-4">
-        <div className="h-16 w-16 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20">
+        <div className="h-16 w-16 shrink-0 rounded-full bg-primary/10 flex items-center justify-center text-primary border border-primary/20 overflow-hidden">
           {user?.image ? (
             <img
               src={user.image}
               alt="Avatar"
+              referrerPolicy="no-referrer"
               className="h-full w-full rounded-full object-cover"
             />
           ) : (

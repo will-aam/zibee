@@ -169,6 +169,7 @@ export function MobileHeader({
               <img
                 src={avatarUrl}
                 alt="Avatar"
+                referrerPolicy="no-referrer"
                 className="h-full w-full rounded-full object-cover"
               />
               {pendingInvite && (

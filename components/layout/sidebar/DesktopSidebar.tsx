@@ -172,6 +172,7 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
               <img
                 src={avatarUrl}
                 alt="Avatar"
+                referrerPolicy="no-referrer"
                 className="h-full w-full rounded-full object-cover bg-muted"
               />
               {pendingInvite && (

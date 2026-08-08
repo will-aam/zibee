@@ -153,6 +153,7 @@ export function ProfileMenu({
             <img
               src={avatarUrl}
               alt="Avatar"
+              referrerPolicy="no-referrer"
               className="w-full h-full object-cover"
             />
           </div>

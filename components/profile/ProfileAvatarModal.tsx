@@ -463,6 +463,7 @@ export default function ProfileAvatarModal({
                       <img
                         src={avatarUrl(ROBOT_STYLE, seed)}
                         alt="Avatar"
+                        referrerPolicy="no-referrer"
                         className="h-full w-full rounded-full bg-muted object-cover border-2 border-background"
                         loading="lazy"
                       />

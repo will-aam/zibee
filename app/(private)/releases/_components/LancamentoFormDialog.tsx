@@ -420,6 +420,28 @@ export function LancamentoFormDialog({
       }
 
       window.dispatchEvent(new Event("zibee:transaction-changed"));
+      
+      // Reset form if it's a new entry (especially for inline forms)
+      if (!lancamentoToEdit) {
+        setFormData({
+          descricao: "",
+          categoria: categoriasUnicas[0] || "Contas Fixas",
+          tipo: "Despesa",
+          valor: 0,
+          forma_pagamento: pagamentosUnicos[0] || "Pix",
+          data_vencimento: new Date().toISOString().split("T")[0],
+          pago: false,
+          observacoes: "",
+          cartao_id: null,
+        });
+        setRepeatType("unica");
+        setStatusFixa("ativo");
+        setRecurrenceEndType("ocorrencias");
+        setRecurrenceEndDate("");
+        setRecurrenceOccurrences(2);
+        setValorInput("0,00");
+      }
+
       onSuccess();
       onClose();
     } catch (error: any) {

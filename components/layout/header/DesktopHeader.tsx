@@ -66,29 +66,33 @@ export function DesktopHeader(props: DesktopHeaderProps) {
 
   return (
     <header
-      className={`hidden md:flex items-center justify-between px-8 py-5 bg-background/80 backdrop-blur-md sticky top-0 z-50 ${sora.className}`}
+      className={`hidden md:flex items-center justify-between px-8 py-5 bg-transparent sticky top-0 z-50 pointer-events-none ${sora.className}`}
     >
       {/* LOGO (Mantido vazio para espaçamento se necessário, ou pode ser removido. Como é justify-between, podemos apenas deixar a div vazia ou tirá-la. Vou deixar vazia para manter o alinhamento dos botões à direita.) */}
       <div className="flex-1"></div>
 
       {/* CONTROLES DIREITA */}
-      <div className="flex items-center gap-3 ml-4">
+      <div className="flex items-center gap-2 ml-4 pointer-events-auto">
         {activeTab === "dashboard" && (
-          <Button
-            variant="outline"
-            className="rounded-2xl h-11 px-5"
-            onClick={onOpenFilter}
-          >
-            <FunnelIcon className="h-5 w-5 mr-2" />
-            <span className="text-base font-medium">Filtrar</span>
-          </Button>
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="rounded-full h-11 w-11 hover:bg-muted/50"
+              onClick={onOpenFilter}
+              title="Filtrar"
+            >
+              <FunnelIcon className="h-5 w-5 text-muted-foreground" />
+            </Button>
+            <div className="w-[1px] h-6 bg-border mx-1" />
+          </>
         )}
 
         {/* --- NOVO: BOTÃO DE NOTIFICAÇÕES (SINO) --- */}
         <Button
           variant="ghost"
           size="icon"
-          className="relative rounded-2xl h-11 w-11 hover:bg-muted/50"
+          className="relative rounded-full h-11 w-11 hover:bg-muted/50"
           onClick={handleOpenUpdates}
           title="Novidades"
         >

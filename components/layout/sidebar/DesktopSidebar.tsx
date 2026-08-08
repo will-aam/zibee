@@ -78,10 +78,9 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
   } = props;
 
   const navButtonClass = (isActive: boolean) =>
-    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] h-12 w-12 mx-auto ${
-      isActive
-        ? "bg-primary/10 text-primary"
-        : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
+    `flex items-center justify-center rounded-2xl transition-all duration-300 ease-in-out active:scale-[0.96] h-12 w-12 mx-auto ${isActive
+      ? "bg-primary/10 text-primary"
+      : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
     }`;
 
   const navItems = [
@@ -103,12 +102,7 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
       Icon: CreditCardOutline,
       IconActive: CreditCardSolid,
     },
-    {
-      id: "receitas",
-      label: "Planejamento",
-      Icon: CalculatorOutline,
-      IconActive: CalculatorSolid,
-    },
+
     {
       id: "investimentos",
       label: "Investimentos",
@@ -202,10 +196,10 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
           </PopoverContent>
         </Popover>
 
-        <button 
-          onClick={onLogout} 
-          disabled={isLoggingOut} 
-          className="p-3 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 ease-in-out active:scale-95" 
+        <button
+          onClick={onLogout}
+          disabled={isLoggingOut}
+          className="p-3 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 ease-in-out active:scale-95"
           title="Sair da Conta"
         >
           {isLoggingOut ? (

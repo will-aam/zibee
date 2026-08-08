@@ -164,6 +164,7 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           label: "Gerenciar Cartões",
           icon: CreditCardIcon,
           action: () => onNavigate("cartoes"),
+          containerClassName: "md:hidden",
         },
         {
           id: "categorias",
@@ -266,6 +267,7 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
                     "w-full flex items-center gap-4 px-5 py-4 transition-colors active:bg-muted/50",
                     index !== section.items.length - 1 &&
                     "border-b border-border/50",
+                    item.containerClassName
                   )}
                 >
                   <div

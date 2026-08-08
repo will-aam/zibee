@@ -113,8 +113,11 @@ export default function Header({
     load();
   }, [userId, userName]);
 
-  const dicebearUrl = `https://api.dicebear.com/9.x/${avatar.style}/svg?seed=${avatar.seed}&size=96`;
-  const avatarUrl = session.data?.user?.image || dicebearUrl;
+  const isCustomAvatar = avatar.style && avatar.style !== "google";
+  const dicebearUrl = `https://api.dicebear.com/9.x/${avatar.style || "bottts-neutral"}/svg?seed=${avatar.seed}&size=96`;
+  const googleImage = session.data?.user?.image;
+  
+  const avatarUrl = isCustomAvatar ? dicebearUrl : (googleImage || dicebearUrl);
 
   return (
     <>
@@ -182,6 +185,7 @@ export default function Header({
         onLogout={handleLogout}
         isLoggingOut={isLoggingOut}
         onNavigateSettings={() => onNavigate?.("configuracoes")}
+        googleImageUrl={session.data?.user?.image}
       />
 
       <UpdatesModal onNavigate={onNavigate ?? (() => {})} />

@@ -13,6 +13,8 @@ import {
   ClipboardDocumentListIcon,
   ChartPieIcon,
   ShieldExclamationIcon,
+  Cog6ToothIcon,
+  ArrowLeftOnRectangleIcon,
 } from "@heroicons/react/24/outline";
 import {
   MoonIcon as MoonSolid,
@@ -31,6 +33,8 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FechamentosListModal } from "./_components/FechamentosListModal";
+import { authClient } from "@/lib/auth-client";
+import { useToast } from "@/hooks/use-toast";
 
 interface MaisPageProps {
   onNavigate: (tab: string) => void;
@@ -38,6 +42,8 @@ interface MaisPageProps {
 
 export default function MaisPage({ onNavigate }: MaisPageProps) {
   const { theme, setTheme } = useTheme();
+  const { toast } = useToast();
+  const [isLoggingOut, setIsLoggingOut] = React.useState(false);
 
   const [mounted, setMounted] = React.useState(false);
   React.useEffect(() => {
@@ -73,6 +79,40 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
         setPromptInstall(null);
         setShowInstructions(false);
       }
+    }
+  };
+
+  const handleShareApp = async () => {
+    const shareText = "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada: https://zibee.vercel.app/";
+    const shareData = {
+      title: "Zibee - Gestão Financeira",
+      text: "Estou usando o Zibee para organizar minhas finanças e recomendo muito! Dá uma olhada:",
+      url: "https://zibee.vercel.app/",
+    };
+
+    try {
+      if (navigator.share) {
+        await navigator.share(shareData);
+      } else {
+        await navigator.clipboard.writeText(shareText);
+        toast({
+          title: "Copiado para a área de transferência! 📋",
+          description: "Agora é só colar e enviar para seus amigos.",
+        });
+      }
+    } catch (err) {
+      console.log("Erro ao compartilhar:", err);
+    }
+  };
+
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await authClient.signOut();
+      window.location.href = "/login";
+    } catch (error) {
+      console.error(error);
+      setIsLoggingOut(false);
     }
   };
 
@@ -116,6 +156,18 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
       title: "Preferências do App",
       items: [
         {
+          id: "configuracoes",
+          label: "Configurações da Conta",
+          icon: Cog6ToothIcon,
+          action: () => onNavigate("configuracoes"),
+        },
+        {
+          id: "compartilhar",
+          label: "Compartilhar Zibee",
+          icon: ShareIcon,
+          action: handleShareApp,
+        },
+        {
           id: "tema",
           label: "Alternar Tema",
           value: mounted ? (theme === "dark" ? "Escuro" : "Claro") : "Sistema",
@@ -125,14 +177,27 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
         ...(isStandalone
           ? []
           : [
-              {
-                id: "install",
-                label: "Instalar App",
-                icon: ArrowDownTraySolid,
-                action: () => setShowInstructions(true),
-                highlight: true,
-              },
-            ]),
+            {
+              id: "install",
+              label: "Instalar App",
+              icon: ArrowDownTraySolid,
+              action: () => setShowInstructions(true),
+              highlight: true,
+            },
+          ]),
+      ],
+    },
+    {
+      title: "Conta",
+      items: [
+        {
+          id: "sair",
+          label: isLoggingOut ? "Saindo..." : "Sair da Conta",
+          icon: ArrowLeftOnRectangleIcon,
+          action: handleLogout,
+          highlight: false,
+          className: "text-red-500",
+        },
       ],
     },
   ];
@@ -167,7 +232,7 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
                   className={cn(
                     "w-full flex items-center gap-4 px-5 py-4 transition-colors active:bg-muted/50",
                     index !== section.items.length - 1 &&
-                      "border-b border-border/50",
+                    "border-b border-border/50",
                   )}
                 >
                   <div
@@ -187,6 +252,7 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
                     className={cn(
                       "flex-1 text-left font-medium",
                       item.highlight ? "text-primary" : "text-foreground",
+                      item.className
                     )}
                   >
                     {item.label}
@@ -269,9 +335,9 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           </div>
         </DialogContent>
       </Dialog>
-      <FechamentosListModal 
-        open={isFechamentosModalOpen} 
-        onClose={() => setFechamentosModalOpen(false)} 
+      <FechamentosListModal
+        open={isFechamentosModalOpen}
+        onClose={() => setFechamentosModalOpen(false)}
       />
     </div>
   );

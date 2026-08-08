@@ -19,6 +19,8 @@ import {
   FunnelIcon,
   FireIcon,
   BriefcaseIcon,
+  ArrowLeftOnRectangleIcon,
+  ArrowPathIcon,
 } from "@heroicons/react/24/outline";
 
 import {
@@ -69,6 +71,8 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
     onNavigate,
     avatarUrl,
     pendingInvite,
+    isLoggingOut,
+    onLogout,
   } = props;
 
   const navButtonClass = (isActive: boolean) =>
@@ -164,8 +168,8 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
         })}
       </nav>
 
-      {/* RODAPÉ (PERFIL) */}
-      <div className="flex justify-center">
+      {/* RODAPÉ (PERFIL E SAIR) */}
+      <div className="flex flex-col items-center gap-4">
         <Popover>
           <PopoverTrigger asChild>
             <button className="relative h-12 w-12 rounded-full ring-2 ring-border hover:ring-primary transition-all outline-none active:scale-95">
@@ -189,6 +193,19 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
             <ProfileMenu {...props} />
           </PopoverContent>
         </Popover>
+
+        <button 
+          onClick={onLogout} 
+          disabled={isLoggingOut} 
+          className="p-3 text-muted-foreground hover:text-red-500 hover:bg-red-500/10 rounded-2xl transition-all duration-300 ease-in-out active:scale-95" 
+          title="Sair da Conta"
+        >
+          {isLoggingOut ? (
+            <ArrowPathIcon className="h-6 w-6 animate-spin" />
+          ) : (
+            <ArrowLeftOnRectangleIcon className="h-6 w-6" />
+          )}
+        </button>
       </div>
     </aside>
   );

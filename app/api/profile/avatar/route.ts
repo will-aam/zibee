@@ -8,6 +8,7 @@ const ALLOWED_STYLES = new Set([
   "bottts-neutral",
   "fun-emoji",
   "lorelei-neutral",
+  "google",
 ]);
 
 function badRequest(message: string) {

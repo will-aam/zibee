@@ -161,20 +161,6 @@ export function ProfileMenu({
             Mudar Foto
           </span>
         </Button>
-
-        <Button
-          variant="ghost"
-          disabled={isLoggingOut}
-          className="w-full justify-start text-red-500 hover:text-red-600 hover:bg-red-50 rounded-xl gap-3 h-11"
-          onClick={onLogout}
-        >
-          {isLoggingOut ? (
-            <ArrowPathIcon className="w-5 h-5 animate-spin" />
-          ) : (
-            <ArrowLeftOnRectangleIcon className="w-5 h-5" />
-          )}
-          <span className="text-sm font-bold">Sair da Conta</span>
-        </Button>
       </div>
     </div>
   );

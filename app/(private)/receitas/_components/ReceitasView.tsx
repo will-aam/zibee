@@ -141,12 +141,12 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
   const [isComposicaoOpen, setIsComposicaoOpen] = useState(true);
 
   // Planejador / Simulador
-  const [simulatedExpenses, setSimulatedExpenses] = useState<Array<{id: string, descricao: string, valor: number}>>([]);
+  const [simulatedExpenses, setSimulatedExpenses] = useState<Array<{ id: string, descricao: string, valor: number }>>([]);
   const [selectedBaseIncomeIds, setSelectedBaseIncomeIds] = useState<string[]>([]);
   const [simulatedDescricao, setSimulatedDescricao] = useState("");
   const [simulatedValor, setSimulatedValor] = useState("");
   const [simulatorLoaded, setSimulatorLoaded] = useState(false);
-  
+
   // Rascunhos Salvos
   const [savedDrafts, setSavedDrafts] = useState<Array<{ id: string, name: string, date: number, expenses: any[], bases: string[] }>>([]);
   const [isDraftsListOpen, setIsDraftsListOpen] = useState(false);
@@ -204,7 +204,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
 
   const handleDownloadImage = useCallback(() => {
     if (simulatorTableRef.current === null) return;
-    
+
     const lightModeVariables = {
       "--background": "oklch(0.98 0 0)",
       "--foreground": "oklch(0.145 0 0)",
@@ -225,8 +225,8 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
       "--success-foreground": "oklch(0.98 0 0)",
     } as any;
 
-    toPng(simulatorTableRef.current, { 
-      cacheBust: true, 
+    toPng(simulatorTableRef.current, {
+      cacheBust: true,
       backgroundColor: "#ffffff",
       style: lightModeVariables
     })
@@ -617,52 +617,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
           value="planejador"
           className="space-y-8 mt-0 outline-none animate-in fade-in"
         >
-          <section className="space-y-4">
-            <h2 className="text-sm font-bold text-muted-foreground uppercase tracking-widest">
-              Teto de Gastos do Mês
-            </h2>
-            <div className="flex flex-col text-sm sm:text-base font-medium">
-              <div className="flex justify-between items-center py-3 border-b border-border/40">
-                <span className="text-green-600 dark:text-green-500 flex items-center gap-2">
-                  <TrendingUpSolid className="h-4 w-4" /> Entradas (Renda Base)
-                </span>
-                <span className="text-foreground">
-                  {formatMoney(totalReceitasBase)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b border-border/40">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  (-) Contas Fixas Reais
-                </span>
-                <span className="text-foreground">
-                  {formatMoney(totalDespesasFixas)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-3 border-b border-border/40">
-                <span className="text-muted-foreground flex items-center gap-2">
-                  (-) Gastos Variáveis Acumulados
-                </span>
-                <span className="text-foreground">
-                  {formatMoney(totalVariaveis)}
-                </span>
-              </div>
-              <div className="flex justify-between items-center py-4 mt-2">
-                <span className="font-bold text-lg text-foreground">
-                  Saldo Livre Atual
-                </span>
-                <span
-                  className={cn(
-                    "text-2xl font-bold tracking-tight",
-                    saldoFinalReal >= 0
-                      ? "text-green-600 dark:text-green-500"
-                      : "text-destructive",
-                  )}
-                >
-                  {formatMoney(saldoFinalReal)}
-                </span>
-              </div>
-            </div>
-          </section>
+
 
           <section className="space-y-4">
             <div className="flex items-center justify-between pb-2 border-b border-border/50">
@@ -688,8 +643,8 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                     <XSolid className="h-4 w-4" />
                   </Button>
                 )}
-                <Button 
-                  variant="ghost" 
+                <Button
+                  variant="ghost"
                   size="sm"
                   className="h-8 w-8 p-0 text-muted-foreground hover:text-foreground"
                   onClick={() => setIsComposicaoOpen(!isComposicaoOpen)}
@@ -773,25 +728,25 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                             <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity">
                               {(activeContext === "pessoal" ||
                                 item.user_id === userId) && (
-                                <>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-primary"
-                                    onClick={() => handleEdit(item)}
-                                  >
-                                    <PencilSolid className="h-3.5 w-3.5" />
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-8 w-8 text-muted-foreground hover:text-destructive"
-                                    onClick={() => handleExcluir(item.id)}
-                                  >
-                                    <TrashSolid className="h-3.5 w-3.5" />
-                                  </Button>
-                                </>
-                              )}
+                                  <>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-primary"
+                                      onClick={() => handleEdit(item)}
+                                    >
+                                      <PencilSolid className="h-3.5 w-3.5" />
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8 text-muted-foreground hover:text-destructive"
+                                      onClick={() => handleExcluir(item.id)}
+                                    >
+                                      <TrashSolid className="h-3.5 w-3.5" />
+                                    </Button>
+                                  </>
+                                )}
                             </div>
                           </div>
                         </div>
@@ -840,7 +795,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
             {/* LISTA DE RASCUNHOS SALVOS */}
             {savedDrafts.length > 0 && (
               <div className="bg-muted/30 border rounded-xl overflow-hidden">
-                <button 
+                <button
                   onClick={() => setIsDraftsListOpen(!isDraftsListOpen)}
                   className="w-full flex items-center justify-between px-4 py-3 text-sm font-semibold hover:bg-muted/50 transition-colors"
                 >
@@ -952,7 +907,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                     ))
                   )}
                 </div>
-                
+
                 {(() => {
                   const valorBaseSimulador = receitas
                     .filter((r) => selectedBaseIncomeIds.includes(r.id.toString()))
@@ -968,7 +923,7 @@ export default function Receitas({ defaultTab, hideTabs }: ReceitasViewProps) {
                       <div className="flex items-center gap-2 bg-background px-3 py-1.5 rounded-lg border">
                         <span className="text-sm font-bold uppercase tracking-wide">Restante:</span>
                         <span className={cn(
-                          "text-xl font-black tracking-tight", 
+                          "text-xl font-black tracking-tight",
                           saldoSimulacao >= 0 ? "text-green-600 dark:text-green-500" : "text-destructive"
                         )}>
                           {formatMoney(saldoSimulacao)}

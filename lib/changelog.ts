@@ -15,7 +15,6 @@ export const appUpdates: UpdateItem[] = [
       "Controle seus gastos com limites por categoria e a regra de ouro 50/30/20.",
     fullDescription: [
       "Novo ecossistema de planejamento do Zibee para ajudar você a nunca mais estourar o orçamento.",
-      "• Teto de Gastos: O app agora calcula seu saldo livre real, já descontando as contas fixas e variáveis.",
       "• Regra 50/30/20: Baseado no método de Elizabeth Warren, seu orçamento é dividido automaticamente em Necessidades (50%), Desejos (30%) e Poupança (20%).",
       "• Limites por Categoria: Defina limites de gastos (ex: R$ 300 para Lazer) e acompanhe o progresso com alertas visuais.",
       "• Dashboard: Acompanhe todos os seus limites em um novo gráfico interativo na tela inicial.",

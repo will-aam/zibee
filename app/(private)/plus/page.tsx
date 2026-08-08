@@ -11,10 +11,13 @@ import {
   EllipsisVerticalIcon,
   UserGroupIcon,
   ClipboardDocumentListIcon,
-  ChartPieIcon,
-  ShieldExclamationIcon,
   Cog6ToothIcon,
   ArrowLeftOnRectangleIcon,
+  TagIcon,
+  CreditCardIcon,
+  BellAlertIcon,
+  ChartPieIcon,
+  ShieldExclamationIcon,
 } from "@heroicons/react/24/outline";
 import {
   MoonIcon as MoonSolid,
@@ -33,6 +36,9 @@ import {
   DialogDescription,
 } from "@/components/ui/dialog";
 import { FechamentosListModal } from "./_components/FechamentosListModal";
+import { CategoriasModal } from "./_components/CategoriasModal";
+import { PagamentosModal } from "./_components/PagamentosModal";
+import { NotificacoesModal } from "./_components/NotificacoesModal";
 import { authClient } from "@/lib/auth-client";
 import { useToast } from "@/hooks/use-toast";
 
@@ -54,6 +60,9 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
   const [isStandalone, setIsStandalone] = React.useState(true);
   const [showInstructions, setShowInstructions] = React.useState(false);
   const [isFechamentosModalOpen, setFechamentosModalOpen] = React.useState(false);
+  const [isCategoriasModalOpen, setCategoriasModalOpen] = React.useState(false);
+  const [isPagamentosModalOpen, setPagamentosModalOpen] = React.useState(false);
+  const [isNotificacoesModalOpen, setNotificacoesModalOpen] = React.useState(false);
   const [isIOS, setIsIOS] = React.useState(false);
 
   React.useEffect(() => {
@@ -150,11 +159,29 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           icon: ShieldExclamationIcon,
           action: () => onNavigate("limites-margens"),
         },
+        {
+          id: "categorias",
+          label: "Categorias",
+          icon: TagIcon,
+          action: () => setCategoriasModalOpen(true),
+        },
+        {
+          id: "pagamentos",
+          label: "Formas de Pagamento",
+          icon: CreditCardIcon,
+          action: () => setPagamentosModalOpen(true),
+        },
       ],
     },
     {
       title: "Preferências do App",
       items: [
+        {
+          id: "notificacoes",
+          label: "Notificações",
+          icon: BellAlertIcon,
+          action: () => setNotificacoesModalOpen(true),
+        },
         {
           id: "configuracoes",
           label: "Configurações da Conta",
@@ -338,6 +365,18 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
       <FechamentosListModal
         open={isFechamentosModalOpen}
         onClose={() => setFechamentosModalOpen(false)}
+      />
+      <CategoriasModal
+        open={isCategoriasModalOpen}
+        onClose={() => setCategoriasModalOpen(false)}
+      />
+      <PagamentosModal
+        open={isPagamentosModalOpen}
+        onClose={() => setPagamentosModalOpen(false)}
+      />
+      <NotificacoesModal
+        open={isNotificacoesModalOpen}
+        onClose={() => setNotificacoesModalOpen(false)}
       />
     </div>
   );

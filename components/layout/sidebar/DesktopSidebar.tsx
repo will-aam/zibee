@@ -21,6 +21,7 @@ import {
   BriefcaseIcon,
   ArrowLeftOnRectangleIcon,
   ArrowPathIcon,
+  EllipsisHorizontalCircleIcon,
 } from "@heroicons/react/24/outline";
 
 import {
@@ -31,6 +32,7 @@ import {
   UserGroupIcon as UserGroupSolid,
   FireIcon as FireSolid,
   BriefcaseIcon as BriefcaseSolid,
+  EllipsisHorizontalCircleIcon as EllipsisHorizontalCircleSolid,
 } from "@heroicons/react/24/solid";
 import { CreditCardIcon as CreditCardOutline } from "@heroicons/react/24/outline";
 import { CreditCardIcon as CreditCardSolid } from "@heroicons/react/24/solid";
@@ -125,6 +127,12 @@ export function DesktopSidebar(props: DesktopSidebarProps) {
       label: "Configurações",
       Icon: Cog6ToothIcon,
       IconActive: CogSolid,
+    },
+    {
+      id: "mais",
+      label: "Mais",
+      Icon: EllipsisHorizontalCircleIcon,
+      IconActive: EllipsisHorizontalCircleSolid,
     },
   ];
 

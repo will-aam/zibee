@@ -158,7 +158,7 @@ export default function Header({
 
       {/* RENDERIZAÇÃO DA PÁGINA "MAIS" */}
       {activeTab === "mais" && (
-        <div className="md:hidden">
+        <div className="w-full">
           <MaisPage onNavigate={onNavigate!} />
         </div>
       )}

@@ -369,15 +369,7 @@ export default function Profile() {
           {/* LINHA DIVISÓRIA ADICIONADA AQUI */}
           <hr className="border-border/30 my-4" />
 
-          {/* BOTÃO DE SAIR - Aparece apenas no Mobile (sm:hidden) */}
-          <Button
-            variant="ghost"
-            className="h-12 rounded-xl w-full sm:hidden justify-start px-2 text-red-600 hover:text-red-700 hover:bg-red-500/10 font-medium"
-            onClick={handleLogout}
-          >
-            <ArrowRightOnRectangleIcon className="h-6 w-6 mr-3" />
-            <span className="text-base">Sair da Conta</span>
-          </Button>
+
         </div>
       </section>
     </div>

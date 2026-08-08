@@ -160,6 +160,12 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           action: () => onNavigate("limites-margens"),
         },
         {
+          id: "cartoes",
+          label: "Gerenciar Cartões",
+          icon: CreditCardIcon,
+          action: () => onNavigate("cartoes"),
+        },
+        {
           id: "categorias",
           label: "Categorias",
           icon: TagIcon,

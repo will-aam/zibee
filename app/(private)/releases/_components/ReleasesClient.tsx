@@ -618,7 +618,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               )}
             </h1>
             <p className="text-muted-foreground text-sm mt-1">
-              Gerencie todas as suas despesas e receitas do mês.
+              Gerencie todas as suas despesas e receitas.
             </p>
           </div>
 
@@ -627,19 +627,12 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               <MonthSelector date={date} setDate={setDate} />
             </div>
 
-            <Button
-              onClick={() => onNavigate?.("cartoes")}
-              variant="outline"
-              className="shrink-0 h-10 rounded-xl gap-2 text-sm md:hidden"
-            >
-              <CreditCardIcon className="h-4 w-4" />
-              <span>Cartões</span>
-            </Button>
+
 
             <Button
               onClick={handleNovoLancamento}
               size="icon"
-              className="shrink-0 h-10 w-10 rounded-xl"
+              className="hidden md:flex shrink-0 h-10 w-10 rounded-xl"
             >
               <PlusIcon className="h-5 w-5" />
             </Button>
@@ -697,7 +690,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
                   className={cn(
                     "h-8 rounded-lg px-3 text-xs shrink-0",
                     mostrarSomentePendentes &&
-                      "bg-amber-500 hover:bg-amber-600 text-white border-amber-500",
+                    "bg-amber-500 hover:bg-amber-600 text-white border-amber-500",
                   )}
                 >
                   {mostrarSomentePendentes ? "Pendentes ON" : "Filtrar"}
@@ -730,10 +723,10 @@ export default function Releases({ onNavigate }: LancamentosProps) {
                           !l.isShadow && (l as any).status_fixa !== "pausado",
                       ).length > 0 &&
                       selectedIds.length ===
-                        lancamentosOrdenados.filter(
-                          (l) =>
-                            !l.isShadow && (l as any).status_fixa !== "pausado",
-                        ).length
+                      lancamentosOrdenados.filter(
+                        (l) =>
+                          !l.isShadow && (l as any).status_fixa !== "pausado",
+                      ).length
                     }
                     onCheckedChange={handleSelectAll}
                     className="rounded-lg"
@@ -800,22 +793,22 @@ export default function Releases({ onNavigate }: LancamentosProps) {
                   filtroStatus ||
                   filtroNatureza !== "todas" ||
                   mostrarSomentePendentes) && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setFiltrosTipo([]);
-                      setFiltrosCategoria([]);
-                      setFiltrosPagamento([]);
-                      setFiltroStatus(null);
-                      setFiltroNatureza("todas");
-                      setMostrarSomentePendentes(false);
-                    }}
-                  >
-                    Limpar filtros
-                  </Button>
-                )}
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        setSearchQuery("");
+                        setFiltrosTipo([]);
+                        setFiltrosCategoria([]);
+                        setFiltrosPagamento([]);
+                        setFiltroStatus(null);
+                        setFiltroNatureza("todas");
+                        setMostrarSomentePendentes(false);
+                      }}
+                    >
+                      Limpar filtros
+                    </Button>
+                  )}
               </div>
             ) : (
               <div className="flex flex-col gap-2">

@@ -2,7 +2,7 @@
 "use client";
 
 import type React from "react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useId } from "react";
 import { supabase } from "@/lib/supabase";
 import type { Lancamento } from "@/types";
 import { Button } from "@/components/ui/button";
@@ -81,6 +81,7 @@ export function LancamentoFormDialog({
   isInline = false,
 }: LancamentoFormDialogProps) {
   const { toast } = useToast();
+  const formId = useId();
 
   // --- ESTADOS ---
   const [formData, setFormData] = useState<Partial<Lancamento>>({});
@@ -456,7 +457,7 @@ export function LancamentoFormDialog({
 
       <div className="flex-1 overflow-y-auto p-6 custom-scrollbar">
         <form
-          id="lancamento-form"
+          id={formId}
           onSubmit={handleSubmit}
           className="space-y-6"
         >
@@ -966,7 +967,7 @@ export function LancamentoFormDialog({
         <Button
           className="flex-1 rounded-xl"
           type="submit"
-          form="lancamento-form"
+          form={formId}
           disabled={isSubmitting}
         >
           {isSubmitting ? (

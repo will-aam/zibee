@@ -21,6 +21,7 @@ import { PaymentMethodsChart } from "@/app/(private)/dashboard/_components/Payme
 import { MonthTurnoverModal } from "@/app/(private)/dashboard/_components/MonthTurnoverModal";
 import { RecentTransactions } from "@/app/(private)/dashboard/_components/RecentTransactions";
 import { LancamentoFormInlineWrapper } from "@/app/(private)/dashboard/_components/LancamentoFormInlineWrapper";
+import { FinancialNotesWidget } from "@/components/dashboard/FinancialNotesWidget";
 
 import {
   FireIcon,
@@ -656,6 +657,9 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         )}
 
         {renderCategoryBudgets()}
+        
+        {/* BLOCO DE ANOTAÇÕES E LEMBRETES (MOBILE) */}
+        <FinancialNotesWidget className="mt-6" />
       </div>
 
       {/* DESKTOP GRÁFICOS E NOVO LAYOUT GRID */}
@@ -691,6 +695,7 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
                 forceDesktop={true}
                 onNavigate={onNavigate as any}
               />
+              <FinancialNotesWidget className="mt-6" />
             </div>
             <div className="col-span-7 flex flex-col">
               <RecentTransactions

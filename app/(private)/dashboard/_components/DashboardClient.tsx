@@ -663,16 +663,8 @@ export default function Dashboard({ onNavigate }: DashboardProps) {
         {/* COLUNA PRINCIPAL (Centro) */}
         <div className="flex-1 space-y-6 pr-2 custom-scrollbar pb-10">
           
-          {/* LINHA 1: SAUDAÇÃO E TOGGLE */}
-          <div className="flex items-center justify-between mb-2">
-            <h2 className="text-3xl font-bold text-foreground tracking-tight">
-              {(() => {
-                const hour = new Date().getHours();
-                if (hour >= 5 && hour < 12) return "Bom dia";
-                if (hour >= 12 && hour < 18) return "Boa tarde";
-                return "Boa noite";
-              })()}, {session.data?.user?.name || "Usuário"}!
-            </h2>
+          {/* LINHA 1: TOGGLE OCULTAR VALORES */}
+          <div className="flex items-center justify-end mb-2">
             <button
               onClick={toggleHidden}
               className="p-2 rounded-full hover:bg-muted/80 transition-colors text-muted-foreground active:scale-95 bg-card border border-border/50 shadow-sm"

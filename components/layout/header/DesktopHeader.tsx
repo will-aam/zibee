@@ -68,8 +68,19 @@ export function DesktopHeader(props: DesktopHeaderProps) {
     <header
       className={`hidden md:flex items-center justify-between px-8 py-5 bg-transparent sticky top-0 z-50 pointer-events-none ${sora.className}`}
     >
-      {/* LOGO (Mantido vazio para espaçamento se necessário, ou pode ser removido. Como é justify-between, podemos apenas deixar a div vazia ou tirá-la. Vou deixar vazia para manter o alinhamento dos botões à direita.) */}
-      <div className="flex-1"></div>
+      {/* SAUDAÇÃO (Alinhada ao topo no Desktop) */}
+      <div className="flex-1 pointer-events-auto">
+        {activeTab === "dashboard" && (
+          <h1 className="text-2xl font-bold text-foreground tracking-tight">
+            {(() => {
+              const hour = new Date().getHours();
+              if (hour >= 5 && hour < 12) return "Bom dia";
+              if (hour >= 12 && hour < 18) return "Boa tarde";
+              return "Boa noite";
+            })()}, {userName || "Usuário"}!
+          </h1>
+        )}
+      </div>
 
       {/* CONTROLES DIREITA */}
       <div className="flex items-center gap-2 ml-4 pointer-events-auto">

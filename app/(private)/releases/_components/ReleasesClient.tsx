@@ -28,8 +28,10 @@ import {
   MagnifyingGlassIcon,
   CreditCardIcon,
   ArrowsUpDownIcon,
+  ArrowUpTrayIcon,
 } from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
+import Link from "next/link";
 
 import { MonthSelector } from "@/components/shared/MonthSelector";
 import { LancamentoItem } from "./LancamentoItem";
@@ -627,7 +629,15 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               <MonthSelector date={date} setDate={setDate} />
             </div>
 
-
+            <Link href="/releases/import" className="md:hidden">
+              <Button
+                variant="outline"
+                size="icon"
+                className="shrink-0 h-10 w-10 rounded-xl"
+              >
+                <ArrowUpTrayIcon className="h-5 w-5" />
+              </Button>
+            </Link>
 
             <Button
               onClick={handleNovoLancamento}

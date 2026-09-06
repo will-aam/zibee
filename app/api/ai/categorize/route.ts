@@ -52,7 +52,7 @@ Retorne o array de resultados.`;
     const ai = new GoogleGenAI({ apiKey });
     
     const response = await ai.models.generateContent({
-      model: 'gemini-3.6-flash',
+      model: 'gemini-1.5-flash',
       contents: prompt,
       config: {
         responseMimeType: "application/json",

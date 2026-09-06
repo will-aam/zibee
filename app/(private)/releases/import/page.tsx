@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
 import { ChevronLeftIcon, ArrowPathIcon, SparklesIcon } from "@heroicons/react/24/solid";
+import { TrashIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { SiNubank } from "react-icons/si";
@@ -136,6 +137,10 @@ export default function ImportPage() {
   const handleGlobalPaymentMethodChange = (methodId: string) => {
     setGlobalPaymentMethodId(methodId);
     setTransactions(prev => prev ? prev.map(t => ({ ...t, paymentMethodId: methodId })) : null);
+  };
+
+  const handleRemoveTransaction = (id: string) => {
+    setTransactions(prev => prev ? prev.filter(t => t.id !== id) : null);
   };
 
   const handleAICategorize = async () => {
@@ -336,9 +341,18 @@ export default function ImportPage() {
                         <span className="text-xs text-muted-foreground font-medium">{new Date(t.date + "T12:00:00").toLocaleDateString('pt-BR')}</span>
                         <span className="font-medium text-sm leading-tight mt-1">{t.description}</span>
                      </div>
-                     <span className={`font-bold whitespace-nowrap ml-2 text-sm ${t.type === 'Receita' ? 'text-green-600' : 'text-red-600'}`}>
-                        {t.type === 'Receita' ? '+' : '-'}{formatCurrency(t.amount)}
-                     </span>
+                     <div className="flex items-center gap-3">
+                       <span className={`font-bold whitespace-nowrap text-sm ${t.type === 'Receita' ? 'text-green-600' : 'text-red-600'}`}>
+                          {t.type === 'Receita' ? '+' : '-'}{formatCurrency(t.amount)}
+                       </span>
+                       <button
+                         onClick={() => handleRemoveTransaction(t.id)}
+                         className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                         title="Ignorar esta transação"
+                       >
+                         <TrashIcon className="w-4 h-4" />
+                       </button>
+                     </div>
                    </div>
 
                    <div className="flex flex-col gap-1 mt-1">

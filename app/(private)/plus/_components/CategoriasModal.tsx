@@ -183,7 +183,7 @@ export function CategoriasModal({ open, onClose }: Props) {
                     <SelectItem value="50">Necessidade (50%)</SelectItem>
                     <SelectItem value="30">Desejo (30%)</SelectItem>
                     <SelectItem value="20">Poupança (20%)</SelectItem>
-                    <SelectItem value="renda">Entrada / Renda</SelectItem>
+                    <SelectItem value="renda">Entrada</SelectItem>
                   </SelectContent>
                 </Select>
                 <Button
@@ -245,7 +245,7 @@ export function CategoriasModal({ open, onClose }: Props) {
                   <SelectItem value="50">Necessidade (50%)</SelectItem>
                   <SelectItem value="30">Desejo (30%)</SelectItem>
                   <SelectItem value="20">Poupança (20%)</SelectItem>
-                  <SelectItem value="renda">Entrada / Renda</SelectItem>
+                  <SelectItem value="renda">Entrada</SelectItem>
                 </SelectContent>
               </Select>
             </div>

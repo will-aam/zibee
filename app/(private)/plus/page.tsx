@@ -25,9 +25,19 @@ import {
   ArrowDownTrayIcon as ArrowDownTraySolid,
   SparklesIcon as SparklesSolid,
 } from "@heroicons/react/24/solid";
-import { TrophyIcon } from "@heroicons/react/24/outline";
+import { TrophyIcon, TrashIcon } from "@heroicons/react/24/outline";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import {
   Dialog,
   DialogContent,
@@ -63,6 +73,8 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
   const [isCategoriasModalOpen, setCategoriasModalOpen] = React.useState(false);
   const [isPagamentosModalOpen, setPagamentosModalOpen] = React.useState(false);
   const [isNotificacoesModalOpen, setNotificacoesModalOpen] = React.useState(false);
+  const [isResetModalOpen, setResetModalOpen] = React.useState(false);
+  const [isResetting, setIsResetting] = React.useState(false);
   const [isIOS, setIsIOS] = React.useState(false);
 
   React.useEffect(() => {
@@ -122,6 +134,28 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
     } catch (error) {
       console.error(error);
       setIsLoggingOut(false);
+    }
+  };
+
+  const handleResetAccount = async () => {
+    setIsResetting(true);
+    try {
+      const res = await fetch("/api/user/reset", { method: "POST" });
+      if (!res.ok) {
+        throw new Error("Erro ao limpar dados");
+      }
+      toast({
+        title: "Dados limpos com sucesso",
+        description: "Sua conta foi redefinida.",
+      });
+      window.location.reload();
+    } catch (error: any) {
+      toast({
+        title: "Erro",
+        description: error.message,
+        variant: "destructive",
+      });
+      setIsResetting(false);
     }
   };
 
@@ -224,6 +258,14 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
     {
       title: "Conta",
       items: [
+        {
+          id: "limpar",
+          label: "Limpar Dados da Conta",
+          icon: TrashIcon,
+          action: () => setResetModalOpen(true),
+          highlight: false,
+          className: "text-red-500 font-bold",
+        },
         {
           id: "sair",
           label: isLoggingOut ? "Saindo..." : "Sair da Conta",
@@ -370,6 +412,34 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
           </div>
         </DialogContent>
       </Dialog>
+
+      <AlertDialog open={isResetModalOpen} onOpenChange={setResetModalOpen}>
+        <AlertDialogContent className="rounded-2xl max-w-sm w-[90vw]">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-destructive flex items-center gap-2">
+              <TrashIcon className="w-5 h-5" />
+              Atenção: Limpeza Total
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              Isso apagará permanentemente <strong>TODOS</strong> os seus lançamentos, metas, despesas fixas, faturas, fechamentos e customizações de categorias. 
+              Sua conta começará 100% do zero. 
+              <br /><br />
+              Deseja mesmo prosseguir? Essa ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="sm:justify-between flex-row-reverse sm:flex-row items-center gap-2 mt-4">
+            <AlertDialogAction
+              onClick={handleResetAccount}
+              disabled={isResetting}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90 w-full sm:w-auto"
+            >
+              {isResetting ? "Limpando..." : "Sim, Limpar Tudo"}
+            </AlertDialogAction>
+            <AlertDialogCancel className="w-full sm:w-auto mt-0">Cancelar</AlertDialogCancel>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
       <FechamentosListModal
         open={isFechamentosModalOpen}
         onClose={() => setFechamentosModalOpen(false)}

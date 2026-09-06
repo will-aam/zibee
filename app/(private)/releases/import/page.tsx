@@ -34,6 +34,7 @@ export default function ImportPage() {
   const [formasPagamento, setFormasPagamento] = useState<{ id: number; nome: string }[]>([]);
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [userHistory, setUserHistory] = useState<string[]>([]);
+  const [isLoadingData, setIsLoadingData] = useState(true);
 
   const categoriasUnicas = Array.from(
     new Set(categorias.map((c) => c.nome.trim()))
@@ -80,7 +81,7 @@ export default function ImportPage() {
         .select("*")
         .eq("user_id", userId)
         .order("nome");
-      
+
       const { data: catData, error: catError } = await queryCat;
       if (catError) console.error("Erro ao carregar categorias:", catError);
       if (catData) setCategorias(catData);
@@ -105,6 +106,8 @@ export default function ImportPage() {
       if (historyData) {
         setUserHistory(historyData.map(h => `"${h.descricao}" -> ${h.categoria}`));
       }
+      
+      setIsLoadingData(false);
     }
 
     loadData();
@@ -118,7 +121,7 @@ export default function ImportPage() {
     try {
       const text = await file.text();
       const parsed = parseOFX(text);
-      
+
       if (parsed.length === 0) {
         toast({ title: "Nenhuma transação encontrada no arquivo", variant: "destructive" });
       } else {
@@ -158,14 +161,14 @@ export default function ImportPage() {
   const confirmBulkApply = () => {
     if (!bulkConfirm || !transactions) return;
     const { description, categoryId, count } = bulkConfirm;
-    
+
     setTransactions(prev => {
       if (!prev) return prev;
-      return prev.map(t => 
+      return prev.map(t =>
         (t.description === description && !t.categoryId) ? { ...t, categoryId } : t
       );
     });
-    
+
     toast({ title: "Sucesso!", description: `${count} transações atualizadas automaticamente.` });
     setBulkConfirm(null);
   };
@@ -198,12 +201,12 @@ export default function ImportPage() {
     setSelectedIds(new Set());
   };
 
-  const sortedTransactions = transactions 
+  const sortedTransactions = transactions
     ? [...transactions].sort((a, b) => {
-        if (!a.categoryId && b.categoryId) return -1;
-        if (a.categoryId && !b.categoryId) return 1;
-        return 0;
-      })
+      if (!a.categoryId && b.categoryId) return -1;
+      if (a.categoryId && !b.categoryId) return 1;
+      return 0;
+    })
     : [];
 
   const [aiProgress, setAiProgress] = useState("");
@@ -212,7 +215,7 @@ export default function ImportPage() {
     if (!transactions || transactions.length === 0 || categorias.length === 0) return;
     setIsCategorizing(true);
     setAiProgress("Iniciando...");
-    
+
     try {
       const batchSize = 30;
       const batches = [];
@@ -223,7 +226,7 @@ export default function ImportPage() {
       for (let i = 0; i < batches.length; i++) {
         setAiProgress(`Analisando lote ${i + 1} de ${batches.length}...`);
         const batch = batches[i];
-        
+
         const response = await fetch("/api/ai/categorize", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -233,13 +236,13 @@ export default function ImportPage() {
             history: userHistory
           }),
         });
-        
+
         const data = await response.json();
-        
+
         if (!response.ok) {
           throw new Error(data.error || "Erro ao categorizar com IA");
         }
-        
+
         if (data.results) {
           setTransactions(prev => {
             if (!prev) return prev;
@@ -251,7 +254,7 @@ export default function ImportPage() {
           });
         }
       }
-      
+
       toast({ title: "Categorização Inteligente concluída!", description: "A IA sugeriu as categorias. Por favor, revise antes de salvar." });
     } catch (error: any) {
       toast({ title: "Erro na IA", description: error.message, variant: "destructive" });
@@ -285,13 +288,13 @@ export default function ImportPage() {
       }));
 
       const { error } = await supabase.from("lancamentos").insert(payloads);
-      
+
       if (error) throw error;
 
       toast({ title: "Lançamentos importados com sucesso!" });
-      
+
       window.dispatchEvent(new Event("zibee:transaction-changed"));
-      
+
       router.push("/?tab=lancamentos");
     } catch (error: any) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
@@ -312,7 +315,11 @@ export default function ImportPage() {
       </header>
 
       <main className="flex-1 p-4 flex flex-col gap-4 pb-28">
-        {categoriasUnicas.length === 0 ? (
+        {isLoadingData ? (
+          <div className="flex justify-center items-center py-24">
+             <ArrowPathIcon className="h-8 w-8 animate-spin text-muted-foreground/50" />
+          </div>
+        ) : categoriasUnicas.length === 0 ? (
           <div className="bg-card p-6 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center mt-12">
             <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
               <SparklesIcon className="w-8 h-8 text-muted-foreground" />
@@ -334,18 +341,18 @@ export default function ImportPage() {
               Selecione o banco para importar seus lançamentos via arquivo OFX.
             </p>
 
-            <input 
-              type="file" 
-              accept=".ofx" 
-              ref={fileInputRef} 
-              className="hidden" 
+            <input
+              type="file"
+              accept=".ofx"
+              ref={fileInputRef}
+              className="hidden"
               onChange={handleFileChange}
             />
 
-            <Button 
-               className="w-full h-16 justify-start text-lg bg-[#8A05BE] hover:bg-[#8A05BE]/90 text-white font-medium rounded-xl relative overflow-hidden group"
-               onClick={() => fileInputRef.current?.click()}
-               disabled={isParsing}
+            <Button
+              className="w-full h-16 justify-start text-lg bg-[#8A05BE] hover:bg-[#8A05BE]/90 text-white font-medium rounded-xl relative overflow-hidden group"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isParsing}
             >
               <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 shrink-0 overflow-hidden">
@@ -355,13 +362,15 @@ export default function ImportPage() {
                   <SiNubank className="w-5 h-5" />
                 )}
               </div>
-              Nubank
+              <div className="flex items-center">
+                Nubank <span className="ml-2 text-xs font-normal border border-white/30 rounded px-1.5 py-0.5">OFX</span>
+              </div>
             </Button>
-            
-            <Button 
-               className="w-full h-16 justify-start text-lg bg-[#FF7A00] hover:bg-[#FF7A00]/90 text-white font-medium rounded-xl relative overflow-hidden group"
-               onClick={() => fileInputRef.current?.click()}
-               disabled={isParsing}
+
+            <Button
+              className="w-full h-16 justify-start text-lg bg-[#FF7A00] hover:bg-[#FF7A00]/90 text-white font-medium rounded-xl relative overflow-hidden group"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isParsing}
             >
               <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
               <div className="w-10 h-10 rounded-full bg-white flex items-center justify-center mr-4 shrink-0 overflow-hidden">
@@ -371,7 +380,45 @@ export default function ImportPage() {
                   <Image src="/inter-logo.png" alt="Banco Inter" width={28} height={28} className="object-contain" />
                 )}
               </div>
-              Banco Inter
+              <div className="flex items-center">
+                Banco Inter <span className="ml-2 text-xs font-normal border border-white/30 rounded px-1.5 py-0.5">OFX</span>
+              </div>
+            </Button>
+
+            <Button
+              className="w-full h-16 justify-start text-lg bg-muted text-muted-foreground font-medium rounded-xl relative overflow-hidden cursor-not-allowed"
+              disabled
+            >
+              <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center mr-4 shrink-0 overflow-hidden grayscale opacity-50">
+                <Image src="/mercado-pago-logo.png" alt="Mercado Pago" width={24} height={24} className="object-contain" />
+              </div>
+              <div className="flex items-center grayscale opacity-80">
+                Mercado Pago <span className="ml-2 text-xs font-normal border border-muted-foreground/30 rounded px-1.5 py-0.5">PDF </span>
+              </div>
+            </Button>
+
+            <Button
+              className="w-full h-16 justify-start text-lg bg-muted text-muted-foreground font-medium rounded-xl relative overflow-hidden cursor-not-allowed mt-3"
+              disabled
+            >
+              <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center mr-4 shrink-0 overflow-hidden grayscale opacity-50">
+                <Image src="/santander-logo.png" alt="Santander" width={24} height={24} className="object-contain" />
+              </div>
+              <div className="flex items-center grayscale opacity-80">
+                Santander <span className="ml-2 text-xs font-normal border border-muted-foreground/30 rounded px-1.5 py-0.5">PDF </span>
+              </div>
+            </Button>
+
+            <Button
+              className="w-full h-16 justify-start text-lg bg-muted text-muted-foreground font-medium rounded-xl relative overflow-hidden cursor-not-allowed mt-3"
+              disabled
+            >
+              <div className="w-10 h-10 rounded-full bg-white/50 flex items-center justify-center mr-4 shrink-0 overflow-hidden grayscale opacity-50">
+                <Image src="/itau-logo.png" alt="Itaú" width={24} height={24} className="object-cover rounded-md" />
+              </div>
+              <div className="flex items-center grayscale opacity-80">
+                Itaú <span className="ml-2 text-xs font-normal border border-muted-foreground/30 rounded px-1.5 py-0.5">PDF </span>
+              </div>
             </Button>
           </>
         ) : (
@@ -379,7 +426,7 @@ export default function ImportPage() {
             <div className="bg-muted/30 p-4 rounded-xl border flex flex-col gap-3">
               <h2 className="font-semibold text-lg">Revisar Importação</h2>
               <p className="text-sm text-muted-foreground">Encontramos <span className="font-bold text-foreground">{transactions.length} transações</span> no seu extrato. Por favor, classifique cada uma antes de salvar.</p>
-              
+
               <div className="mt-2">
                 <label className="text-xs font-semibold mb-1 block">Forma de Pagamento Padrão</label>
                 <Select value={globalPaymentMethodId} onValueChange={handleGlobalPaymentMethodChange}>
@@ -395,6 +442,7 @@ export default function ImportPage() {
               </div>
 
               <div className="mt-2 pt-2 border-t flex flex-col gap-2">
+                {/* 
                 <Button 
                    variant="outline" 
                    className="w-full h-11 border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium"
@@ -409,51 +457,72 @@ export default function ImportPage() {
                   {isCategorizing ? (aiProgress || "Analisando transações...") : "Autocategorizar com IA"}
                 </Button>
                 <p className="text-[10px] text-center text-muted-foreground">A inteligência artificial analisará os nomes e tentará preencher as categorias para você.</p>
+                */}
               </div>
             </div>
 
             <div className="flex flex-col gap-3">
               {sortedTransactions.map((t) => (
-                <div key={t.id} 
-                  className={`p-3 border rounded-xl flex flex-col gap-3 shadow-sm transition-colors cursor-pointer ${
-                    selectedIds.has(t.id) ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300' : 'bg-card'
-                  }`}
+                <div key={t.id}
+                  className={`p-3 border rounded-xl flex flex-col gap-3 shadow-sm transition-colors cursor-pointer ${selectedIds.has(t.id) ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300' : 'bg-card'
+                    }`}
                   onClick={(e) => {
                     if ((e.target as HTMLElement).closest('button, [role="combobox"], [data-radix-collection-item], label')) return;
                     toggleSelection(t.id);
                   }}
                 >
-                   <div className="flex justify-between items-start">
-                     <div className="flex gap-3 pr-2 items-start">
-                        <Checkbox 
-                          checked={selectedIds.has(t.id)} 
-                          onCheckedChange={() => toggleSelection(t.id)}
-                          className="mt-1"
-                        />
-                        <div className="flex flex-col">
-                          <span className="text-xs text-muted-foreground font-medium">{new Date(t.date + "T12:00:00").toLocaleDateString('pt-BR')}</span>
-                          <span className="font-medium text-sm leading-tight mt-1">{t.description}</span>
-                        </div>
-                     </div>
-                     <div className="flex items-center gap-3">
-                       <span className={`font-bold whitespace-nowrap text-sm ${t.type === 'Receita' ? 'text-green-600' : 'text-red-600'}`}>
-                          {t.type === 'Receita' ? '+' : '-'}{formatCurrency(t.amount)}
-                       </span>
-                       <button
-                         onClick={() => handleRemoveTransaction(t.id)}
-                         className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
-                         title="Ignorar esta transação"
-                       >
-                         <TrashIcon className="w-4 h-4" />
-                       </button>
-                     </div>
-                   </div>
+                  <div className="flex justify-between items-start">
+                    <div className="flex gap-3 pr-2 items-start">
+                      <Checkbox
+                        checked={selectedIds.has(t.id)}
+                        onCheckedChange={() => toggleSelection(t.id)}
+                        className="mt-1"
+                      />
+                      <div className="flex flex-col">
+                        <span className="text-xs text-muted-foreground font-medium">{new Date(t.date + "T12:00:00").toLocaleDateString('pt-BR')}</span>
+                        <span className="font-medium text-sm leading-tight mt-1">{t.description}</span>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-bold whitespace-nowrap text-sm ${t.type === 'Receita' ? 'text-green-600' : 'text-red-600'}`}>
+                        {t.type === 'Receita' ? '+' : '-'}{formatCurrency(t.amount)}
+                      </span>
+                      <button
+                        onClick={() => handleRemoveTransaction(t.id)}
+                        className="p-1.5 text-muted-foreground hover:text-red-600 hover:bg-red-50 rounded-md transition-colors"
+                        title="Ignorar esta transação"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
 
-                   <div className="flex flex-col gap-1 mt-1">
-                      <label className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">Categoria <span className="text-red-500">*</span></label>
-                      <Select value={t.categoryId || ""} onValueChange={(val) => handleCategoryChange(t.id, val)}>
-                        <SelectTrigger className={`h-10 rounded-lg ${!t.categoryId ? 'border-red-300 ring-red-100 focus:ring-red-300 bg-red-50/30' : 'bg-muted/20'}`}>
-                          <SelectValue placeholder="Selecionar Categoria..." />
+                  <div className="flex flex-col gap-1 mt-1">
+                    <label className="text-[11px] text-muted-foreground uppercase font-bold tracking-wider">Categoria <span className="text-red-500">*</span></label>
+                    <Select value={t.categoryId || ""} onValueChange={(val) => handleCategoryChange(t.id, val)}>
+                      <SelectTrigger className={`h-10 rounded-lg ${!t.categoryId ? 'border-red-300 ring-red-100 focus:ring-red-300 bg-red-50/30' : 'bg-muted/20'}`}>
+                        <SelectValue placeholder="Selecionar Categoria..." />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {categoriasUnicas.map((nome: string) => (
+                          <SelectItem key={nome} value={nome}>{nome}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10 flex flex-col items-center">
+              <div className="w-full max-w-2xl">
+                {selectedIds.size > 0 && (
+                  <div className="mb-3 p-3 bg-purple-100 border border-purple-200 rounded-xl flex items-center justify-between shadow-sm">
+                    <span className="text-sm font-semibold text-purple-700">{selectedIds.size} selecionados</span>
+                    <div className="flex gap-2 items-center">
+                      <Select onValueChange={(val) => handleBulkCategorize(val)}>
+                        <SelectTrigger className="h-9 w-[150px] bg-white text-xs text-black border-purple-200">
+                          <SelectValue placeholder="Aplicar categoria..." />
                         </SelectTrigger>
                         <SelectContent>
                           {categoriasUnicas.map((nome: string) => (
@@ -461,42 +530,21 @@ export default function ImportPage() {
                           ))}
                         </SelectContent>
                       </Select>
-                   </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10 flex flex-col items-center">
-               <div className="w-full max-w-2xl">
-                 {selectedIds.size > 0 && (
-                   <div className="mb-3 p-3 bg-purple-100 border border-purple-200 rounded-xl flex items-center justify-between shadow-sm">
-                     <span className="text-sm font-semibold text-purple-700">{selectedIds.size} selecionados</span>
-                     <div className="flex gap-2 items-center">
-                       <Select onValueChange={(val) => handleBulkCategorize(val)}>
-                          <SelectTrigger className="h-9 w-[150px] bg-white text-xs text-black border-purple-200">
-                            <SelectValue placeholder="Aplicar categoria..." />
-                          </SelectTrigger>
-                          <SelectContent>
-                            {categoriasUnicas.map((nome: string) => (
-                              <SelectItem key={nome} value={nome}>{nome}</SelectItem>
-                            ))}
-                          </SelectContent>
-                       </Select>
-                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }} className="h-9 px-2 text-purple-700 hover:bg-purple-200 hover:text-purple-800">
-                          Cancelar
-                       </Button>
-                     </div>
-                   </div>
-                 )}
-                 <Button 
-                    className="w-full h-12 text-base font-bold rounded-xl shadow-lg" 
-                    onClick={handleSave}
-                    disabled={isSaving}
-                 >
-                    {isSaving ? <ArrowPathIcon className="h-5 w-5 animate-spin mr-2" /> : null}
-                    {isSaving ? 'Salvando...' : 'Salvar Lançamentos'}
-                 </Button>
-               </div>
+                      <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }} className="h-9 px-2 text-purple-700 hover:bg-purple-200 hover:text-purple-800">
+                        Cancelar
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                <Button
+                  className="w-full h-12 text-base font-bold rounded-xl shadow-lg"
+                  onClick={handleSave}
+                  disabled={isSaving}
+                >
+                  {isSaving ? <ArrowPathIcon className="h-5 w-5 animate-spin mr-2" /> : null}
+                  {isSaving ? 'Salvando...' : 'Salvar Lançamentos'}
+                </Button>
+              </div>
             </div>
           </div>
         )}
@@ -505,7 +553,7 @@ export default function ImportPage() {
             <DialogHeader>
               <DialogTitle>Categorizar itens similares?</DialogTitle>
               <DialogDescription className="pt-2">
-                Você tem outras <strong className="text-foreground">{bulkConfirm?.count} transações idênticas</strong> ("{bulkConfirm?.description}") sem categoria. 
+                Você tem outras <strong className="text-foreground">{bulkConfirm?.count} transações idênticas</strong> ("{bulkConfirm?.description}") sem categoria.
                 Deseja aplicar a categoria "{bulkConfirm?.categoryId}" a todas elas?
               </DialogDescription>
             </DialogHeader>

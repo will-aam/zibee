@@ -203,7 +203,7 @@ export function FinancialNotesWidget({ className }: { className?: string }) {
         <Input
           value={newText}
           onChange={(e) => setNewText(e.target.value)}
-          placeholder="Ex: Lembrar de cancelar plano do Dr. Inter..."
+          placeholder="Ex: Lembrar de cancelar assinatura..."
           className="h-10 rounded-xl text-sm bg-muted/30 border-border/60 focus:bg-background transition-colors"
         />
         <Button

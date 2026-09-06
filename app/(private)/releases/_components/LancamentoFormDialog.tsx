@@ -99,11 +99,17 @@ export function LancamentoFormDialog({
   const [valorInput, setValorInput] = useState("0,00");
 
   const categoriasUnicas = Array.from(
-    new Set(categoriasDB.map((c) => c.nome.trim())),
-  );
+    new Set([
+      ...categoriasDB.map((c) => c.nome.trim()),
+      ...(formData.categoria ? [formData.categoria.trim()] : [])
+    ])
+  ).sort();
   const pagamentosUnicos = Array.from(
-    new Set(formasPagamentoDB.map((p) => p.nome.trim())),
-  );
+    new Set([
+      ...formasPagamentoDB.map((p) => p.nome.trim()),
+      ...(formData.forma_pagamento ? [formData.forma_pagamento.trim()] : [])
+    ])
+  ).sort();
 
   const isCartao =
     formData.forma_pagamento?.toLowerCase().includes("cartão") ||
@@ -689,7 +695,7 @@ export function LancamentoFormDialog({
               {formData.tipo === "Receita"
                 ? "Data do Recebimento"
                 : isCartao
-                  ? "Dia da Cobrança / Compra"
+                  ? "Dia do pagamento"
                   : "Data de Vencimento"}
             </Label>
             <Popover>

@@ -67,6 +67,7 @@ export function PagamentosModal({ open, onClose }: Props) {
       await fetchData(true);
       setNovaForma("");
       toast({ title: "Forma de pagamento adicionada!" });
+      window.dispatchEvent(new Event("zibee:payment-methods-changed"));
     }
     setIsAddingForma(false);
   };

@@ -29,6 +29,7 @@ import {
   CreditCardIcon,
   ArrowsUpDownIcon,
   ArrowUpTrayIcon,
+  XMarkIcon,
 } from "@heroicons/react/24/solid";
 import { useToast } from "@/hooks/use-toast";
 import Link from "next/link";
@@ -97,7 +98,6 @@ export default function Releases({ onNavigate }: LancamentosProps) {
   const [lancamentoEditando, setLancamentoEditando] =
     useState<Lancamento | null>(null);
 
-  const [selectedIds, setSelectedIds] = useState<number[]>([]);
   const [searchQuery, setSearchQuery] = useState("");
   const [sortBy, setSortBy] = useState<string>("data_asc");
 
@@ -106,14 +106,19 @@ export default function Releases({ onNavigate }: LancamentosProps) {
   const [filtrosPagamento, setFiltrosPagamento] = useState<string[]>([]);
   const [filtroStatus, setFiltroStatus] = useState<string | null>(null);
   const [filtroNatureza, setFiltroNatureza] = useState<string>("todas");
-  const [mostrarOcultos, setMostrarOcultos] = useState(false);
 
   // NOVO: toggle rápido "falta pagar"
   const [mostrarSomentePendentes, setMostrarSomentePendentes] = useState(false);
 
+  const [quickSumIds, setQuickSumIds] = useState<number[]>([]);
+
+  const handleQuickSumToggle = (id: number) => {
+    setQuickSumIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]);
+  };
+
   const [deleteConfig, setDeleteConfig] = useState<{
     isOpen: boolean;
-    type: "single" | "bulk" | null;
+    type: "single" | null;
     id?: number;
     grupoParcelaId?: string | null;
   }>({ isOpen: false, type: null });
@@ -303,11 +308,17 @@ export default function Releases({ onNavigate }: LancamentosProps) {
       fetchAllData();
     };
 
+    const handlePaymentMethodsChanged = () => {
+      memoryCache.formasPagamento = null;
+      fetchAllData();
+    };
+
     window.addEventListener(
       "zibee:categories-changed",
       handleCategoriesChanged,
     );
     window.addEventListener("zibee:cards-changed", handleCardsChanged);
+    window.addEventListener("zibee:payment-methods-changed", handlePaymentMethodsChanged);
 
     return () => {
       window.removeEventListener(
@@ -315,11 +326,11 @@ export default function Releases({ onNavigate }: LancamentosProps) {
         handleCategoriesChanged,
       );
       window.removeEventListener("zibee:cards-changed", handleCardsChanged);
+      window.removeEventListener("zibee:payment-methods-changed", handlePaymentMethodsChanged);
     };
   }, [activeContext, fetchAllData]);
 
   const lancamentosFiltrados = lancamentos.filter((l) => {
-    if ((l as any).status_fixa === "pausado" && !mostrarOcultos) return false;
 
     const query = searchQuery.toLowerCase().trim();
     const queryNumber = query.replace("r$", "").replace(/\s/g, "");
@@ -406,22 +417,6 @@ export default function Releases({ onNavigate }: LancamentosProps) {
       currency: "BRL",
     }).format(value);
 
-  const handleSelectAll = () => {
-    const lancamentosSelecionaveis = lancamentosOrdenados.filter(
-      (l) => !l.isShadow && (l as any).status_fixa !== "pausado",
-    );
-    if (
-      selectedIds.length === lancamentosSelecionaveis.length &&
-      lancamentosSelecionaveis.length > 0
-    )
-      setSelectedIds([]);
-    else setSelectedIds(lancamentosSelecionaveis.map((l) => l.id));
-  };
-
-  const handleBulkDeleteClick = () => {
-    if (selectedIds.length === 0) return;
-    setDeleteConfig({ isOpen: true, type: "bulk" });
-  };
 
   const handleDeleteClick = (id: number) => {
     const lancamentoParaExcluir = lancamentos.find((l) => l.id === id);
@@ -444,25 +439,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
     setIsDeleting(true);
 
     try {
-      if (deleteConfig.type === "bulk") {
-        const remaining = lancamentos.filter(
-          (l) => !selectedIds.includes(l.id),
-        );
-        setLancamentos(remaining);
-        memoryCache.lancamentosPorMes[`${filtroMes}_${activeContext}`] =
-          remaining;
-        const idsToDelete = [...selectedIds];
-        setSelectedIds([]);
-
-        let query = supabase.from("lancamentos").delete().in("id", idsToDelete);
-        if (activeContext === "grupo" && currentGroupId)
-          query = query.eq("grupo_id", currentGroupId);
-        else query = query.eq("user_id", userId).is("grupo_id", null);
-
-        await query;
-        toast({ title: `${idsToDelete.length} excluídos.` });
-        window.dispatchEvent(new Event("zibee:transaction-changed"));
-      } else if (deleteConfig.type === "single" && deleteConfig.id) {
+      if (deleteConfig.type === "single" && deleteConfig.id) {
         const isShadow = deleteConfig.id < 0;
         const realId = isShadow ? -deleteConfig.id : deleteConfig.id;
 
@@ -605,6 +582,30 @@ export default function Releases({ onNavigate }: LancamentosProps) {
     setIsDialogOpen(true);
   };
 
+  const handleClone = async (lancamento: Lancamento) => {
+    try {
+      const { id, isShadow, status_fixa, created_at, updated_at, ...resto } = lancamento as any;
+      const payloadInsert = { ...resto, pago: false };
+      
+      // Se estiver clonando uma sombra (conta fixa pendente), removemos o vínculo para virar um lançamento avulso
+      if (isShadow) {
+        payloadInsert.conta_fixa_id = null;
+      }
+
+      const { error } = await supabase
+        .from("lancamentos")
+        .insert([payloadInsert]);
+
+      if (error) throw error;
+
+      toast({ title: "Lançamento clonado com sucesso!" });
+      fetchAllData();
+      window.dispatchEvent(new Event("zibee:transaction-changed"));
+    } catch (error: any) {
+      toast({ title: "Erro ao clonar", description: error.message, variant: "destructive" });
+    }
+  };
+
   const isShadowDeleting =
     deleteConfig.type === "single" && deleteConfig.id && deleteConfig.id < 0;
 
@@ -612,7 +613,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
     <>
       <div className="w-full px-4 pt-6 pb-24">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between mb-6">
-          <div>
+          <div className="hidden md:block">
             <h1 className="text-3xl font-bold tracking-tight">
               Lançamentos{" "}
               {activeContext === "grupo" && (
@@ -629,13 +630,13 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               <MonthSelector date={date} setDate={setDate} />
             </div>
 
-            <Link href="/releases/import" className="md:hidden">
+            <Link href="/releases/import">
               <Button
                 variant="outline"
-                size="icon"
-                className="shrink-0 h-10 w-10 rounded-xl"
+                className="h-10 rounded-xl px-3 font-medium flex items-center gap-2"
               >
-                <ArrowUpTrayIcon className="h-5 w-5" />
+                <ArrowUpTrayIcon className="h-4 w-4" />
+                Importar
               </Button>
             </Link>
 
@@ -655,7 +656,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               <div className="relative group flex-1">
                 <MagnifyingGlassIcon className="absolute left-3.5 top-3 h-4 w-4 text-muted-foreground transition-colors group-focus-within:text-primary" />
                 <Input
-                  placeholder="Buscar por nome ou valor (ex: 150,00)..."
+                  placeholder="Digite nome ou valor..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="pl-10 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary transition-all rounded-xl"
@@ -663,10 +664,16 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               </div>
 
               <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-[130px] sm:w-40 shrink-0 h-10 bg-muted/30 border-transparent hover:bg-muted/50 focus:bg-background focus:border-primary rounded-xl">
-                  <div className="flex items-center gap-2 truncate">
-                    <ArrowsUpDownIcon className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <SelectValue placeholder="Ordenar" />
+                <SelectTrigger
+                  className={cn(
+                    "w-10 h-10 shrink-0 p-0 flex items-center justify-center border-transparent focus:bg-background focus:border-primary rounded-xl [&>svg]:hidden transition-colors",
+                    sortBy !== "data_desc"
+                      ? "bg-primary/15 text-primary hover:bg-primary/25"
+                      : "bg-muted/30 text-muted-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <div>
+                    <ArrowsUpDownIcon className="h-5 w-5" />
                   </div>
                 </SelectTrigger>
                 <SelectContent>
@@ -680,33 +687,7 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               </Select>
             </div>
 
-            {/* BLOCO COMPACTO: Filtro + Total (mobile first) */}
-            <div className="rounded-xl bg-background px-3 py-2.5">
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-[11px] text-muted-foreground leading-none">
-                    Falta pagar
-                  </p>
-                  <p className="text-base sm:text-lg font-bold text-amber-700 leading-tight truncate">
-                    {formatCurrency(totalFaltaPagar)}
-                  </p>
-                </div>
 
-                <Button
-                  type="button"
-                  variant={mostrarSomentePendentes ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setMostrarSomentePendentes((prev) => !prev)}
-                  className={cn(
-                    "h-8 rounded-lg px-3 text-xs shrink-0",
-                    mostrarSomentePendentes &&
-                    "bg-amber-500 hover:bg-amber-600 text-white border-amber-500",
-                  )}
-                >
-                  {mostrarSomentePendentes ? "Pendentes ON" : "Filtrar"}
-                </Button>
-              </div>
-            </div>
             <LancamentosFilters
               filtrosTipo={filtrosTipo}
               setFiltrosTipo={setFiltrosTipo}
@@ -722,63 +703,34 @@ export default function Releases({ onNavigate }: LancamentosProps) {
               pagamentoOptions={formasPagamentoDB}
             />
 
-            <div className="flex items-center justify-between pt-1">
-              <div className="flex items-center gap-4 sm:gap-6 px-1">
-                <div className="flex items-center gap-2">
-                  <Checkbox
-                    id="select-all"
-                    checked={
-                      lancamentosOrdenados.filter(
-                        (l) =>
-                          !l.isShadow && (l as any).status_fixa !== "pausado",
-                      ).length > 0 &&
-                      selectedIds.length ===
-                      lancamentosOrdenados.filter(
-                        (l) =>
-                          !l.isShadow && (l as any).status_fixa !== "pausado",
-                      ).length
-                    }
-                    onCheckedChange={handleSelectAll}
-                    className="rounded-lg"
-                  />
-                  <Label
-                    htmlFor="select-all"
-                    className="cursor-pointer font-medium text-sm text-muted-foreground"
+            {quickSumIds.length > 0 && (
+              <div className="flex items-center justify-center pt-2 pb-1 animate-in fade-in slide-in-from-top-4">
+                <div className="bg-primary/10 border border-primary/20 px-4 py-2 rounded-full flex items-center gap-3 shadow-sm">
+                  <span className="text-sm font-medium text-primary">
+                    Soma ({quickSumIds.length}):
+                  </span>
+                  <span className="font-bold text-base text-primary">
+                    {Number(
+                      lancamentosOrdenados
+                        .filter((l) => quickSumIds.includes(l.id))
+                        .reduce((acc, l) => {
+                          const valor = Number(l.valor) || 0;
+                          return l.tipo === "Despesa" ? acc - valor : acc + valor;
+                        }, 0)
+                    ).toLocaleString("pt-BR", {
+                      style: "currency",
+                      currency: "BRL",
+                    })}
+                  </span>
+                  <button
+                    onClick={() => setQuickSumIds([])}
+                    className="ml-1 p-1 hover:bg-primary/20 rounded-full transition-colors text-primary/70 hover:text-primary"
                   >
-                    Selecionar Todos
-                  </Label>
-                </div>
-
-                <div className="w-px h-4 bg-border hidden sm:block" />
-
-                <div className="flex items-center gap-2">
-                  <Switch
-                    id="mostrar-ocultos"
-                    checked={mostrarOcultos}
-                    onCheckedChange={setMostrarOcultos}
-                    className="scale-75 origin-left"
-                  />
-                  <Label
-                    htmlFor="mostrar-ocultos"
-                    className="cursor-pointer font-medium text-sm text-muted-foreground select-none"
-                  >
-                    Mostrar pausadas
-                  </Label>
+                    <XMarkIcon className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
-
-              {selectedIds.length > 0 && (
-                <Button
-                  variant="destructive"
-                  size="sm"
-                  onClick={handleBulkDeleteClick}
-                  className="h-8 rounded-lg"
-                >
-                  <TrashIcon className="h-3.5 w-3.5 mr-1.5" /> Excluir (
-                  {selectedIds.length})
-                </Button>
-              )}
-            </div>
+            )}
           </div>
 
           <div className="space-y-3">
@@ -870,19 +822,11 @@ export default function Releases({ onNavigate }: LancamentosProps) {
                       lancamento={lancamento}
                       categoriaRegra={regra}
                       infoFatura={infoFatura}
-                      isSelected={selectedIds.includes(lancamento.id)}
-                      onSelect={() => {
-                        if (lancamento.isShadow) return;
-                        if (selectedIds.includes(lancamento.id)) {
-                          setSelectedIds((prev) =>
-                            prev.filter((id) => id !== lancamento.id),
-                          );
-                        } else {
-                          setSelectedIds((prev) => [...prev, lancamento.id]);
-                        }
-                      }}
+                      isQuickSummed={quickSumIds.includes(lancamento.id)}
+                      onQuickSumToggle={() => handleQuickSumToggle(lancamento.id)}
                       onTogglePago={() => togglePago(lancamento)}
                       onEdit={() => handleEdit(lancamento)}
+                      onClone={() => handleClone(lancamento)}
                       onDelete={() => handleDeleteClick(lancamento.id)}
                     />
                   );
@@ -917,19 +861,15 @@ export default function Releases({ onNavigate }: LancamentosProps) {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>
-              {deleteConfig.type === "bulk"
-                ? "Excluir lançamentos selecionados?"
-                : isShadowDeleting
-                  ? "Excluir Conta Fixa?"
-                  : "Excluir lançamento?"}
+              {isShadowDeleting
+                ? "Excluir Conta Fixa?"
+                : "Excluir lançamento?"}
             </AlertDialogTitle>
 
             <AlertDialogDescription>
-              {deleteConfig.type === "bulk"
-                ? `Você está prestes a excluir ${selectedIds.length} lançamentos. Esta ação não pode ser desfeita.`
-                : isShadowDeleting
-                  ? "Você apagará esta regra de cobrança para os meses futuros. Os pagamentos já realizados nos meses anteriores serão mantidos no histórico."
-                  : "Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita."}
+              {isShadowDeleting
+                ? "Você apagará esta regra de cobrança para os meses futuros. Os pagamentos já realizados nos meses anteriores serão mantidos no histórico."
+                : "Tem certeza que deseja excluir este lançamento? Esta ação não pode ser desfeita."}
             </AlertDialogDescription>
           </AlertDialogHeader>
 

@@ -3,11 +3,13 @@ import webpush from "web-push";
 import { supabaseAdmin } from "@/lib/supabase-admin";
 
 // Configuração do Web Push
-webpush.setVapidDetails(
-  "mailto:seu-email@exemplo.com", // Coloque seu e-mail real aqui
-  process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY!,
-  process.env.VAPID_PRIVATE_KEY!,
-);
+if (process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY && process.env.VAPID_PRIVATE_KEY) {
+  webpush.setVapidDetails(
+    "mailto:seu-email@exemplo.com", // Coloque seu e-mail real aqui
+    process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY,
+    process.env.VAPID_PRIVATE_KEY,
+  );
+}
 
 export async function POST(request: Request) {
   try {

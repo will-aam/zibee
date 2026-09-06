@@ -66,7 +66,12 @@ export default function ImportPage() {
       }
 
       // Load Categories
-      let queryCat = supabase.from("categorias").select("*").eq("user_id", userId).order("nome");
+      let queryCat = supabase.from("categorias").select("*").order("nome");
+      if (groupId) {
+        queryCat = queryCat.eq("grupo_id", groupId);
+      } else {
+        queryCat = queryCat.eq("user_id", userId);
+      }
       
       const { data: catData } = await queryCat;
       if (catData) setCategorias(catData);

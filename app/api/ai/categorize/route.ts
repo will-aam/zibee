@@ -6,11 +6,11 @@ export const maxDuration = 30;
 export async function POST(req: Request) {
   try {
     const { transactions, categories, history } = await req.json();
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     if (!apiKey) {
       return NextResponse.json(
-        { error: "A chave GOOGLE_GENERATIVE_AI_API_KEY não está configurada no seu arquivo .env.local" },
+        { error: "A chave GEMINI_API_KEY não está configurada no seu arquivo .env.local" },
         { status: 500 }
       );
     }

@@ -427,7 +427,7 @@ export default function MaisPage({ onNavigate }: MaisPageProps) {
               Deseja mesmo prosseguir? Essa ação não pode ser desfeita.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="sm:justify-between flex-row-reverse sm:flex-row items-center gap-2 mt-4">
+          <AlertDialogFooter className="sm:justify-between flex flex-col-reverse sm:flex-row items-stretch sm:items-center gap-2 mt-4">
             <AlertDialogAction
               onClick={handleResetAccount}
               disabled={isResetting}

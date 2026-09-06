@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { GoogleGenAI, Type } from "@google/genai";
 
-export const maxDuration = 30;
+export const runtime = 'edge';
+export const maxDuration = 60;
 
 export async function POST(req: Request) {
   try {

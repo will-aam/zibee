@@ -228,7 +228,23 @@ export default function ImportPage() {
       </header>
 
       <main className="flex-1 p-4 flex flex-col gap-4 pb-28">
-        {!transactions ? (
+        {categoriasUnicas.length === 0 ? (
+          <div className="bg-card p-6 rounded-2xl border shadow-sm flex flex-col items-center justify-center text-center mt-12">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mb-4">
+              <SparklesIcon className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <h3 className="text-xl font-bold mb-2">Quase lá!</h3>
+            <p className="text-muted-foreground max-w-md">
+              Você ainda não tem categorias cadastradas. Para que a Inteligência Artificial e a importação funcionem corretamente, volte na página de Lançamentos e crie algumas categorias (ex: Alimentação, Transporte, Lazer).
+            </p>
+            <Button
+              className="mt-6 bg-purple-600 hover:bg-purple-700 text-white"
+              onClick={() => router.push("/releases")}
+            >
+              Criar Categorias Agora
+            </Button>
+          </div>
+        ) : !transactions ? (
           <>
             <p className="text-muted-foreground text-sm">
               Selecione o banco para importar seus lançamentos via arquivo OFX.

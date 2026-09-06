@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useRouter } from "next/navigation";
-import { ChevronLeftIcon, ArrowPathIcon } from "@heroicons/react/24/solid";
+import { ChevronLeftIcon, ArrowPathIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import { Button } from "@/components/ui/button";
 import { useToast } from "@/hooks/use-toast";
 import { SiNubank } from "react-icons/si";
@@ -35,6 +35,7 @@ export default function ImportPage() {
   const [isParsing, setIsParsing] = useState(false);
   const [transactions, setTransactions] = useState<OFXTransaction[] | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+  const [isCategorizing, setIsCategorizing] = useState(false);
 
   // Forma de pagamento padrão global para o lote
   const [globalPaymentMethodId, setGlobalPaymentMethodId] = useState<string>("");
@@ -113,6 +114,44 @@ export default function ImportPage() {
   const handleGlobalPaymentMethodChange = (methodId: string) => {
     setGlobalPaymentMethodId(methodId);
     setTransactions(prev => prev ? prev.map(t => ({ ...t, paymentMethodId: methodId })) : null);
+  };
+
+  const handleAICategorize = async () => {
+    if (!transactions || transactions.length === 0 || categorias.length === 0) return;
+    setIsCategorizing(true);
+    
+    try {
+      const response = await fetch("/api/ai/categorize", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          transactions: transactions.map(t => ({ id: t.id, description: t.description, amount: t.amount, type: t.type })),
+          categories: categorias.map(c => ({ id: c.id.toString(), nome: c.nome }))
+        }),
+      });
+      
+      const data = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(data.error || "Erro ao categorizar com IA");
+      }
+      
+      if (data.results) {
+        setTransactions(prev => {
+          if (!prev) return prev;
+          const map = new Map(data.results.map((r: any) => [r.transactionId, r.categoryId]));
+          return prev.map(t => ({
+            ...t,
+            categoryId: map.get(t.id) || t.categoryId
+          }));
+        });
+        toast({ title: "Categorização Inteligente concluída!", description: "A IA sugeriu as categorias. Por favor, revise antes de salvar." });
+      }
+    } catch (error: any) {
+      toast({ title: "Erro na IA", description: error.message, variant: "destructive" });
+    } finally {
+      setIsCategorizing(false);
+    }
   };
 
   const handleSave = async () => {
@@ -224,6 +263,23 @@ export default function ImportPage() {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="mt-2 pt-2 border-t flex flex-col gap-2">
+                <Button 
+                   variant="outline" 
+                   className="w-full h-11 border-purple-200 bg-purple-50 hover:bg-purple-100 text-purple-700 font-medium"
+                   onClick={handleAICategorize}
+                   disabled={isCategorizing || categorias.length === 0}
+                >
+                  {isCategorizing ? (
+                     <ArrowPathIcon className="h-5 w-5 animate-spin mr-2" />
+                  ) : (
+                     <SparklesIcon className="h-5 w-5 mr-2 text-purple-600" />
+                  )}
+                  {isCategorizing ? "Analisando transações..." : "Autocategorizar com IA"}
+                </Button>
+                <p className="text-[10px] text-center text-muted-foreground">A inteligência artificial analisará os nomes e tentará preencher as categorias para você.</p>
               </div>
             </div>
 

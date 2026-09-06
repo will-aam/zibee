@@ -25,6 +25,15 @@ export default function Home() {
     const checkMobile = () => setIsMobile(window.innerWidth < 768);
     checkMobile();
     window.addEventListener("resize", checkMobile);
+
+    const params = new URLSearchParams(window.location.search);
+    const tab = params.get("tab");
+    if (tab) {
+      setActiveTab(tab);
+      // Remove o tab da url para manter limpo, se quiser
+      window.history.replaceState({}, '', '/');
+    }
+
     return () => window.removeEventListener("resize", checkMobile);
   }, []);
 

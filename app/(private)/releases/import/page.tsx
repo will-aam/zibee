@@ -7,6 +7,8 @@ import { useRouter } from "next/navigation";
 import { ChevronLeftIcon, ArrowPathIcon, SparklesIcon } from "@heroicons/react/24/solid";
 import { TrashIcon } from "@heroicons/react/24/outline";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogFooter } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { SiNubank } from "react-icons/si";
 import { parseOFX, OFXTransaction } from "@/lib/ofxParser";
@@ -40,6 +42,8 @@ export default function ImportPage() {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [transactions, setTransactions] = useState<OFXTransaction[] | null>(null);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [bulkConfirm, setBulkConfirm] = useState<{ description: string, count: number, categoryId: string } | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [isCategorizing, setIsCategorizing] = useState(false);
 
@@ -131,7 +135,39 @@ export default function ImportPage() {
   };
 
   const handleCategoryChange = (id: string, categoryId: string) => {
-    setTransactions(prev => prev ? prev.map(t => t.id === id ? { ...t, categoryId } : t) : null);
+    if (!transactions) return;
+    const changedTx = transactions.find(t => t.id === id);
+    let nextTransactions = transactions.map(t => t.id === id ? { ...t, categoryId } : t);
+
+    if (changedTx) {
+      const similarUncategorized = nextTransactions.filter(
+        t => t.id !== id && t.description === changedTx.description && !t.categoryId
+      );
+
+      if (similarUncategorized.length > 0) {
+        setBulkConfirm({
+          description: changedTx.description,
+          count: similarUncategorized.length,
+          categoryId: categoryId
+        });
+      }
+    }
+    setTransactions(nextTransactions);
+  };
+
+  const confirmBulkApply = () => {
+    if (!bulkConfirm || !transactions) return;
+    const { description, categoryId, count } = bulkConfirm;
+    
+    setTransactions(prev => {
+      if (!prev) return prev;
+      return prev.map(t => 
+        (t.description === description && !t.categoryId) ? { ...t, categoryId } : t
+      );
+    });
+    
+    toast({ title: "Sucesso!", description: `${count} transações atualizadas automaticamente.` });
+    setBulkConfirm(null);
   };
 
   const handleGlobalPaymentMethodChange = (methodId: string) => {
@@ -141,7 +177,34 @@ export default function ImportPage() {
 
   const handleRemoveTransaction = (id: string) => {
     setTransactions(prev => prev ? prev.filter(t => t.id !== id) : null);
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      next.delete(id);
+      return next;
+    });
   };
+
+  const toggleSelection = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  };
+
+  const handleBulkCategorize = (categoryId: string) => {
+    setTransactions(prev => prev ? prev.map(t => selectedIds.has(t.id) ? { ...t, categoryId } : t) : null);
+    setSelectedIds(new Set());
+  };
+
+  const sortedTransactions = transactions 
+    ? [...transactions].sort((a, b) => {
+        if (!a.categoryId && b.categoryId) return -1;
+        if (a.categoryId && !b.categoryId) return 1;
+        return 0;
+      })
+    : [];
 
   const [aiProgress, setAiProgress] = useState("");
 
@@ -229,7 +292,7 @@ export default function ImportPage() {
       
       window.dispatchEvent(new Event("zibee:transaction-changed"));
       
-      router.push("/releases");
+      router.push("/?tab=lancamentos");
     } catch (error: any) {
       toast({ title: "Erro ao salvar", description: error.message, variant: "destructive" });
     } finally {
@@ -242,7 +305,7 @@ export default function ImportPage() {
   return (
     <div className="flex flex-col min-h-screen bg-background">
       <header className="flex items-center p-4 border-b">
-        <Button variant="ghost" size="icon" className="mr-2" onClick={() => transactions ? setTransactions(null) : router.push("/releases")}>
+        <Button variant="ghost" size="icon" className="mr-2" onClick={() => transactions ? setTransactions(null) : router.push("/?tab=lancamentos")}>
           <ChevronLeftIcon className="h-6 w-6" />
         </Button>
         <h1 className="text-xl font-bold">Importar Dados</h1>
@@ -260,7 +323,7 @@ export default function ImportPage() {
             </p>
             <Button
               className="mt-6 bg-purple-600 hover:bg-purple-700 text-white"
-              onClick={() => router.push("/releases")}
+              onClick={() => router.push("/?tab=lancamentos")}
             >
               Criar Categorias Agora
             </Button>
@@ -350,12 +413,27 @@ export default function ImportPage() {
             </div>
 
             <div className="flex flex-col gap-3">
-              {transactions.map((t) => (
-                <div key={t.id} className="p-3 border rounded-xl flex flex-col gap-3 bg-card shadow-sm">
+              {sortedTransactions.map((t) => (
+                <div key={t.id} 
+                  className={`p-3 border rounded-xl flex flex-col gap-3 shadow-sm transition-colors cursor-pointer ${
+                    selectedIds.has(t.id) ? 'bg-purple-50 border-purple-300 ring-1 ring-purple-300' : 'bg-card'
+                  }`}
+                  onClick={(e) => {
+                    if ((e.target as HTMLElement).closest('button, [role="combobox"], [data-radix-collection-item], label')) return;
+                    toggleSelection(t.id);
+                  }}
+                >
                    <div className="flex justify-between items-start">
-                     <div className="flex flex-col pr-2">
-                        <span className="text-xs text-muted-foreground font-medium">{new Date(t.date + "T12:00:00").toLocaleDateString('pt-BR')}</span>
-                        <span className="font-medium text-sm leading-tight mt-1">{t.description}</span>
+                     <div className="flex gap-3 pr-2 items-start">
+                        <Checkbox 
+                          checked={selectedIds.has(t.id)} 
+                          onCheckedChange={() => toggleSelection(t.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex flex-col">
+                          <span className="text-xs text-muted-foreground font-medium">{new Date(t.date + "T12:00:00").toLocaleDateString('pt-BR')}</span>
+                          <span className="font-medium text-sm leading-tight mt-1">{t.description}</span>
+                        </div>
                      </div>
                      <div className="flex items-center gap-3">
                        <span className={`font-bold whitespace-nowrap text-sm ${t.type === 'Receita' ? 'text-green-600' : 'text-red-600'}`}>
@@ -390,6 +468,26 @@ export default function ImportPage() {
 
             <div className="fixed bottom-0 left-0 right-0 p-4 bg-background/80 backdrop-blur-md border-t z-10 flex flex-col items-center">
                <div className="w-full max-w-2xl">
+                 {selectedIds.size > 0 && (
+                   <div className="mb-3 p-3 bg-purple-100 border border-purple-200 rounded-xl flex items-center justify-between shadow-sm">
+                     <span className="text-sm font-semibold text-purple-700">{selectedIds.size} selecionados</span>
+                     <div className="flex gap-2 items-center">
+                       <Select onValueChange={(val) => handleBulkCategorize(val)}>
+                          <SelectTrigger className="h-9 w-[150px] bg-white text-xs text-black border-purple-200">
+                            <SelectValue placeholder="Aplicar categoria..." />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {categoriasUnicas.map((nome: string) => (
+                              <SelectItem key={nome} value={nome}>{nome}</SelectItem>
+                            ))}
+                          </SelectContent>
+                       </Select>
+                       <Button variant="ghost" size="sm" onClick={(e) => { e.stopPropagation(); setSelectedIds(new Set()); }} className="h-9 px-2 text-purple-700 hover:bg-purple-200 hover:text-purple-800">
+                          Cancelar
+                       </Button>
+                     </div>
+                   </div>
+                 )}
                  <Button 
                     className="w-full h-12 text-base font-bold rounded-xl shadow-lg" 
                     onClick={handleSave}
@@ -402,6 +500,21 @@ export default function ImportPage() {
             </div>
           </div>
         )}
+        <Dialog open={!!bulkConfirm} onOpenChange={(open) => !open && setBulkConfirm(null)}>
+          <DialogContent className="max-w-[400px]">
+            <DialogHeader>
+              <DialogTitle>Categorizar itens similares?</DialogTitle>
+              <DialogDescription className="pt-2">
+                Você tem outras <strong className="text-foreground">{bulkConfirm?.count} transações idênticas</strong> ("{bulkConfirm?.description}") sem categoria. 
+                Deseja aplicar a categoria "{bulkConfirm?.categoryId}" a todas elas?
+              </DialogDescription>
+            </DialogHeader>
+            <DialogFooter className="mt-4 flex sm:justify-between gap-2">
+              <Button variant="outline" onClick={() => setBulkConfirm(null)} className="flex-1">Não, só essa</Button>
+              <Button onClick={confirmBulkApply} className="flex-1">Sim, aplicar a todas</Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
       </main>
     </div>
   );

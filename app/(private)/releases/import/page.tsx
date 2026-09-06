@@ -143,42 +143,58 @@ export default function ImportPage() {
     setTransactions(prev => prev ? prev.filter(t => t.id !== id) : null);
   };
 
+  const [aiProgress, setAiProgress] = useState("");
+
   const handleAICategorize = async () => {
     if (!transactions || transactions.length === 0 || categorias.length === 0) return;
     setIsCategorizing(true);
+    setAiProgress("Iniciando...");
     
     try {
-      const response = await fetch("/api/ai/categorize", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transactions: transactions.map(t => ({ id: t.id, description: t.description, amount: t.amount, type: t.type })),
-          categories: categoriasUnicas.map((nome: string) => ({ id: nome, nome })),
-          history: userHistory
-        }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.error || "Erro ao categorizar com IA");
+      const batchSize = 30;
+      const batches = [];
+      for (let i = 0; i < transactions.length; i += batchSize) {
+        batches.push(transactions.slice(i, i + batchSize));
       }
-      
-      if (data.results) {
-        setTransactions(prev => {
-          if (!prev) return prev;
-          const map = new Map<string, string>(data.results.map((r: any) => [r.transactionId, r.categoryId]));
-          return prev.map(t => ({
-            ...t,
-            categoryId: (map.get(t.id) as string) || t.categoryId
-          }));
+
+      for (let i = 0; i < batches.length; i++) {
+        setAiProgress(`Analisando lote ${i + 1} de ${batches.length}...`);
+        const batch = batches[i];
+        
+        const response = await fetch("/api/ai/categorize", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            transactions: batch.map(t => ({ id: t.id, description: t.description, amount: t.amount, type: t.type })),
+            categories: categoriasUnicas.map((nome: string) => ({ id: nome, nome })),
+            history: userHistory
+          }),
         });
-        toast({ title: "Categorização Inteligente concluída!", description: "A IA sugeriu as categorias. Por favor, revise antes de salvar." });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+          throw new Error(data.error || "Erro ao categorizar com IA");
+        }
+        
+        if (data.results) {
+          setTransactions(prev => {
+            if (!prev) return prev;
+            const map = new Map<string, string>(data.results.map((r: any) => [r.transactionId, r.categoryId]));
+            return prev.map(t => ({
+              ...t,
+              categoryId: map.has(t.id) ? (map.get(t.id) as string) : t.categoryId
+            }));
+          });
+        }
       }
+      
+      toast({ title: "Categorização Inteligente concluída!", description: "A IA sugeriu as categorias. Por favor, revise antes de salvar." });
     } catch (error: any) {
       toast({ title: "Erro na IA", description: error.message, variant: "destructive" });
     } finally {
       setIsCategorizing(false);
+      setAiProgress("");
     }
   };
 
@@ -327,7 +343,7 @@ export default function ImportPage() {
                   ) : (
                      <SparklesIcon className="h-5 w-5 mr-2 text-purple-600" />
                   )}
-                  {isCategorizing ? "Analisando transações..." : "Autocategorizar com IA"}
+                  {isCategorizing ? (aiProgress || "Analisando transações...") : "Autocategorizar com IA"}
                 </Button>
                 <p className="text-[10px] text-center text-muted-foreground">A inteligência artificial analisará os nomes e tentará preencher as categorias para você.</p>
               </div>

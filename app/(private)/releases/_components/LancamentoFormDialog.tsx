@@ -120,9 +120,9 @@ export function LancamentoFormDialog({
       setValorInput(
         lancamentoToEdit.valor
           ? lancamentoToEdit.valor.toLocaleString("pt-BR", {
-              minimumFractionDigits: 2,
-              maximumFractionDigits: 2,
-            })
+            minimumFractionDigits: 2,
+            maximumFractionDigits: 2,
+          })
           : "0,00",
       );
       setRepeatType(lancamentoToEdit.isShadow ? "fixa" : "unica");
@@ -420,7 +420,7 @@ export function LancamentoFormDialog({
       }
 
       window.dispatchEvent(new Event("zibee:transaction-changed"));
-      
+
       // Reset form if it's a new entry (especially for inline forms)
       if (!lancamentoToEdit) {
         setFormData({
@@ -483,494 +483,494 @@ export function LancamentoFormDialog({
           onSubmit={handleSubmit}
           className="space-y-6"
         >
-            {/* SEÇÃO 1: INFORMAÇÕES BÁSICAS */}
+          {/* SEÇÃO 1: INFORMAÇÕES BÁSICAS */}
+          <div className="space-y-2">
+            <Label>Descrição</Label>
+            <Input
+              value={formData.descricao || ""}
+              onChange={(e) =>
+                setFormData({ ...formData, descricao: e.target.value })
+              }
+              required
+              placeholder="Ex: Conta de Luz, Aluguel..."
+              className="text-lg py-6"
+              disabled={isSubmitting}
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label>Descrição</Label>
-              <Input
-                value={formData.descricao || ""}
-                onChange={(e) =>
-                  setFormData({ ...formData, descricao: e.target.value })
+              <Label>Valor</Label>
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                  R$
+                </span>
+                <Input
+                  type="text"
+                  inputMode="numeric"
+                  value={valorInput}
+                  onChange={handleValorChange}
+                  required
+                  className="pl-9"
+                  disabled={isSubmitting}
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
+              <Label>
+                {formData.tipo === "Receita" ? "Fonte de Renda" : "Tipo"}
+              </Label>
+              <Select
+                value={formData.tipo}
+                onValueChange={(v: any) =>
+                  setFormData({ ...formData, tipo: v })
                 }
-                required
-                placeholder="Ex: Conta de Luz, Aluguel..."
-                className="text-lg py-6"
-                disabled={isSubmitting}
-              />
+                disabled={!!lancamentoToEdit || isSubmitting}
+              >
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="Despesa">Despesa</SelectItem>
+                  <SelectItem value="Receita">Receita</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
+          </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-2">
-                <Label>Valor</Label>
-                <div className="relative">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-                    R$
-                  </span>
-                  <Input
-                    type="text"
-                    inputMode="numeric"
-                    value={valorInput}
-                    onChange={handleValorChange}
-                    required
-                    className="pl-9"
-                    disabled={isSubmitting}
-                  />
-                </div>
-              </div>
-              <div className="space-y-2">
-                <Label>
-                  {formData.tipo === "Receita" ? "Fonte de Renda" : "Tipo"}
-                </Label>
-                <Select
-                  value={formData.tipo}
-                  onValueChange={(v: any) =>
-                    setFormData({ ...formData, tipo: v })
-                  }
-                  disabled={!!lancamentoToEdit || isSubmitting}
-                >
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="Despesa">Despesa</SelectItem>
-                    <SelectItem value="Receita">Receita</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-
-            {/* SEÇÃO 2: CATEGORIA E PAGAMENTO */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Categoria</Label>
-                {/* Botão de Nova Categoria do lado da Label */}
-                {!isCreatingCategory && (
-                  <button
-                    type="button"
-                    onClick={() => setIsCreatingCategory(true)}
-                    className="text-xs font-bold text-primary hover:underline flex items-center gap-1 active:scale-95 transition-transform"
-                    disabled={isSubmitting}
-                  >
-                    <PlusIcon className="w-3 h-3" /> Nova Categoria
-                  </button>
-                )}
-              </div>
-
-              {isCreatingCategory ? (
-                // Modo de Criação (Substitui o Select)
-                <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
-                  <Input
-                    autoFocus
-                    placeholder="Nome da categoria..."
-                    value={newCategoryName}
-                    onChange={(e) => setNewCategoryName(e.target.value)}
-                    className="h-10 text-base" // text-base evita o zoom automático no iOS
-                    onKeyDown={(e) => {
-                      if (e.key === "Enter") {
-                        e.preventDefault();
-                        handleCreateCategory(e);
-                      }
-                    }}
-                    disabled={isSubmitting}
-                  />
-                  <Button
-                    type="button"
-                    onClick={(e) => handleCreateCategory(e)}
-                    disabled={!newCategoryName.trim() || isSubmitting}
-                    className="h-10 px-4"
-                  >
-                    Salvar
-                  </Button>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    onClick={() => {
-                      setIsCreatingCategory(false);
-                      setNewCategoryName("");
-                    }}
-                    disabled={isSubmitting}
-                    className="h-10 px-3 border-destructive/30 text-destructive hover:bg-destructive/10"
-                  >
-                    X
-                  </Button>
-                </div>
-              ) : (
-                // Modo Normal de Seleção
-                <Select
-                  value={formData.categoria}
-                  onValueChange={(v) =>
-                    setFormData({ ...formData, categoria: v })
-                  }
+          {/* SEÇÃO 2: CATEGORIA E PAGAMENTO */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between">
+              <Label>Categoria</Label>
+              {/* Botão de Nova Categoria do lado da Label */}
+              {!isCreatingCategory && (
+                <button
+                  type="button"
+                  onClick={() => setIsCreatingCategory(true)}
+                  className="text-xs font-bold text-primary hover:underline flex items-center gap-1 active:scale-95 transition-transform"
                   disabled={isSubmitting}
                 >
-                  <SelectTrigger className="h-10">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {categoriasUnicas.map((nome) => (
-                      <SelectItem key={nome} value={nome}>
-                        {nome}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <PlusIcon className="w-3 h-3" /> Nova Categoria
+                </button>
               )}
             </div>
 
-            <div className="space-y-2">
-              <Label>
-                {formData.tipo === "Receita"
-                  ? "Recebido via"
-                  : "Forma de Pagamento"}
-              </Label>
+            {isCreatingCategory ? (
+              // Modo de Criação (Substitui o Select)
+              <div className="flex items-center gap-2 animate-in fade-in zoom-in-95 duration-200">
+                <Input
+                  autoFocus
+                  placeholder="Nome da categoria..."
+                  value={newCategoryName}
+                  onChange={(e) => setNewCategoryName(e.target.value)}
+                  className="h-10 text-base" // text-base evita o zoom automático no iOS
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      e.preventDefault();
+                      handleCreateCategory(e);
+                    }
+                  }}
+                  disabled={isSubmitting}
+                />
+                <Button
+                  type="button"
+                  onClick={(e) => handleCreateCategory(e)}
+                  disabled={!newCategoryName.trim() || isSubmitting}
+                  className="h-10 px-4"
+                >
+                  Salvar
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    setIsCreatingCategory(false);
+                    setNewCategoryName("");
+                  }}
+                  disabled={isSubmitting}
+                  className="h-10 px-3 border-destructive/30 text-destructive hover:bg-destructive/10"
+                >
+                  X
+                </Button>
+              </div>
+            ) : (
+              // Modo Normal de Seleção
               <Select
-                value={formData.forma_pagamento}
-                disabled={isSubmitting}
+                value={formData.categoria}
                 onValueChange={(v) =>
-                  setFormData({
-                    ...formData,
-                    forma_pagamento: v,
-                    cartao_id: null,
-                  })
+                  setFormData({ ...formData, categoria: v })
                 }
+                disabled={isSubmitting}
               >
                 <SelectTrigger className="h-10">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  {pagamentosUnicos.map((nome) => (
+                  {categoriasUnicas.map((nome) => (
                     <SelectItem key={nome} value={nome}>
                       {nome}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-            </div>
-
-            {/* SEÇÃO 3: OPÇÕES ESPECÍFICAS (CARTÃO / DATAS) */}
-            {isCartao && formData.tipo === "Despesa" && (
-              <div className="space-y-2 p-3 bg-muted/30 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
-                <Label className="flex items-center gap-1.5 text-primary">
-                  <CreditCardIcon className="h-4 w-4" /> Qual Cartão de Crédito?
-                </Label>
-                {cartoesDB.length > 0 ? (
-                  <Select
-                    value={
-                      formData.cartao_id
-                        ? String(formData.cartao_id)
-                        : undefined
-                    }
-                    onValueChange={(v) =>
-                      setFormData({ ...formData, cartao_id: Number(v) })
-                    }
-                    disabled={isSubmitting}
-                  >
-                    <SelectTrigger className="bg-background">
-                      <SelectValue placeholder="Selecione o cartão..." />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {cartoesDB.map((cartao) => (
-                        <SelectItem key={cartao.id} value={String(cartao.id)}>
-                          {cartao.nome}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <div className="text-xs text-muted-foreground pt-1 pb-1">
-                    Você não cadastrou nenhum cartão. A despesa será salva sem
-                    vínculo.
-                  </div>
-                )}
-              </div>
             )}
+          </div>
 
-            <div className="space-y-2">
-              <Label className="flex items-center gap-2">
-                {formData.tipo === "Receita"
-                  ? "Data do Recebimento"
-                  : isCartao
-                    ? "Dia da Cobrança / Compra"
-                    : "Data de Vencimento"}
+          <div className="space-y-2">
+            <Label>
+              {formData.tipo === "Receita"
+                ? "Recebido via"
+                : "Forma de Pagamento"}
+            </Label>
+            <Select
+              value={formData.forma_pagamento}
+              disabled={isSubmitting}
+              onValueChange={(v) =>
+                setFormData({
+                  ...formData,
+                  forma_pagamento: v,
+                  cartao_id: null,
+                })
+              }
+            >
+              <SelectTrigger className="h-10">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {pagamentosUnicos.map((nome) => (
+                  <SelectItem key={nome} value={nome}>
+                    {nome}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+
+          {/* SEÇÃO 3: OPÇÕES ESPECÍFICAS (CARTÃO / DATAS) */}
+          {isCartao && formData.tipo === "Despesa" && (
+            <div className="space-y-2 p-3 bg-muted/30 rounded-xl border border-border/50 animate-in fade-in slide-in-from-top-2">
+              <Label className="flex items-center gap-1.5 text-primary">
+                <CreditCardIcon className="h-4 w-4" /> Qual Cartão de Crédito?
               </Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    disabled={isSubmitting}
-                    className={cn(
-                      "w-full justify-start text-left font-normal h-10",
-                      !formData.data_vencimento && "text-muted-foreground",
-                    )}
-                  >
-                    <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
-                    {formData.data_vencimento
-                      ? format(
-                          parseDateLocal(formData.data_vencimento),
-                          "dd 'de' MMMM 'de' yyyy",
-                          { locale: ptBR },
-                        )
-                      : "Selecione a data"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    locale={ptBR}
-                    selected={
-                      formData.data_vencimento
-                        ? parseDateLocal(formData.data_vencimento)
-                        : undefined
-                    }
-                    onSelect={(date) => {
-                      if (date)
-                        setFormData({
-                          ...formData,
-                          data_vencimento: formatDateLocal(date),
-                        });
-                    }}
-                    initialFocus
-                  />
-                </PopoverContent>
-              </Popover>
+              {cartoesDB.length > 0 ? (
+                <Select
+                  value={
+                    formData.cartao_id
+                      ? String(formData.cartao_id)
+                      : undefined
+                  }
+                  onValueChange={(v) =>
+                    setFormData({ ...formData, cartao_id: Number(v) })
+                  }
+                  disabled={isSubmitting}
+                >
+                  <SelectTrigger className="bg-background">
+                    <SelectValue placeholder="Selecione o cartão..." />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {cartoesDB.map((cartao) => (
+                      <SelectItem key={cartao.id} value={String(cartao.id)}>
+                        {cartao.nome}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <div className="text-xs text-muted-foreground pt-1 pb-1">
+                  Você não cadastrou nenhum cartão. A despesa será salva sem
+                  vínculo.
+                </div>
+              )}
             </div>
+          )}
 
-            {/* SEÇÃO 4: REPETIÇÃO E RECORRÊNCIA */}
-            {formData.tipo === "Despesa" && !lancamentoToEdit && (
-              <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
-                <div className="flex items-center gap-2">
-                  <Label className="text-muted-foreground font-bold">
-                    Como essa despesa se repete?
-                  </Label>
-                  <Popover>
-                    <PopoverTrigger asChild>
-                      <button
-                        type="button"
-                        className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
-                      >
-                        <InformationCircleIcon className="h-5 w-5" />
-                      </button>
-                    </PopoverTrigger>
-                    <PopoverContent
-                      className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-9999"
-                      align="start"
-                      side="top"
+          <div className="space-y-2">
+            <Label className="flex items-center gap-2">
+              {formData.tipo === "Receita"
+                ? "Data do Recebimento"
+                : isCartao
+                  ? "Dia da Cobrança / Compra"
+                  : "Data de Vencimento"}
+            </Label>
+            <Popover>
+              <PopoverTrigger asChild>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={isSubmitting}
+                  className={cn(
+                    "w-full justify-start text-left font-normal h-10",
+                    !formData.data_vencimento && "text-muted-foreground",
+                  )}
+                >
+                  <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
+                  {formData.data_vencimento
+                    ? format(
+                      parseDateLocal(formData.data_vencimento),
+                      "dd 'de' MMMM 'de' yyyy",
+                      { locale: ptBR },
+                    )
+                    : "Selecione a data"}
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-auto p-0" align="start">
+                <Calendar
+                  mode="single"
+                  locale={ptBR}
+                  selected={
+                    formData.data_vencimento
+                      ? parseDateLocal(formData.data_vencimento)
+                      : undefined
+                  }
+                  onSelect={(date) => {
+                    if (date)
+                      setFormData({
+                        ...formData,
+                        data_vencimento: formatDateLocal(date),
+                      });
+                  }}
+                  initialFocus
+                />
+              </PopoverContent>
+            </Popover>
+          </div>
+
+          {/* SEÇÃO 4: REPETIÇÃO E RECORRÊNCIA */}
+          {formData.tipo === "Despesa" && !lancamentoToEdit && (
+            <div className="space-y-4 mt-4 pt-4 border-t border-border/50">
+              <div className="flex items-center gap-2">
+                <Label className="text-muted-foreground font-bold">
+                  Como essa despesa se repete?
+                </Label>
+                <Popover>
+                  <PopoverTrigger asChild>
+                    <button
+                      type="button"
+                      className="text-muted-foreground hover:text-primary transition-colors focus:outline-none"
                     >
-                      <div className="space-y-3 text-sm">
-                        <h4 className="font-bold text-foreground">
-                          Tipos de Repetição
-                        </h4>
-                        <div className="space-y-2 text-muted-foreground">
-                          <p>
-                            <strong className="text-foreground">Única:</strong>{" "}
-                            acontece só uma vez.
-                          </p>
-                          <p>
-                            <strong className="text-foreground">
-                              Recorrente:
-                            </strong>{" "}
-                            repete todo mês até pausar.
-                          </p>
-                          <p>
-                            <strong className="text-foreground">
-                              Parcelada:
-                            </strong>{" "}
-                            repete por X meses ou até data final.
-                          </p>
-                        </div>
+                      <InformationCircleIcon className="h-5 w-5" />
+                    </button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    className="w-[280px] sm:w-[320px] p-4 rounded-2xl z-9999"
+                    align="start"
+                    side="top"
+                  >
+                    <div className="space-y-3 text-sm">
+                      <h4 className="font-bold text-foreground">
+                        Tipos de Repetição
+                      </h4>
+                      <div className="space-y-2 text-muted-foreground">
+                        <p>
+                          <strong className="text-foreground">Única:</strong>{" "}
+                          acontece só uma vez.
+                        </p>
+                        <p>
+                          <strong className="text-foreground">
+                            Recorrente:
+                          </strong>{" "}
+                          repete todo mês até pausar.
+                        </p>
+                        <p>
+                          <strong className="text-foreground">
+                            Parcelada:
+                          </strong>{" "}
+                          repete por X meses ou até data final.
+                        </p>
                       </div>
-                    </PopoverContent>
-                  </Popover>
-                </div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <Button
-                    type="button"
-                    variant={repeatType === "unica" ? "default" : "outline"}
-                    onClick={() => {
-                      setRepeatType("unica");
-                      setFormData((prev) => ({ ...prev, pago: false }));
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Única
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={repeatType === "fixa" ? "default" : "outline"}
-                    onClick={() => {
-                      setRepeatType("fixa");
-                      setFormData((prev) => ({ ...prev, pago: false }));
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Recorrente
-                  </Button>
-                  <Button
-                    type="button"
-                    variant={repeatType === "parcelada" ? "default" : "outline"}
-                    onClick={() => {
-                      setRepeatType("parcelada");
-                      setFormData((prev) => ({ ...prev, pago: false }));
-                    }}
-                    disabled={isSubmitting}
-                  >
-                    Parcelada
-                  </Button>
-                </div>
-
-                {repeatType === "parcelada" && (
-                  <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
-                    <div className="space-y-2">
-                      <Label>Até quando se repete?</Label>
-                      <Select
-                        value={recurrenceEndType}
-                        onValueChange={(v: RecurrenceEndType) =>
-                          setRecurrenceEndType(v)
-                        }
-                        disabled={isSubmitting}
-                      >
-                        <SelectTrigger className="bg-background">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="ocorrencias">
-                            Quantidade de Parcelas
-                          </SelectItem>
-                          <SelectItem value="ate_data">
-                            Até uma data limite
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
                     </div>
-
-                    {recurrenceEndType === "ate_data" ? (
-                      <div className="space-y-2">
-                        <Label>Data da última parcela</Label>
-                        <Popover>
-                          <PopoverTrigger asChild>
-                            <Button
-                              type="button"
-                              variant="outline"
-                              disabled={isSubmitting}
-                              className={cn(
-                                "w-full justify-start text-left font-normal h-10 bg-background",
-                                !recurrenceEndDate && "text-muted-foreground",
-                              )}
-                            >
-                              <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
-                              {recurrenceEndDate
-                                ? format(
-                                    parseDateLocal(recurrenceEndDate),
-                                    "dd 'de' MMMM 'de' yyyy",
-                                    { locale: ptBR },
-                                  )
-                                : "Selecione a data"}
-                            </Button>
-                          </PopoverTrigger>
-                          <PopoverContent className="w-auto p-0" align="start">
-                            <Calendar
-                              mode="single"
-                              locale={ptBR}
-                              selected={
-                                recurrenceEndDate
-                                  ? parseDateLocal(recurrenceEndDate)
-                                  : undefined
-                              }
-                              onSelect={(d) => {
-                                if (d) setRecurrenceEndDate(formatDateLocal(d));
-                              }}
-                              initialFocus
-                            />
-                          </PopoverContent>
-                        </Popover>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <Label>Quantos meses no total?</Label>
-                        <div className="flex items-center justify-between bg-background border rounded-xl h-12 px-2 w-full max-w-[200px]">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setRecurrenceOccurrences(
-                                Math.max(2, recurrenceOccurrences - 1),
-                              )
-                            }
-                            disabled={
-                              recurrenceOccurrences <= 2 || isSubmitting
-                            }
-                          >
-                            <MinusIcon className="h-5 w-5" />
-                          </Button>
-                          <span className="text-lg font-bold w-12 text-center">
-                            {recurrenceOccurrences}
-                          </span>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            onClick={() =>
-                              setRecurrenceOccurrences(
-                                recurrenceOccurrences + 1,
-                              )
-                            }
-                            disabled={isSubmitting}
-                          >
-                            <PlusIcon className="h-5 w-5" />
-                          </Button>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                )}
+                  </PopoverContent>
+                </Popover>
               </div>
-            )}
 
-            {/* STATUS E PAGAMENTO */}
-            {lancamentoToEdit?.isShadow && (
-              <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
-                <div className="space-y-0.5">
-                  <Label className="text-base font-bold">Cobrança Ativa</Label>
-                  <p className="text-xs text-muted-foreground">
-                    Pausar nos próximos meses.
-                  </p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <Button
+                  type="button"
+                  variant={repeatType === "unica" ? "default" : "outline"}
+                  onClick={() => {
+                    setRepeatType("unica");
+                    setFormData((prev) => ({ ...prev, pago: false }));
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Única
+                </Button>
+                <Button
+                  type="button"
+                  variant={repeatType === "fixa" ? "default" : "outline"}
+                  onClick={() => {
+                    setRepeatType("fixa");
+                    setFormData((prev) => ({ ...prev, pago: false }));
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Recorrente
+                </Button>
+                <Button
+                  type="button"
+                  variant={repeatType === "parcelada" ? "default" : "outline"}
+                  onClick={() => {
+                    setRepeatType("parcelada");
+                    setFormData((prev) => ({ ...prev, pago: false }));
+                  }}
+                  disabled={isSubmitting}
+                >
+                  Parcelada
+                </Button>
+              </div>
+
+              {repeatType === "parcelada" && (
+                <div className="grid gap-3 p-4 bg-muted/20 border border-border/50 rounded-2xl animate-in fade-in slide-in-from-top-2">
+                  <div className="space-y-2">
+                    <Label>Até quando se repete?</Label>
+                    <Select
+                      value={recurrenceEndType}
+                      onValueChange={(v: RecurrenceEndType) =>
+                        setRecurrenceEndType(v)
+                      }
+                      disabled={isSubmitting}
+                    >
+                      <SelectTrigger className="bg-background">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="ocorrencias">
+                          Quantidade de Parcelas
+                        </SelectItem>
+                        <SelectItem value="ate_data">
+                          Até uma data limite
+                        </SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  {recurrenceEndType === "ate_data" ? (
+                    <div className="space-y-2">
+                      <Label>Data da última parcela</Label>
+                      <Popover>
+                        <PopoverTrigger asChild>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            disabled={isSubmitting}
+                            className={cn(
+                              "w-full justify-start text-left font-normal h-10 bg-background",
+                              !recurrenceEndDate && "text-muted-foreground",
+                            )}
+                          >
+                            <CalendarDaysIcon className="mr-2 h-4 w-4 shrink-0" />
+                            {recurrenceEndDate
+                              ? format(
+                                parseDateLocal(recurrenceEndDate),
+                                "dd 'de' MMMM 'de' yyyy",
+                                { locale: ptBR },
+                              )
+                              : "Selecione a data"}
+                          </Button>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-auto p-0" align="start">
+                          <Calendar
+                            mode="single"
+                            locale={ptBR}
+                            selected={
+                              recurrenceEndDate
+                                ? parseDateLocal(recurrenceEndDate)
+                                : undefined
+                            }
+                            onSelect={(d) => {
+                              if (d) setRecurrenceEndDate(formatDateLocal(d));
+                            }}
+                            initialFocus
+                          />
+                        </PopoverContent>
+                      </Popover>
+                    </div>
+                  ) : (
+                    <div className="space-y-2">
+                      <Label>Quantos meses no total?</Label>
+                      <div className="flex items-center justify-between bg-background border rounded-xl h-12 px-2 w-full max-w-[200px]">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            setRecurrenceOccurrences(
+                              Math.max(2, recurrenceOccurrences - 1),
+                            )
+                          }
+                          disabled={
+                            recurrenceOccurrences <= 2 || isSubmitting
+                          }
+                        >
+                          <MinusIcon className="h-5 w-5" />
+                        </Button>
+                        <span className="text-lg font-bold w-12 text-center">
+                          {recurrenceOccurrences}
+                        </span>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          onClick={() =>
+                            setRecurrenceOccurrences(
+                              recurrenceOccurrences + 1,
+                            )
+                          }
+                          disabled={isSubmitting}
+                        >
+                          <PlusIcon className="h-5 w-5" />
+                        </Button>
+                      </div>
+                    </div>
+                  )}
                 </div>
-                <Switch
-                  checked={statusFixa === "ativo"}
+              )}
+            </div>
+          )}
+
+          {/* STATUS E PAGAMENTO */}
+          {lancamentoToEdit?.isShadow && (
+            <div className="bg-muted/30 p-4 rounded-2xl border border-border/50 flex items-center justify-between mt-4">
+              <div className="space-y-0.5">
+                <Label className="text-base font-bold">Cobrança Ativa</Label>
+                <p className="text-xs text-muted-foreground">
+                  Pausar nos próximos meses.
+                </p>
+              </div>
+              <Switch
+                checked={statusFixa === "ativo"}
+                onCheckedChange={(c) =>
+                  setStatusFixa(c ? "ativo" : "pausado")
+                }
+                disabled={isSubmitting}
+              />
+            </div>
+          )}
+
+          {repeatType !== "fixa" &&
+            !isCartao &&
+            !lancamentoToEdit?.isShadow && (
+              <div className="flex items-center gap-2 border p-3 rounded-md bg-card mt-4">
+                <Checkbox
+                  id="pago"
+                  checked={formData.pago}
                   onCheckedChange={(c) =>
-                    setStatusFixa(c ? "ativo" : "pausado")
+                    setFormData({ ...formData, pago: c === true })
                   }
                   disabled={isSubmitting}
                 />
+                <Label
+                  htmlFor="pago"
+                  className="cursor-pointer flex-1 font-medium"
+                >
+                  {formData.tipo === "Receita"
+                    ? "Já foi recebido?"
+                    : "Já foi pago?"}
+                </Label>
               </div>
             )}
-
-            {repeatType !== "fixa" &&
-              !isCartao &&
-              !lancamentoToEdit?.isShadow && (
-                <div className="flex items-center gap-2 border p-3 rounded-md bg-card mt-4">
-                  <Checkbox
-                    id="pago"
-                    checked={formData.pago}
-                    onCheckedChange={(c) =>
-                      setFormData({ ...formData, pago: c === true })
-                    }
-                    disabled={isSubmitting}
-                  />
-                  <Label
-                    htmlFor="pago"
-                    className="cursor-pointer flex-1 font-medium"
-                  >
-                    {formData.tipo === "Receita"
-                      ? "Já foi recebido?"
-                      : "Já foi pago?"}
-                  </Label>
-                </div>
-              )}
-            <div className="h-4"></div>
-          </form>
+          <div className="h-4"></div>
+        </form>
       </div>
 
       {/* RODAPÉ E BOTÕES DE AÇÃO */}

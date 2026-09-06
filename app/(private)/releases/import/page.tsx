@@ -32,6 +32,10 @@ export default function ImportPage() {
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
   const [userHistory, setUserHistory] = useState<string[]>([]);
 
+  const categoriasUnicas = Array.from(
+    new Set(categorias.map((c) => c.nome.trim()))
+  ).sort();
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isParsing, setIsParsing] = useState(false);
   const [transactions, setTransactions] = useState<OFXTransaction[] | null>(null);
@@ -66,14 +70,14 @@ export default function ImportPage() {
       }
 
       // Load Categories
-      let queryCat = supabase.from("categorias").select("*").order("nome");
-      if (groupId) {
-        queryCat = queryCat.eq("grupo_id", groupId);
-      } else {
-        queryCat = queryCat.eq("user_id", userId);
-      }
+      let queryCat = supabase
+        .from("categorias")
+        .select("*")
+        .eq("user_id", userId)
+        .order("nome");
       
-      const { data: catData } = await queryCat;
+      const { data: catData, error: catError } = await queryCat;
+      if (catError) console.error("Erro ao carregar categorias:", catError);
       if (catData) setCategorias(catData);
 
       // Load Payment Methods
@@ -144,7 +148,7 @@ export default function ImportPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transactions: transactions.map(t => ({ id: t.id, description: t.description, amount: t.amount, type: t.type })),
-          categories: categorias.map(c => ({ id: c.id.toString(), nome: c.nome })),
+          categories: categoriasUnicas.map((nome: string) => ({ id: nome, nome })),
           history: userHistory
         }),
       });
@@ -188,7 +192,7 @@ export default function ImportPage() {
         user_id: userId,
         grupo_id: activeContext === "grupo" ? currentGroupId : null,
         descricao: t.description.substring(0, 255),
-        categoria: categorias.find(c => c.id.toString() === t.categoryId)?.nome || "Sem Categoria",
+        categoria: t.categoryId || "Sem Categoria",
         tipo: t.type,
         valor: t.amount,
         forma_pagamento: formasPagamento.find(p => p.id.toString() === (t.paymentMethodId || globalPaymentMethodId))?.nome || "Conta Corrente",
@@ -328,8 +332,8 @@ export default function ImportPage() {
                           <SelectValue placeholder="Selecionar Categoria..." />
                         </SelectTrigger>
                         <SelectContent>
-                          {categorias.map((c) => (
-                            <SelectItem key={c.id} value={c.id.toString()}>{c.nome}</SelectItem>
+                          {categoriasUnicas.map((nome: string) => (
+                            <SelectItem key={nome} value={nome}>{nome}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>

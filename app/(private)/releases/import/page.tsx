@@ -234,13 +234,19 @@ export default function ImportPage() {
             />
 
             <Button 
-               className="w-full h-16 justify-start text-lg bg-[#8A05BE] hover:bg-[#8A05BE]/90 text-white font-medium rounded-xl relative overflow-hidden group opacity-50 cursor-not-allowed"
-               disabled
+               className="w-full h-16 justify-start text-lg bg-[#8A05BE] hover:bg-[#8A05BE]/90 text-white font-medium rounded-xl relative overflow-hidden group"
+               onClick={() => fileInputRef.current?.click()}
+               disabled={isParsing}
             >
-              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 shrink-0">
-                <SiNubank className="w-5 h-5" />
+              <div className="absolute inset-0 bg-black/10 opacity-0 group-hover:opacity-100 transition-opacity" />
+              <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center mr-4 shrink-0 overflow-hidden">
+                {isParsing ? (
+                  <ArrowPathIcon className="h-5 w-5 text-white animate-spin" />
+                ) : (
+                  <SiNubank className="w-5 h-5" />
+                )}
               </div>
-              Nubank (Em breve)
+              Nubank
             </Button>
             
             <Button 

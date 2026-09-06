@@ -5,7 +5,7 @@ export const maxDuration = 30;
 
 export async function POST(req: Request) {
   try {
-    const { transactions, categories } = await req.json();
+    const { transactions, categories, history } = await req.json();
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
 
     if (!apiKey) {
@@ -26,6 +26,8 @@ export async function POST(req: Request) {
     const transactionsList = transactions
       .map((t: any) => `ID: ${t.id} | Descrição: "${t.description}" | Valor: ${t.amount} | Tipo: ${t.type}`)
       .join("\n");
+      
+    const historyList = history && history.length > 0 ? history.join("\n") : "Sem histórico prévio.";
 
     const prompt = `Você é um assistente financeiro extremamente inteligente.
 Sua tarefa é analisar uma lista de transações bancárias lidas de um extrato OFX e, para cada transação, escolher a categoria mais adequada dentre as categorias do usuário.
@@ -40,6 +42,9 @@ Siga estas regras:
 1. Analise o campo Descrição. Ex: "Uber", "99App" -> Transporte. "Mcdonalds", "Ifood" -> Alimentação. "Pix enviado para Joao" -> Transferência/Pix.
 2. Você DEVE retornar EXATAMENTE um objeto categoryId (string) correspondente a um dos IDs da lista de categorias disponíveis para CADA transação.
 3. Se não tiver muita certeza, escolha a que melhor se aproxima. Se a descrição for apenas 'Pix Enviado', escolha algo relacionado a Pagamentos ou Transferências.
+4. MUITO IMPORTANTE: O usuário possui um histórico de categorização. Tente SEGUIR o padrão dele sempre que a descrição for parecida.
+Histórico do usuário:
+${historyList}
 
 Retorne o array de resultados.`;
 

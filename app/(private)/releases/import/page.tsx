@@ -30,6 +30,7 @@ export default function ImportPage() {
   const [categorias, setCategorias] = useState<{ id: number; nome: string }[]>([]);
   const [formasPagamento, setFormasPagamento] = useState<{ id: number; nome: string }[]>([]);
   const [currentGroupId, setCurrentGroupId] = useState<string | null>(null);
+  const [userHistory, setUserHistory] = useState<string[]>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isParsing, setIsParsing] = useState(false);
@@ -77,6 +78,18 @@ export default function ImportPage() {
         const cc = payData.find(p => p.nome.toLowerCase().includes("conta corrente"));
         if (cc) setGlobalPaymentMethodId(cc.id.toString());
         else if (payData.length > 0) setGlobalPaymentMethodId(payData[0].id.toString());
+      }
+
+      // Load Recent History for AI
+      let historyQuery = supabase.from("lancamentos").select("descricao, categoria").order("created_at", { ascending: false }).limit(100);
+      if (groupId) {
+        historyQuery = historyQuery.eq("grupo_id", groupId);
+      } else {
+        historyQuery = historyQuery.eq("user_id", userId);
+      }
+      const { data: historyData } = await historyQuery;
+      if (historyData) {
+        setUserHistory(historyData.map(h => `"${h.descricao}" -> ${h.categoria}`));
       }
     }
 
@@ -126,7 +139,8 @@ export default function ImportPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           transactions: transactions.map(t => ({ id: t.id, description: t.description, amount: t.amount, type: t.type })),
-          categories: categorias.map(c => ({ id: c.id.toString(), nome: c.nome }))
+          categories: categorias.map(c => ({ id: c.id.toString(), nome: c.nome })),
+          history: userHistory
         }),
       });
       
@@ -139,10 +153,10 @@ export default function ImportPage() {
       if (data.results) {
         setTransactions(prev => {
           if (!prev) return prev;
-          const map = new Map(data.results.map((r: any) => [r.transactionId, r.categoryId]));
+          const map = new Map<string, string>(data.results.map((r: any) => [r.transactionId, r.categoryId]));
           return prev.map(t => ({
             ...t,
-            categoryId: map.get(t.id) || t.categoryId
+            categoryId: (map.get(t.id) as string) || t.categoryId
           }));
         });
         toast({ title: "Categorização Inteligente concluída!", description: "A IA sugeriu as categorias. Por favor, revise antes de salvar." });

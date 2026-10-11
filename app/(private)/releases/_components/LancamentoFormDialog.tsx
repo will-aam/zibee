@@ -180,9 +180,6 @@ export function LancamentoFormDialog({
         nome: newCategoryName.trim(),
         user_id: userId,
         grupo_id: activeContext === "grupo" ? groupId : null,
-        tipo: formData.tipo === "Receita" ? "receita" : "despesa",
-        cor: "#64748b",
-        icone: "🏷️",
       };
       const { data, error } = await supabase
         .from("categorias")

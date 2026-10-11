@@ -3,6 +3,7 @@
 import * as React from "react";
 import { supabase } from "@/lib/supabase";
 import { authClient } from "@/lib/auth-client";
+import { useToast } from "@/hooks/use-toast";
 import {
   BookmarkSquareIcon,
   PlusIcon,
@@ -24,146 +25,219 @@ interface NoteItem {
 const LOCAL_STORAGE_KEY = "zibee_financial_notes";
 
 export function FinancialNotesWidget({ className }: { className?: string }) {
+  const { toast } = useToast();
   const session = authClient.useSession();
   const userId = session.data?.user?.id;
 
   const [notes, setNotes] = React.useState<NoteItem[]>([]);
   const [newText, setNewText] = React.useState("");
   const [isLoading, setIsLoading] = React.useState(true);
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
 
-  // Carregar notas (Supabase com fallback para localStorage)
+  // Carregar notas do Supabase (com migração de dados do localStorage se houver)
   const loadNotes = React.useCallback(async () => {
-    setIsLoading(true);
-    let loadedFromDb = false;
-
-    if (userId) {
-      try {
-        const { data, error } = await supabase
-          .from("lembretes")
-          .select("*")
-          .eq("user_id", userId)
-          .order("created_at", { ascending: false });
-
-        if (!error && data) {
-          setNotes(
-            data.map((item: any) => ({
-              id: item.id,
-              texto: item.texto,
-              concluido: item.concluido,
-              created_at: item.created_at,
-            }))
-          );
-          loadedFromDb = true;
-        }
-      } catch (err) {
-        console.warn("Tabela 'lembretes' não encontrada no DB, usando localStorage fallback.");
-      }
+    if (!userId) {
+      setIsLoading(false);
+      return;
     }
 
-    if (!loadedFromDb) {
+    setIsLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from("lembretes")
+        .select("*")
+        .eq("user_id", userId)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.error("Erro ao buscar lembretes no banco:", error);
+        toast({
+          title: "Erro ao carregar lembretes",
+          description: error.message,
+          variant: "destructive",
+        });
+        setIsLoading(false);
+        return;
+      }
+
+      let currentNotes: NoteItem[] = (data || []).map((item: any) => ({
+        id: item.id,
+        texto: item.texto,
+        concluido: item.concluido,
+        created_at: item.created_at,
+      }));
+
+      // Migração: se o usuário já tinha notas salvas no localStorage no navegador, migra para o banco
       try {
         const localData = localStorage.getItem(LOCAL_STORAGE_KEY);
         if (localData) {
-          setNotes(JSON.parse(localData));
-        }
-      } catch (e) {
-        console.error("Erro ao ler localStorage:", e);
-      }
-    }
+          const parsedLocal: NoteItem[] = JSON.parse(localData);
+          if (Array.isArray(parsedLocal) && parsedLocal.length > 0) {
+            // Itens locais que ainda não estão no banco (comparando pelo texto)
+            const dbTexts = new Set(currentNotes.map((n) => n.texto.trim()));
+            const toMigrate = parsedLocal.filter((n) => !dbTexts.has(n.texto.trim()));
 
-    setIsLoading(false);
-  }, [userId]);
+            if (toMigrate.length > 0) {
+              const rowsToInsert = toMigrate.map((n) => ({
+                user_id: userId,
+                texto: n.texto.trim(),
+                concluido: !!n.concluido,
+              }));
+
+              const { data: insertedData, error: migrateError } = await supabase
+                .from("lembretes")
+                .insert(rowsToInsert)
+                .select();
+
+              if (!migrateError && insertedData) {
+                const migratedNotes: NoteItem[] = insertedData.map((item: any) => ({
+                  id: item.id,
+                  texto: item.texto,
+                  concluido: item.concluido,
+                  created_at: item.created_at,
+                }));
+                currentNotes = [...migratedNotes, ...currentNotes];
+              }
+            }
+
+            // Remove do localStorage após migrar para não acumular
+            localStorage.removeItem(LOCAL_STORAGE_KEY);
+          }
+        }
+      } catch (migrationErr) {
+        console.warn("Aviso ao migrar notas locais:", migrationErr);
+      }
+
+      setNotes(currentNotes);
+    } catch (err: any) {
+      console.error("Erro inesperado ao carregar lembretes:", err);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [userId, toast]);
 
   React.useEffect(() => {
     loadNotes();
   }, [loadNotes]);
 
-  // Salvar no localStorage como backup local
-  const saveLocalFallback = (updatedNotes: NoteItem[]) => {
-    try {
-      localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(updatedNotes));
-    } catch (e) {
-      console.error("Erro ao salvar localStorage:", e);
-    }
-  };
-
-  // Adicionar Lembrete
+  // Adicionar Lembrete no Banco de Dados
   const handleAddNote = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     const trimmed = newText.trim();
-    if (!trimmed) return;
+    if (!trimmed || !userId || isSubmitting) return;
 
-    const tempId = Date.now().toString();
-    const newNoteObj: NoteItem = {
-      id: tempId,
-      texto: trimmed,
-      concluido: false,
-      created_at: new Date().toISOString(),
-    };
+    setIsSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from("lembretes")
+        .insert([
+          {
+            user_id: userId,
+            texto: trimmed,
+            concluido: false,
+          },
+        ])
+        .select()
+        .single();
 
-    const nextNotes = [newNoteObj, ...notes];
-    setNotes(nextNotes);
-    setNewText("");
-    saveLocalFallback(nextNotes);
-
-    if (userId) {
-      try {
-        const { data, error } = await supabase
-          .from("lembretes")
-          .insert([
-            {
-              user_id: userId,
-              texto: trimmed,
-              concluido: false,
-            },
-          ])
-          .select();
-
-        if (!error && data && data.length > 0) {
-          setNotes((prev) =>
-            prev.map((n) => (n.id === tempId ? { ...n, id: data[0].id } : n))
-          );
-        }
-      } catch (err) {
-        // Ignora erro do DB e mantém local
+      if (error) {
+        toast({
+          title: "Erro ao salvar anotação",
+          description: error.message,
+          variant: "destructive",
+        });
+        return;
       }
+
+      if (data) {
+        const createdNote: NoteItem = {
+          id: data.id,
+          texto: data.texto,
+          concluido: data.concluido,
+          created_at: data.created_at,
+        };
+        setNotes((prev) => [createdNote, ...prev]);
+        setNewText("");
+      }
+    } catch (err: any) {
+      toast({
+        title: "Erro inesperado",
+        description: err.message || "Não foi possível salvar o lembrete.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
-  // Alternar Concluído
+  // Alternar Concluído no Banco de Dados
   const handleToggleConcluido = async (note: NoteItem) => {
-    const nextConcluido = !note.concluido;
-    const nextNotes = notes.map((n) =>
-      n.id === note.id ? { ...n, concluido: nextConcluido } : n
-    );
-    setNotes(nextNotes);
-    saveLocalFallback(nextNotes);
+    if (!userId) return;
 
-    if (userId && typeof note.id !== "string") {
-      try {
-        await supabase
-          .from("lembretes")
-          .update({ concluido: nextConcluido })
-          .eq("id", note.id)
-          .eq("user_id", userId);
-      } catch (err) {
-        // Ignora erro
+    const previousNotes = [...notes];
+    const nextConcluido = !note.concluido;
+
+    // Atualização otimista
+    setNotes((prev) =>
+      prev.map((n) => (n.id === note.id ? { ...n, concluido: nextConcluido } : n))
+    );
+
+    try {
+      const { error } = await supabase
+        .from("lembretes")
+        .update({ concluido: nextConcluido })
+        .eq("id", note.id)
+        .eq("user_id", userId);
+
+      if (error) {
+        setNotes(previousNotes);
+        toast({
+          title: "Erro ao atualizar lembrete",
+          description: error.message,
+          variant: "destructive",
+        });
       }
+    } catch (err: any) {
+      setNotes(previousNotes);
+      toast({
+        title: "Erro ao atualizar lembrete",
+        description: err.message,
+        variant: "destructive",
+      });
     }
   };
 
-  // Excluir Lembrete
+  // Excluir Lembrete do Banco de Dados
   const handleDeleteNote = async (id: string | number) => {
-    const nextNotes = notes.filter((n) => n.id !== id);
-    setNotes(nextNotes);
-    saveLocalFallback(nextNotes);
+    if (!userId) return;
 
-    if (userId && typeof id !== "string") {
-      try {
-        await supabase.from("lembretes").delete().eq("id", id).eq("user_id", userId);
-      } catch (err) {
-        // Ignora erro
+    const previousNotes = [...notes];
+
+    // Atualização otimista
+    setNotes((prev) => prev.filter((n) => n.id !== id));
+
+    try {
+      const { error } = await supabase
+        .from("lembretes")
+        .delete()
+        .eq("id", id)
+        .eq("user_id", userId);
+
+      if (error) {
+        setNotes(previousNotes);
+        toast({
+          title: "Erro ao excluir lembrete",
+          description: error.message,
+          variant: "destructive",
+        });
       }
+    } catch (err: any) {
+      setNotes(previousNotes);
+      toast({
+        title: "Erro ao excluir lembrete",
+        description: err.message,
+        variant: "destructive",
+      });
     }
   };
 
@@ -208,7 +282,7 @@ export function FinancialNotesWidget({ className }: { className?: string }) {
         />
         <Button
           type="submit"
-          disabled={!newText.trim()}
+          disabled={!newText.trim() || isSubmitting}
           size="icon"
           className="h-10 w-10 shrink-0 rounded-xl"
         >
